@@ -1,57 +1,148 @@
-# Micro SaaS Starter Kit
+# Micro SaaS Starter Kit 🚀
 
-A production-ready boilerplate for launching subscription-based web tools with Stripe and Next.js.
+A **production-ready**, **enterprise-grade** boilerplate for launching subscription-based web tools with Stripe and Next.js. This starter kit includes everything you need to ship your SaaS product in days, not months.
 
-## Features
+[![CI](https://github.com/your-repo/actions/workflows/ci.yml/badge.svg)](https://github.com/your-repo/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-- **Next.js 14** with App Router and TypeScript
-- **Authentication** with NextAuth.js (Google & GitHub OAuth)
-- **Payments** with Stripe (subscriptions, billing portal, webhooks)
-- **Database** with Prisma and PostgreSQL
-- **Styling** with Tailwind CSS and Radix UI components
-- **Fully Responsive** design
-- **Production Ready** with proper error handling and security
+## ✨ Features
 
-## Tech Stack
+### 🔐 Authentication & User Management
+- **NextAuth.js** with Google & GitHub OAuth
+- Protected routes with middleware
+- Session management with PostgreSQL
+- User roles (admin, user)
+- Activity logging
 
-- **Framework**: Next.js 14
-- **Language**: TypeScript
-- **Database**: PostgreSQL with Prisma ORM
-- **Authentication**: NextAuth.js
-- **Payments**: Stripe
-- **Styling**: Tailwind CSS
-- **UI Components**: Radix UI
-- **Deployment**: Vercel (recommended)
+### 💳 Payments & Subscriptions
+- **Stripe** integration (checkout, webhooks, billing portal)
+- 4 subscription tiers (Free, Basic, Pro, Enterprise)
+- Automatic subscription status tracking
+- Usage-based billing ready
+- Proration support
 
-## Getting Started
+### 🗄️ Database & ORM
+- **Prisma** ORM with PostgreSQL
+- Complete schema (Users, Subscriptions, API Keys, Webhooks, Activity Logs)
+- Type-safe database queries
+- Automatic migrations
+
+### 🎨 UI/UX
+- **Tailwind CSS** + **Radix UI** components
+- Responsive design (mobile-first)
+- Dark mode ready
+- Loading states & skeletons
+- Toast notifications
+- Beautiful landing page
+
+### 🔑 API & Webhooks
+- **API key management** system
+- Bcrypt-hashed keys for security
+- Webhook management (create, test, monitor)
+- Rate limiting (per-user, per-endpoint)
+- RESTful API structure
+
+### 📊 Analytics & Admin
+- **Admin dashboard** with key metrics
+- User analytics & activity tracking
+- Subscription metrics (MRR, conversion rate)
+- **Vercel Analytics** integration
+- **Speed Insights** monitoring
+
+### 📧 Email & Notifications
+- **Resend** email service
+- Welcome emails
+- Subscription confirmations
+- Cancellation notifications
+- Customizable templates
+
+### 🧪 Testing & Quality
+- **Jest** for unit tests
+- **Playwright** for E2E tests
+- **Prettier** code formatting
+- **ESLint** with Next.js config
+- **Husky** pre-commit hooks
+- **lint-staged** for fast checks
+
+### 🚢 DevOps & Deployment
+- **GitHub Actions** CI/CD pipeline
+- **Docker** & **Docker Compose** support
+- **Vercel** deployment ready
+- **Sentry** error tracking
+- Production optimizations
+- Standalone build output
+
+### 🔒 Security
+- Rate limiting on API routes
+- Stripe webhook signature verification
+- API key hashing with bcrypt
+- Environment variable validation
+- HTTPS enforcement (production)
+- CSRF protection (NextAuth)
+
+## 📦 Tech Stack
+
+| Category | Technology |
+|----------|------------|
+| **Framework** | Next.js 14 (App Router) |
+| **Language** | TypeScript |
+| **Database** | PostgreSQL + Prisma ORM |
+| **Authentication** | NextAuth.js |
+| **Payments** | Stripe |
+| **Styling** | Tailwind CSS + Radix UI |
+| **Email** | Resend |
+| **Error Tracking** | Sentry |
+| **Analytics** | Vercel Analytics |
+| **Testing** | Jest + Playwright |
+| **CI/CD** | GitHub Actions |
+| **Deployment** | Vercel / Docker |
+
+## 🚀 Quick Start
 
 ### Prerequisites
 
-- Node.js 18+ installed
-- PostgreSQL database (local or hosted)
-- Stripe account
-- Google OAuth credentials (optional)
-- GitHub OAuth credentials (optional)
+- **Node.js 18+** installed
+- **PostgreSQL** database (local or hosted)
+- **Stripe** account
+- **Google OAuth** credentials (optional)
+- **GitHub OAuth** credentials (optional)
 
 ### Installation
 
-1. Clone the repository:
+1. **Clone the repository:**
 ```bash
 git clone <your-repo-url>
 cd Micro-SaaS-Starter-Kit
 ```
 
-2. Install dependencies:
+2. **Install dependencies:**
 ```bash
 npm install
 ```
 
-3. Set up environment variables:
+3. **Set up environment variables:**
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` and fill in your credentials:
+Edit `.env` with your credentials (see [Environment Variables](#environment-variables))
+
+4. **Set up the database:**
+```bash
+npm run db:push
+```
+
+5. **Run the development server:**
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) 🎉
+
+## 🔧 Environment Variables
+
+<details>
+<summary>Click to expand full configuration</summary>
 
 ```env
 # Database
@@ -59,7 +150,7 @@ DATABASE_URL="postgresql://user:password@localhost:5432/microsaas?schema=public"
 
 # NextAuth
 NEXTAUTH_URL="http://localhost:3000"
-NEXTAUTH_SECRET="generate-with-openssl-rand-base64-32"
+NEXTAUTH_SECRET="generate-with: openssl rand -base64 32"
 
 # OAuth Providers
 GOOGLE_CLIENT_ID="your-google-client-id"
@@ -71,187 +162,207 @@ GITHUB_SECRET="your-github-client-secret"
 STRIPE_PUBLIC_KEY="pk_test_..."
 STRIPE_SECRET_KEY="sk_test_..."
 STRIPE_WEBHOOK_SECRET="whsec_..."
-
-# Stripe Price IDs (create these in your Stripe dashboard)
 STRIPE_PRICE_ID_BASIC="price_..."
 STRIPE_PRICE_ID_PRO="price_..."
 STRIPE_PRICE_ID_ENTERPRISE="price_..."
+
+# Email
+RESEND_API_KEY="re_..."
+EMAIL_FROM="noreply@yourdomain.com"
+
+# Error Tracking
+NEXT_PUBLIC_SENTRY_DSN="https://..."
+SENTRY_ORG="your-org"
+SENTRY_PROJECT="your-project"
 
 # App Config
 NEXT_PUBLIC_APP_NAME="Micro SaaS"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 ```
 
-4. Set up the database:
+</details>
+
+## 📂 Project Structure
+
+```
+├── app/                          # Next.js app directory
+│   ├── api/                      # API routes
+│   │   ├── auth/                 # NextAuth endpoints
+│   │   ├── keys/                 # API key management
+│   │   ├── stripe/               # Stripe checkout & portal
+│   │   └── webhooks/             # Stripe webhooks
+│   ├── dashboard/                # Protected dashboard
+│   │   ├── admin/                # Admin dashboard
+│   │   ├── api-keys/             # API key management UI
+│   │   └── settings/             # User settings
+│   ├── changelog/                # Public changelog
+│   ├── faq/                      # FAQ page
+│   ├── login/                    # Login page
+│   ├── pricing/                  # Pricing page
+│   └── page.tsx                  # Landing page
+├── components/                   # React components
+│   ├── ui/                       # UI components (Button, Card, etc.)
+│   ├── navbar.tsx                # Navigation
+│   └── pricing-cards.tsx         # Pricing cards
+├── lib/                          # Utility functions
+│   ├── analytics.ts              # Analytics helpers
+│   ├── api-keys.ts               # API key management
+│   ├── auth.ts                   # NextAuth config
+│   ├── email.ts                  # Email service
+│   ├── prisma.ts                 # Prisma client
+│   ├── rate-limit.ts             # Rate limiting
+│   ├── stripe.ts                 # Stripe helpers
+│   ├── subscription.ts           # Subscription logic
+│   └── utils.ts                  # General utilities
+├── prisma/                       # Database
+│   └── schema.prisma             # Database schema
+├── e2e/                          # E2E tests
+├── .github/workflows/            # GitHub Actions
+├── docker-compose.yml            # Docker Compose config
+├── Dockerfile                    # Docker image
+└── README.md                     # You are here
+```
+
+## 🧪 Testing
+
 ```bash
-npm run db:push
+# Unit tests
+npm run test
+
+# Unit tests (watch mode)
+npm test
+
+# E2E tests
+npm run test:e2e
+
+# E2E tests (UI mode)
+npm run test:e2e:ui
 ```
 
-5. Run the development server:
+## 🐳 Docker
+
+### Using Docker Compose (Recommended)
+
 ```bash
-npm run dev
+# Start all services (app + database)
+npm run docker:up
+
+# Stop all services
+npm run docker:down
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to see your app.
+### Building Docker Image
 
-## Stripe Setup
-
-1. Create a Stripe account at [stripe.com](https://stripe.com)
-
-2. Create your subscription products and prices in the Stripe Dashboard
-
-3. Set up webhooks:
-   - For local development: `npm run stripe:listen`
-   - For production: Add your webhook endpoint at `https://your-domain.com/api/webhooks/stripe`
-   - Required events: `checkout.session.completed`, `invoice.payment_succeeded`, `customer.subscription.updated`, `customer.subscription.deleted`
-
-4. Update your `.env` file with the Stripe keys and price IDs
-
-## OAuth Setup
-
-### Google OAuth
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select an existing one
-3. Enable Google+ API
-4. Create OAuth 2.0 credentials
-5. Add authorized redirect URI: `http://localhost:3000/api/auth/callback/google`
-6. Copy Client ID and Client Secret to `.env`
-
-### GitHub OAuth
-
-1. Go to [GitHub Developer Settings](https://github.com/settings/developers)
-2. Create a new OAuth App
-3. Set Homepage URL: `http://localhost:3000`
-4. Set Authorization callback URL: `http://localhost:3000/api/auth/callback/github`
-5. Copy Client ID and Client Secret to `.env`
-
-## Project Structure
-
-```
-├── app/
-│   ├── api/
-│   │   ├── auth/[...nextauth]/    # NextAuth.js routes
-│   │   ├── stripe/                 # Stripe checkout & portal
-│   │   └── webhooks/stripe/        # Stripe webhooks
-│   ├── dashboard/                  # Protected dashboard pages
-│   ├── login/                      # Login page
-│   ├── pricing/                    # Pricing page
-│   └── page.tsx                    # Landing page
-├── components/
-│   ├── ui/                         # Reusable UI components
-│   ├── navbar.tsx                  # Navigation bar
-│   └── pricing-cards.tsx           # Pricing cards component
-├── lib/
-│   ├── auth.ts                     # NextAuth configuration
-│   ├── prisma.ts                   # Prisma client
-│   ├── stripe.ts                   # Stripe helpers
-│   ├── subscription.ts             # Subscription logic
-│   └── utils.ts                    # Utility functions
-├── prisma/
-│   └── schema.prisma               # Database schema
-└── types/
-    └── next-auth.d.ts              # NextAuth type extensions
+```bash
+docker build -t micro-saas .
+docker run -p 3000:3000 micro-saas
 ```
 
-## Database Schema
-
-The app uses a PostgreSQL database with the following main tables:
-
-- **User**: User accounts with Stripe customer info
-- **Account**: OAuth account connections
-- **Session**: User sessions
-- **VerificationToken**: Email verification tokens
-
-## Deployment
+## 🚢 Deployment
 
 ### Vercel (Recommended)
 
 1. Push your code to GitHub
-2. Import your repository in Vercel
+2. Import repository in [Vercel](https://vercel.com)
 3. Add environment variables
-4. Deploy!
+4. Deploy! 🎉
 
 ### Other Platforms
 
-This is a standard Next.js app and can be deployed to any platform that supports Node.js:
-
+Works with any platform supporting Node.js:
 - Railway
 - Render
 - DigitalOcean App Platform
 - AWS Amplify
-- etc.
+- Fly.io
 
-## Environment Variables for Production
+## 📝 Scripts
 
-Make sure to update these for production:
+| Script | Description |
+|--------|-------------|
+| `npm run dev` | Start development server |
+| `npm run build` | Build for production |
+| `npm start` | Start production server |
+| `npm run lint` | Run ESLint |
+| `npm run format` | Format code with Prettier |
+| `npm run type-check` | TypeScript type checking |
+| `npm run test` | Run unit tests |
+| `npm run test:e2e` | Run E2E tests |
+| `npm run db:push` | Push database schema |
+| `npm run db:studio` | Open Prisma Studio |
+| `npm run stripe:listen` | Listen to Stripe webhooks |
 
-- `NEXTAUTH_URL`: Your production domain
-- `NEXT_PUBLIC_APP_URL`: Your production domain
-- `STRIPE_PUBLIC_KEY`: Your live Stripe public key
-- `STRIPE_SECRET_KEY`: Your live Stripe secret key
-- `STRIPE_WEBHOOK_SECRET`: Your production webhook secret
-- `STRIPE_PRICE_ID_*`: Your live Stripe price IDs
+## 🔐 API Key Usage
 
-## Customization
+Users can generate API keys from `/dashboard/api-keys`:
+
+```bash
+curl -H "Authorization: Bearer sk_..." \
+  https://your-domain.com/api/your-endpoint
+```
+
+## 📊 Admin Dashboard
+
+Access admin features at `/dashboard/admin` (requires admin role):
+- Total users & active subscriptions
+- Conversion rates & MRR
+- Recent user signups
+- Users by plan distribution
+
+## 🎨 Customization
 
 ### Branding
 
 1. Update `NEXT_PUBLIC_APP_NAME` in `.env`
-2. Replace logo and images in the landing page
-3. Customize colors in `tailwind.config.ts`
+2. Replace colors in `tailwind.config.ts`
+3. Update logo and images
 
 ### Subscription Plans
 
-Edit `lib/subscription.ts` to modify:
-- Plan names, prices, and features
+Edit `lib/subscription.ts` to customize:
+- Plan names & prices
+- Features list
 - Usage limits
-- Plan comparison
 
-### Features
+### Email Templates
 
-Add your SaaS features by:
-1. Creating new pages in `app/`
-2. Adding API routes in `app/api/`
-3. Updating the database schema in `prisma/schema.prisma`
+Modify email templates in `lib/email.ts`
 
-## Security Best Practices
+## 🤝 Contributing
 
-- ✅ Environment variables for secrets
-- ✅ HTTPS in production (handled by hosting platform)
-- ✅ Stripe webhook signature verification
-- ✅ NextAuth.js for secure authentication
-- ✅ Database connection pooling with Prisma
-- ✅ Server-side session validation
-- ✅ CSRF protection (built into NextAuth)
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md)
 
-## Scripts
+1. Fork the repository
+2. Create your feature branch
+3. Commit your changes
+4. Push to the branch
+5. Open a Pull Request
 
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm start` - Start production server
-- `npm run lint` - Run ESLint
-- `npm run db:push` - Push database schema changes
-- `npm run db:studio` - Open Prisma Studio
-- `npm run stripe:listen` - Listen to Stripe webhooks locally
+## 📄 License
 
-## Support
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-For issues and questions:
-- Check the [documentation](https://nextjs.org/docs)
-- Review [Stripe docs](https://stripe.com/docs)
-- Check [NextAuth.js docs](https://next-auth.js.org)
+## 🙏 Acknowledgments
 
-## License
-
-MIT License - feel free to use this for your own projects!
-
-## Credits
-
-Built with:
+Built with amazing open-source tools:
 - [Next.js](https://nextjs.org)
 - [NextAuth.js](https://next-auth.js.org)
 - [Stripe](https://stripe.com)
 - [Prisma](https://prisma.io)
 - [Tailwind CSS](https://tailwindcss.com)
 - [Radix UI](https://radix-ui.com)
+
+## 📞 Support
+
+- 📧 Email: support@example.com
+- 💬 Discord: [Join our community](#)
+- 📚 Docs: [Read the docs](#)
+- 🐛 Issues: [GitHub Issues](https://github.com/your-repo/issues)
+
+## ⭐ Star History
+
+If you find this project helpful, please consider giving it a star!
+
+---
+
+**Made with ❤️ for the SaaS community**
