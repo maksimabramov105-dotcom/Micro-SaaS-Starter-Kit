@@ -44,6 +44,11 @@ model User {
   sessions      Session[]
   apiKeys       ApiKey[]
   webhooks      Webhook[]
+  notifications Notification[]
+  ownedTeams    Team[]    @relation("TeamOwner")
+  teamMembers   TeamMember[]
+  invitedBy     String?
+  referralCode  String?   @unique
 
   stripeCustomerId       String?   @unique
   stripeSubscriptionId   String?   @unique
@@ -51,12 +56,24 @@ model User {
   stripeCurrentPeriodEnd DateTime?
 
   role          String    @default("user")
+  permissions   String[]  @default(["read"])
   onboarded     Boolean   @default(false)
+  onboardingStep Int      @default(0)
   usageCount    Int       @default(0)
+  usageLimit    Int       @default(1000)
+  credits       Int       @default(0)
   lastActiveAt  DateTime  @default(now())
+
+  twoFactorEnabled Boolean @default(false)
+  twoFactorSecret  String?
+
+  preferences   Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([referralCode])
 }
 
 model VerificationToken {
@@ -104,5 +121,149 @@ model ActivityLog {
   createdAt DateTime @default(now())
 
   @@index([userId])
+  @@index([createdAt])
+}
+
+model Team {
+  id          String       @id @default(cuid())
+  name        String
+  slug        String       @unique
+  logo        String?
+  ownerId     String
+  owner       User         @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members     TeamMember[]
+  invites     TeamInvite[]
+
+  stripeCustomerId       String?   @unique
+  stripeSubscriptionId   String?   @unique
+  stripePriceId          String?
+  stripeCurrentPeriodEnd DateTime?
+
+  settings    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([ownerId])
+  @@index([slug])
+}
+
+model TeamMember {
+  id        String   @id @default(cuid())
+  teamId    String
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String   @default("member")
+  permissions String[] @default(["read"])
+  createdAt DateTime @default(now())
+
+  @@unique([teamId, userId])
+  @@index([teamId])
+  @@index([userId])
+}
+
+model TeamInvite {
+  id        String   @id @default(cuid())
+  teamId    String
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  email     String
+  role      String   @default("member")
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([teamId])
+  @@index([email])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      String   @default("info")
+  read      Boolean  @default(false)
+  actionUrl String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId, read])
+  @@index([createdAt])
+}
+
+model FeatureFlag {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  enabled     Boolean  @default(false)
+  rolloutPercentage Int @default(0)
+  conditions  Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([name])
+}
+
+model Referral {
+  id            String   @id @default(cuid())
+  referrerId    String
+  referredEmail String?
+  referredId    String?
+  status        String   @default("pending")
+  reward        Int      @default(0)
+  metadata      Json?
+  createdAt     DateTime @default(now())
+  completedAt   DateTime?
+
+  @@index([referrerId])
+  @@index([referredId])
+}
+
+model Upload {
+  id        String   @id @default(cuid())
+  userId    String
+  filename  String
+  url       String
+  size      Int
+  mimeType  String
+  key       String   @unique
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([key])
+}
+
+model UsageRecord {
+  id        String   @id @default(cuid())
+  userId    String
+  teamId    String?
+  feature   String
+  quantity  Int      @default(1)
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([teamId])
+  @@index([feature])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  teamId      String?
+  action      String
+  resource    String
+  resourceId  String?
+  changes     Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([teamId])
+  @@index([resource, resourceId])
   @@index([createdAt])
 }
