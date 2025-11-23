@@ -267,3 +267,180 @@ model AuditLog {
   @@index([resource, resourceId])
   @@index([createdAt])
 }
+
+model Invoice {
+  id            String   @id @default(cuid())
+  userId        String
+  teamId        String?
+  invoiceNumber String   @unique
+  stripeInvoiceId String? @unique
+  status        String   @default("draft")
+  amount        Int
+  currency      String   @default("usd")
+  tax           Int      @default(0)
+  items         Json
+  paidAt        DateTime?
+  dueDate       DateTime?
+  metadata      Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId])
+  @@index([teamId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model SupportTicket {
+  id          String   @id @default(cuid())
+  userId      String
+  subject     String
+  description String   @db.Text
+  status      String   @default("open")
+  priority    String   @default("medium")
+  category    String?
+  assignedTo  String?
+  messages    SupportMessage[]
+  metadata    Json?
+  closedAt    DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([priority])
+  @@index([createdAt])
+}
+
+model SupportMessage {
+  id        String   @id @default(cuid())
+  ticketId  String
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  userId    String
+  message   String   @db.Text
+  isStaff   Boolean  @default(false)
+  attachments Json?
+  createdAt DateTime @default(now())
+
+  @@index([ticketId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model OnboardingStep {
+  id          String   @id @default(cuid())
+  userId      String
+  step        String
+  completed   Boolean  @default(false)
+  data        Json?
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, step])
+  @@index([userId])
+  @@index([completed])
+}
+
+model AnalyticsEvent {
+  id         String   @id @default(cuid())
+  userId     String?
+  sessionId  String?
+  event      String
+  properties Json?
+  page       String?
+  referrer   String?
+  userAgent  String?
+  ipAddress  String?
+  country    String?
+  city       String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([sessionId])
+  @@index([event])
+  @@index([createdAt])
+}
+
+model Feedback {
+  id        String   @id @default(cuid())
+  userId    String?
+  type      String   @default("feature")
+  title     String
+  description String @db.Text
+  status    String   @default("under_review")
+  votes     Int      @default(0)
+  voters    String[] @default([])
+  category  String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([type])
+  @@index([status])
+  @@index([votes])
+  @@index([createdAt])
+}
+
+model Consent {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  version   String
+  accepted  Boolean  @default(false)
+  ipAddress String?
+  userAgent String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@unique([userId, type, version])
+  @@index([userId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model PasswordHistory {
+  id           String   @id @default(cuid())
+  userId       String
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model LoginAttempt {
+  id         String   @id @default(cuid())
+  email      String
+  ipAddress  String
+  userAgent  String?
+  success    Boolean  @default(false)
+  failReason String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([email])
+  @@index([ipAddress])
+  @@index([success])
+  @@index([createdAt])
+}
+
+model DeviceSession {
+  id          String   @id @default(cuid())
+  userId      String
+  deviceId    String
+  deviceName  String?
+  deviceType  String?
+  browser     String?
+  os          String?
+  ipAddress   String
+  location    String?
+  lastActive  DateTime @default(now())
+  trusted     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, deviceId])
+  @@index([userId])
+  @@index([deviceId])
+  @@index([lastActive])
+}
