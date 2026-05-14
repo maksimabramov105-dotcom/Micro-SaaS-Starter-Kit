@@ -23,6 +23,12 @@ log() { echo "[$(date -u +%T)] $*"; }
 log "▶ Deploying tag=${IMAGE_TAG}"
 cd "$DEPLOY_DIR"
 
+# ── 0. Login to GHCR ─────────────────────────────────────────────────────────
+if [[ -n "${GHCR_TOKEN:-}" ]]; then
+  log "Logging in to GHCR…"
+  echo "$GHCR_TOKEN" | docker login ghcr.io -u "$OWNER" --password-stdin
+fi
+
 # ── 1. Pull new images ────────────────────────────────────────────────────────
 log "Pulling images…"
 WEB_IMAGE="$WEB_IMAGE" WORKER_IMAGE="$WORKER_IMAGE" \

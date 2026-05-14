@@ -96,12 +96,14 @@ jobs:
     steps:
       - name: SSH deploy
         uses: appleboy/ssh-action@v1
+        env:
+          # Expose GHCR_TOKEN to the remote shell so deploy.sh can docker-login
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
         with:
           host:     ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key:      ${{ secrets.VPS_SSH_KEY }}
-          # Pass the image tag so deploy.sh knows which version to pull
-          envs: GITHUB_SHA
+          envs: GITHUB_SHA,GHCR_TOKEN
           script: |
             export IMAGE_TAG="${GITHUB_SHA}"
             export OWNER="${{ env.OWNER }}"
