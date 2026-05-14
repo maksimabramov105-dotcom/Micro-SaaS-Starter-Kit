@@ -109,6 +109,9 @@ jobs:
             export OWNER="${{ env.OWNER }}"
             # Login to GHCR so docker can pull private images
             echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${OWNER}" --password-stdin
+            # Free ports 80/443 — nginx must not run alongside Caddy
+            systemctl stop nginx 2>/dev/null || true
+            systemctl disable nginx 2>/dev/null || true
             bash /opt/resumeai/scripts/deploy.sh
 
       - name: Notify success
