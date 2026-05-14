@@ -1,0 +1,21 @@
+resumeai-bot.ru, www.resumeai-bot.ru {
+	encode gzip
+
+	# Strip /api/worker prefix and proxy to the Python FastAPI worker.
+	# /api/worker/health  →  worker:8000/health
+	# /api/worker/jobs/*  →  worker:8000/jobs/*
+	handle_path /api/worker/* {
+		reverse_proxy worker:8000
+	}
+
+	# Everything else goes to the Next.js app.
+	reverse_proxy * web:3000
+
+	log {
+		output file /var/log/caddy/access.log {
+			roll_size 50mb
+			roll_keep 5
+		}
+		format json
+	}
+}

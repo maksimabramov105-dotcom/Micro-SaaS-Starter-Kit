@@ -1,0 +1,113 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: production
+  cancel-in-progress: false   # never cancel a running deploy
+
+env:
+  REGISTRY: ghcr.io
+  OWNER: ${{ github.repository_owner }}
+
+jobs:
+  # ── 1. Quality gate ──────────────────────────────────────────────────────────
+  test:
+    name: Test & type-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Type-check
+        run: npm run type-check
+
+      - name: Unit tests
+        run: npm run test:ci
+
+      - name: Prisma schema validate
+        # No real DB needed — just checks schema syntax
+        run: |
+          DATABASE_URL=postgresql://x:x@localhost:5432/x \
+          npx prisma validate
+
+  # ── 2. Build & push images to GHCR ──────────────────────────────────────────
+  build:
+    name: Build & push Docker images
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_tag: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ── web image ─────────────────────────────────────────────────────────
+      - name: Build & push web
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ env.OWNER }}/resumeai-web:${{ github.sha }}
+            ghcr.io/${{ env.OWNER }}/resumeai-web:latest
+          cache-from: type=gha,scope=web
+          cache-to:   type=gha,scope=web,mode=max
+
+      # ── worker image ──────────────────────────────────────────────────────
+      - name: Build & push worker
+        uses: docker/build-push-action@v5
+        with:
+          context: ./worker
+          push: true
+          tags: |
+            ghcr.io/${{ env.OWNER }}/resumeai-worker:${{ github.sha }}
+            ghcr.io/${{ env.OWNER }}/resumeai-worker:latest
+          cache-from: type=gha,scope=worker
+          cache-to:   type=gha,scope=worker,mode=max
+
+  # ── 3. Deploy to VPS ─────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to VPS
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: SSH deploy
+        uses: appleboy/ssh-action@v1
+        with:
+          host:     ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key:      ${{ secrets.VPS_SSH_KEY }}
+          # Pass the image tag so deploy.sh knows which version to pull
+          envs: GITHUB_SHA
+          script: |
+            export IMAGE_TAG="${GITHUB_SHA}"
+            export OWNER="${{ env.OWNER }}"
+            bash /opt/resumeai/scripts/deploy.sh
+
+      - name: Notify success
+        if: success()
+        run: |
+          echo "✅ Deployed ${{ github.sha }} to production"
