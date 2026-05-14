@@ -1,5 +1,8 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // Include Alpine/musl (x86_64 + ARM64) engines so Docker builds work.
+  // "native" covers macOS dev; the musl targets cover node:20-alpine (openssl 3).
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "linux-musl-arm64-openssl-3.0.x"]
 }
 
 datasource db {
