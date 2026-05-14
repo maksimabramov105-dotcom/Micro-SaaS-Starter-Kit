@@ -1,4 +1,4 @@
-FROM node:20-alpine AS base
+FROM node:22-alpine AS base
 # openssl is installed in base so every stage can detect the version for Prisma
 RUN apk add --no-cache libc6-compat openssl
 
