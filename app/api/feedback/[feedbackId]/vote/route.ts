@@ -5,15 +5,16 @@ import { upvoteFeedback, removeUpvote } from '@/lib/feedback'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { feedbackId: string } }
+  { params }: { params: Promise<{ feedbackId: string }> }
 ) {
   try {
+    const { feedbackId } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const feedback = await upvoteFeedback(params.feedbackId, session.user.id)
+    const feedback = await upvoteFeedback(feedbackId, session.user.id)
     return NextResponse.json(feedback)
   } catch (error: any) {
     console.error('Error upvoting feedback:', error)
@@ -31,15 +32,16 @@ export async function POST(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { feedbackId: string } }
+  { params }: { params: Promise<{ feedbackId: string }> }
 ) {
   try {
+    const { feedbackId } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const feedback = await removeUpvote(params.feedbackId, session.user.id)
+    const feedback = await removeUpvote(feedbackId, session.user.id)
     return NextResponse.json(feedback)
   } catch (error: any) {
     console.error('Error removing upvote:', error)

@@ -7,6 +7,7 @@
  */
 
 import { prisma } from './prisma'
+import { Prisma } from '@prisma/client'
 import { createNotification } from './notifications'
 
 export type OnboardingStepType =
@@ -172,7 +173,7 @@ export async function resetOnboarding(userId: string): Promise<void> {
     data: {
       completed: false,
       completedAt: null,
-      data: null,
+      data: Prisma.JsonNull,
     },
   })
 

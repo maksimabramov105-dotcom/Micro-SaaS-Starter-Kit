@@ -15,7 +15,7 @@ export async function generate2FASecret(userId: string, email: string) {
   }
 }
 
-export async function verify2FAToken(secret: string, token: string): boolean {
+export async function verify2FAToken(secret: string, token: string): Promise<boolean> {
   return speakeasy.totp.verify({
     secret,
     encoding: 'base32',
