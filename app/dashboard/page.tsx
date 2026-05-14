@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { getUserPlan, isSubscriptionActive } from '@/lib/subscription'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { formatDate } from '@/lib/utils'
 
 export default async function DashboardPage() {
@@ -115,7 +116,7 @@ function ManageBillingButton() {
 
       const data = await response.json()
       if (data.url) {
-        return { url: data.url }
+        redirect(data.url)
       }
     }}>
       <ManageBillingButtonClient />

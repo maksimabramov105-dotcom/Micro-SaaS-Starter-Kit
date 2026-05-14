@@ -10,15 +10,16 @@ import {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { ticketId: string } }
+  { params }: { params: Promise<{ ticketId: string }> }
 ) {
   try {
+    const { ticketId } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const ticket = await getTicket(params.ticketId)
+    const ticket = await getTicket(ticketId)
 
     if (!ticket) {
       return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
@@ -42,9 +43,10 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { ticketId: string } }
+  { params }: { params: Promise<{ ticketId: string }> }
 ) {
   try {
+    const { ticketId } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -60,7 +62,7 @@ export async function POST(
       )
     }
 
-    const ticket = await getTicket(params.ticketId)
+    const ticket = await getTicket(ticketId)
     if (!ticket) {
       return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
     }
@@ -71,7 +73,7 @@ export async function POST(
     }
 
     const ticketMessage = await addTicketMessage({
-      ticketId: params.ticketId,
+      ticketId,
       userId: session.user.id,
       message,
       isStaff: isAdmin,
@@ -89,9 +91,10 @@ export async function POST(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { ticketId: string } }
+  { params }: { params: Promise<{ ticketId: string }> }
 ) {
   try {
+    const { ticketId } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user?.id || session.user.role !== 'admin') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -100,17 +103,20 @@ export async function PATCH(
     const body = await request.json()
     const { status, priority } = body
 
-    let ticket = await getTicket(params.ticketId)
-    if (!ticket) {
+    const existing = await getTicket(ticketId)
+    if (!existing) {
       return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
     }
 
+    // updateTicketStatus/Priority return the base ticket without relations;
+    // merge with existing to preserve the messages relation for the response.
+    let ticket: typeof existing = existing
     if (status) {
-      ticket = await updateTicketStatus(params.ticketId, status)
+      ticket = { ...existing, ...(await updateTicketStatus(ticketId, status)) }
     }
 
     if (priority) {
-      ticket = await updateTicketPriority(params.ticketId, priority)
+      ticket = { ...existing, ...(await updateTicketPriority(ticketId, priority)) }
     }
 
     return NextResponse.json(ticket)

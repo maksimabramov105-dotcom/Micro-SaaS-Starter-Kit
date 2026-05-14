@@ -71,7 +71,7 @@ export function PricingCards() {
             <Button
               className="w-full"
               variant={plan.slug === 'pro' ? 'default' : 'outline'}
-              onClick={() => handleSubscribe(plan.priceId.monthly, plan.slug)}
+              onClick={() => handleSubscribe(plan.priceId.monthly ?? null, plan.slug)}
               disabled={isLoading === plan.slug || plan.slug === 'free'}
             >
               {isLoading === plan.slug
