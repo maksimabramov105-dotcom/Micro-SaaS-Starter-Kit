@@ -43,12 +43,7 @@ model User {
   accounts      Account[]
   sessions      Session[]
   apiKeys       ApiKey[]
-  webhooks      Webhook[]
   notifications Notification[]
-  ownedTeams    Team[]    @relation("TeamOwner")
-  teamMembers   TeamMember[]
-  invitedBy     String?
-  referralCode  String?   @unique
 
   stripeCustomerId       String?   @unique
   stripeSubscriptionId   String?   @unique
@@ -63,17 +58,12 @@ model User {
   usageLimit    Int       @default(1000)
   credits       Int       @default(0)
   lastActiveAt  DateTime  @default(now())
-
-  twoFactorEnabled Boolean @default(false)
-  twoFactorSecret  String?
-
   preferences   Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([email])
-  @@index([referralCode])
 }
 
 model VerificationToken {
@@ -97,20 +87,6 @@ model ApiKey {
   @@index([userId])
 }
 
-model Webhook {
-  id          String   @id @default(cuid())
-  url         String
-  events      String[]
-  secret      String
-  enabled     Boolean  @default(true)
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  lastTriggered DateTime?
-  createdAt   DateTime @default(now())
-
-  @@index([userId])
-}
-
 model ActivityLog {
   id        String   @id @default(cuid())
   userId    String?
@@ -122,58 +98,6 @@ model ActivityLog {
 
   @@index([userId])
   @@index([createdAt])
-}
-
-model Team {
-  id          String       @id @default(cuid())
-  name        String
-  slug        String       @unique
-  logo        String?
-  ownerId     String
-  owner       User         @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  members     TeamMember[]
-  invites     TeamInvite[]
-
-  stripeCustomerId       String?   @unique
-  stripeSubscriptionId   String?   @unique
-  stripePriceId          String?
-  stripeCurrentPeriodEnd DateTime?
-
-  settings    Json?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([ownerId])
-  @@index([slug])
-}
-
-model TeamMember {
-  id        String   @id @default(cuid())
-  teamId    String
-  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role      String   @default("member")
-  permissions String[] @default(["read"])
-  createdAt DateTime @default(now())
-
-  @@unique([teamId, userId])
-  @@index([teamId])
-  @@index([userId])
-}
-
-model TeamInvite {
-  id        String   @id @default(cuid())
-  teamId    String
-  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  email     String
-  role      String   @default("member")
-  token     String   @unique
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-
-  @@index([teamId])
-  @@index([email])
 }
 
 model Notification {
@@ -190,34 +114,6 @@ model Notification {
 
   @@index([userId, read])
   @@index([createdAt])
-}
-
-model FeatureFlag {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  description String?
-  enabled     Boolean  @default(false)
-  rolloutPercentage Int @default(0)
-  conditions  Json?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([name])
-}
-
-model Referral {
-  id            String   @id @default(cuid())
-  referrerId    String
-  referredEmail String?
-  referredId    String?
-  status        String   @default("pending")
-  reward        Int      @default(0)
-  metadata      Json?
-  createdAt     DateTime @default(now())
-  completedAt   DateTime?
-
-  @@index([referrerId])
-  @@index([referredId])
 }
 
 model Upload {
@@ -291,56 +187,6 @@ model Invoice {
   @@index([createdAt])
 }
 
-model SupportTicket {
-  id          String   @id @default(cuid())
-  userId      String
-  subject     String
-  description String   @db.Text
-  status      String   @default("open")
-  priority    String   @default("medium")
-  category    String?
-  assignedTo  String?
-  messages    SupportMessage[]
-  metadata    Json?
-  closedAt    DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([userId])
-  @@index([status])
-  @@index([priority])
-  @@index([createdAt])
-}
-
-model SupportMessage {
-  id        String   @id @default(cuid())
-  ticketId  String
-  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  userId    String
-  message   String   @db.Text
-  isStaff   Boolean  @default(false)
-  attachments Json?
-  createdAt DateTime @default(now())
-
-  @@index([ticketId])
-  @@index([userId])
-  @@index([createdAt])
-}
-
-model OnboardingStep {
-  id          String   @id @default(cuid())
-  userId      String
-  step        String
-  completed   Boolean  @default(false)
-  data        Json?
-  completedAt DateTime?
-  createdAt   DateTime @default(now())
-
-  @@unique([userId, step])
-  @@index([userId])
-  @@index([completed])
-}
-
 model AnalyticsEvent {
   id         String   @id @default(cuid())
   userId     String?
@@ -358,27 +204,6 @@ model AnalyticsEvent {
   @@index([userId])
   @@index([sessionId])
   @@index([event])
-  @@index([createdAt])
-}
-
-model Feedback {
-  id        String   @id @default(cuid())
-  userId    String?
-  type      String   @default("feature")
-  title     String
-  description String @db.Text
-  status    String   @default("under_review")
-  votes     Int      @default(0)
-  voters    String[] @default([])
-  category  String?
-  metadata  Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([userId])
-  @@index([type])
-  @@index([status])
-  @@index([votes])
   @@index([createdAt])
 }
 

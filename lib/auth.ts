@@ -1,6 +1,7 @@
 import { NextAuthOptions } from 'next-auth'
 import GoogleProvider from 'next-auth/providers/google'
 import GitHubProvider from 'next-auth/providers/github'
+import EmailProvider from 'next-auth/providers/email'
 import { PrismaAdapter } from '@next-auth/prisma-adapter'
 import { prisma } from './prisma'
 
@@ -15,6 +16,17 @@ export const authOptions: NextAuthOptions = {
       clientId: process.env.GITHUB_ID!,
       clientSecret: process.env.GITHUB_SECRET!,
     }),
+    EmailProvider({
+      server: {
+        host: 'smtp.resend.com',
+        port: 465,
+        auth: {
+          user: 'resend',
+          pass: process.env.RESEND_API_KEY,
+        },
+      },
+      from: process.env.RESEND_FROM ?? 'noreply@resumeai-bot.ru',
+    }),
   ],
   pages: {
     signIn: '/login',
@@ -24,6 +36,7 @@ export const authOptions: NextAuthOptions = {
     async session({ session, user }) {
       if (session.user) {
         session.user.id = user.id
+        session.user.role = (user as any).role
         const dbUser = await prisma.user.findUnique({
           where: { id: user.id },
           select: {
@@ -31,14 +44,15 @@ export const authOptions: NextAuthOptions = {
             stripeSubscriptionId: true,
             stripePriceId: true,
             stripeCurrentPeriodEnd: true,
+            role: true,
           },
         })
-
         if (dbUser) {
           session.user.stripeCustomerId = dbUser.stripeCustomerId
           session.user.stripeSubscriptionId = dbUser.stripeSubscriptionId
           session.user.stripePriceId = dbUser.stripePriceId
           session.user.stripeCurrentPeriodEnd = dbUser.stripeCurrentPeriodEnd
+          session.user.role = dbUser.role
         }
       }
       return session
