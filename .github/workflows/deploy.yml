@@ -107,6 +107,8 @@ jobs:
           script: |
             export IMAGE_TAG="${GITHUB_SHA}"
             export OWNER="${{ env.OWNER }}"
+            # Login to GHCR so docker can pull private images
+            echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${OWNER}" --password-stdin
             bash /opt/resumeai/scripts/deploy.sh
 
       - name: Notify success
