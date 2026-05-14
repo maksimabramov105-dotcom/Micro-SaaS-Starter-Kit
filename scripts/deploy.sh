@@ -41,7 +41,8 @@ WEB_IMAGE="$WEB_IMAGE" WORKER_IMAGE="$WORKER_IMAGE" \
 
 # ── 3. Run database migrations ────────────────────────────────────────────────
 log "Running Prisma migrations…"
-docker compose exec -T web npx prisma migrate deploy
+# Use the prisma CLI bundled in the image (avoids npx downloading latest incompatible version)
+docker compose exec -T web ./node_modules/.bin/prisma migrate deploy
 
 # ── 4. Wait for services to become healthy ────────────────────────────────────
 log "Waiting 15 s for services to stabilise…"

@@ -107,11 +107,42 @@ jobs:
           script: |
             export IMAGE_TAG="${GITHUB_SHA}"
             export OWNER="${{ env.OWNER }}"
-            # Login to GHCR so docker can pull private images
+
+            # ── Auth ────────────────────────────────────────────────────────────
             echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${OWNER}" --password-stdin
-            # Free ports 80/443 — nginx must not run alongside Caddy
+
+            # ── Free ports 80/443 — Caddy needs them ────────────────────────────
             systemctl stop nginx 2>/dev/null || true
             systemctl disable nginx 2>/dev/null || true
+
+            # ── Sync deploy.sh from CI (always latest, never stale) ─────────────
+            mkdir -p /opt/resumeai/scripts
+            cat > /opt/resumeai/scripts/deploy.sh << 'DEPLOY_EOF'
+            #!/usr/bin/env bash
+            set -euo pipefail
+            DEPLOY_DIR="${DEPLOY_DIR:-/opt/resumeai}"
+            REGISTRY="ghcr.io"
+            IMAGE_TAG="${IMAGE_TAG:-latest}"
+            OWNER="${OWNER:-maksimabramov105-dotcom}"
+            WEB_IMAGE="${REGISTRY}/${OWNER}/resumeai-web:${IMAGE_TAG}"
+            WORKER_IMAGE="${REGISTRY}/${OWNER}/resumeai-worker:${IMAGE_TAG}"
+            log() { echo "[$(date -u +%T)] $*"; }
+            log "Deploying tag=${IMAGE_TAG}"
+            cd "$DEPLOY_DIR"
+            log "Pulling images..."
+            WEB_IMAGE="$WEB_IMAGE" WORKER_IMAGE="$WORKER_IMAGE" docker compose pull web worker
+            log "Restarting services..."
+            WEB_IMAGE="$WEB_IMAGE" WORKER_IMAGE="$WORKER_IMAGE" docker compose up -d --remove-orphans --no-build
+            log "Running Prisma migrations..."
+            docker compose exec -T web ./node_modules/.bin/prisma migrate deploy
+            log "Waiting 15s for services to stabilise..."
+            sleep 15
+            log "Running smoke tests..."
+            bash "${DEPLOY_DIR}/scripts/smoke_test.sh"
+            log "Deploy complete — tag=${IMAGE_TAG}"
+            DEPLOY_EOF
+            chmod +x /opt/resumeai/scripts/deploy.sh
+
             bash /opt/resumeai/scripts/deploy.sh
 
       - name: Notify success
