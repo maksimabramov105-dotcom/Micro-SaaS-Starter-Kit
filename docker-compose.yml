@@ -39,6 +39,9 @@ services:
 
   # ── Next.js web ────────────────────────────────────────────────────────────
   web:
+    # WEB_IMAGE is set in production to the GHCR image (e.g. ghcr.io/org/resumeai-web:sha-abc).
+    # When unset (local dev), docker compose builds from the Dockerfile.
+    image: ${WEB_IMAGE:-resumeai-web:local}
     build:
       context: .
       dockerfile: Dockerfile
@@ -80,6 +83,8 @@ services:
 
   # ── Python FastAPI worker ──────────────────────────────────────────────────
   worker:
+    # WORKER_IMAGE is set in production to the GHCR image.
+    image: ${WORKER_IMAGE:-resumeai-worker:local}
     build:
       context: worker
       dockerfile: Dockerfile
