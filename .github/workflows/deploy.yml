@@ -134,7 +134,7 @@ jobs:
             log "Restarting services..."
             WEB_IMAGE="$WEB_IMAGE" WORKER_IMAGE="$WORKER_IMAGE" docker compose up -d --remove-orphans --no-build
             log "Running Prisma migrations..."
-            docker compose exec -T web ./node_modules/.bin/prisma migrate deploy
+            docker compose exec -T web node node_modules/prisma/build/index.js migrate deploy
             log "Waiting 15s for services to stabilise..."
             sleep 15
             log "Running smoke tests..."

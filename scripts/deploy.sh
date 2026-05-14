@@ -41,8 +41,9 @@ WEB_IMAGE="$WEB_IMAGE" WORKER_IMAGE="$WORKER_IMAGE" \
 
 # ── 3. Run database migrations ────────────────────────────────────────────────
 log "Running Prisma migrations…"
-# Use the prisma CLI bundled in the image (avoids npx downloading latest incompatible version)
-docker compose exec -T web ./node_modules/.bin/prisma migrate deploy
+# Invoke index.js directly so __dirname = node_modules/prisma/build/ where the
+# prisma_schema_build_bg.wasm lives (copying the .bin symlink breaks __dirname)
+docker compose exec -T web node node_modules/prisma/build/index.js migrate deploy
 
 # ── 4. Wait for services to become healthy ────────────────────────────────────
 log "Waiting 15 s for services to stabilise…"
