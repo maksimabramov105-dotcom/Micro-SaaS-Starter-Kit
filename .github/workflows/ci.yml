@@ -14,16 +14,22 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
-      - run: npm ci
+      - run: npm ci --legacy-peer-deps
       - run: npm run lint
       - run: npm run build
         env:
           SKIP_ENV_VALIDATION: true
           NEXTAUTH_URL: http://localhost:3000
-          NEXTAUTH_SECRET: ci-secret
+          NEXTAUTH_SECRET: ci-secret-not-real
           DATABASE_URL: postgresql://user:pass@localhost:5432/ci
+          STRIPE_SECRET_KEY: sk_test_ci
+          STRIPE_WEBHOOK_SECRET: whsec_ci
+          WORKER_URL: http://localhost:8000
+          WORKER_SECRET: ci-worker-secret
+          ENCRYPTION_KEY: bV4UmliwP4xFApJTnq5O5XxJ4mltOC4bjrQQ7EdCUtc=
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
 
   cyrillic-guard:
     name: No Cyrillic in source

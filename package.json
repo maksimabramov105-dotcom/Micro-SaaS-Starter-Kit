@@ -7,8 +7,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "lint:fix": "next lint --fix",
+    "lint": "eslint . --max-warnings 0",
+    "lint:fix": "eslint . --fix",
     "type-check": "tsc --noEmit",
     "format": "prettier --write \"**/*.{ts,tsx,md,json}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,md,json}\"",
@@ -97,7 +97,7 @@
     "@types/ua-parser-js": "^0.7.39",
     "autoprefixer": "^10.4.16",
     "better-sqlite3": "^12.10.0",
-    "eslint": "^8.56.0",
+    "eslint": "^9.39.4",
     "eslint-config-next": "^16.2.6",
     "eslint-config-prettier": "^9.1.0",
     "husky": "^8.0.3",
@@ -113,6 +113,6 @@
     "typescript": "^5.3.3"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.0.0"
   }
 }

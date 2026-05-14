@@ -1,6 +1,7 @@
-FROM node:20-alpine AS base
-# openssl is installed in base so every stage can detect the version for Prisma
-RUN apk add --no-cache libc6-compat openssl
+FROM node:22-alpine AS base
+# openssl: Prisma binary detection
+# python3 make g++: node-gyp (required by better-sqlite3 and other native devDeps)
+RUN apk add --no-cache libc6-compat openssl python3 make g++
 
 # Install dependencies only when needed
 FROM base AS deps

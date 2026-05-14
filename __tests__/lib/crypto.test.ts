@@ -28,7 +28,6 @@ describe('Fernet crypto', () => {
   })
 
   it('decrypts Python-produced ciphertext', () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const fixture = require('../../worker/tests/fixtures/fernet_sample.json') as {
       key: string
       plaintext: string
