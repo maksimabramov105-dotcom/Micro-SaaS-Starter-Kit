@@ -40,6 +40,17 @@ jobs:
           DATABASE_URL=postgresql://x:x@localhost:5432/x \
           npx prisma validate
 
+      - name: Next.js build check
+        # Runs next build outside Docker — errors appear here in plain text.
+        # Mirrors exactly what the Dockerfile does (same NODE_OPTIONS).
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+          NODE_OPTIONS: '--max-old-space-size=3500'
+          # Stub required build-time vars so Next.js / Sentry don't abort
+          NEXT_PUBLIC_APP_URL: 'https://resumeai-bot.ru'
+          NEXT_PUBLIC_APP_NAME: 'ResumeAI'
+        run: npm run build
+
   # ── 2. Build & push images to GHCR ──────────────────────────────────────────
   build:
     name: Build & push Docker images

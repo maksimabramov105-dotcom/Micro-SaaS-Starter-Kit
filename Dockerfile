@@ -22,7 +22,9 @@ COPY . .
 RUN npx prisma generate
 
 # Build application
+# NODE_OPTIONS caps RSS so the 7 GB GHA runner never OOMs during next build
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_OPTIONS="--max-old-space-size=3500"
 RUN npm run build
 
 # Production image, copy all the files and run next
