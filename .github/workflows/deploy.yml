@@ -58,7 +58,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GHCR_TOKEN }}
+          password: ${{ github.token }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -93,12 +93,14 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     environment: production
+    permissions:
+      packages: read   # allows github.token to pull images from GHCR on VPS
     steps:
       - name: SSH deploy
         uses: appleboy/ssh-action@v1
         env:
-          # Expose GHCR_TOKEN to the remote shell so deploy.sh can docker-login
-          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          # Use the job's github.token for GHCR pull on VPS — no custom PAT needed.
+          GHCR_TOKEN: ${{ github.token }}
         with:
           host:     ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
