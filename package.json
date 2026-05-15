@@ -47,7 +47,6 @@
     "@stripe/stripe-js": "^2.4.0",
     "@types/nodemailer": "^8.0.0",
     "@vercel/analytics": "^1.1.2",
-    "@vercel/speed-insights": "^1.0.8",
     "bcrypt": "^6.0.0",
     "bullmq": "^5.1.9",
     "class-variance-authority": "^0.7.0",
