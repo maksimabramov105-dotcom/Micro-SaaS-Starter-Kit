@@ -142,6 +142,23 @@ jobs:
             log() { echo "[$(date -u +%T)] $*"; }
             log "Deploying tag=${IMAGE_TAG}"
             cd "$DEPLOY_DIR"
+
+            # ── Disk guard: fail fast if <2 GB free before pull ─────────────────
+            AVAIL_KB=$(df / | awk 'NR==2 {print $4}')
+            AVAIL_GB=$(echo "scale=1; ${AVAIL_KB}/1048576" | bc)
+            log "Disk: ${AVAIL_GB}G free before pull"
+            if [ "${AVAIL_KB}" -lt 2097152 ]; then
+              log "ERROR: less than 2 GB free (${AVAIL_GB}G). Pruning unused images first..."
+              docker image prune -f
+              AVAIL_KB=$(df / | awk 'NR==2 {print $4}')
+              AVAIL_GB=$(echo "scale=1; ${AVAIL_KB}/1048576" | bc)
+              log "Disk after prune: ${AVAIL_GB}G free"
+              if [ "${AVAIL_KB}" -lt 2097152 ]; then
+                log "FATAL: still less than 2 GB free after prune. Aborting deploy."
+                exit 1
+              fi
+            fi
+
             log "Pulling images..."
             WEB_IMAGE="$WEB_IMAGE" WORKER_IMAGE="$WORKER_IMAGE" docker compose pull web worker
             log "Restarting services..."
@@ -152,6 +169,13 @@ jobs:
             sleep 15
             log "Running smoke tests..."
             bash "${DEPLOY_DIR}/scripts/smoke_test.sh"
+            # ── Post-deploy cleanup: remove images from previous deploys ────────
+            log "Pruning dangling/old images to reclaim disk..."
+            docker image prune -f
+            AVAIL_KB=$(df / | awk 'NR==2 {print $4}')
+            AVAIL_GB=$(echo "scale=1; ${AVAIL_KB}/1048576" | bc)
+            log "Disk after cleanup: ${AVAIL_GB}G free"
+
             log "Deploy complete — tag=${IMAGE_TAG}"
             DEPLOY_EOF
             chmod +x /opt/resumeai/scripts/deploy.sh
