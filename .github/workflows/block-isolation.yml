@@ -1,0 +1,111 @@
+name: Block isolation guard
+
+on:
+  pull_request:
+    types: [opened, synchronize, edited]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Parse PR body and verify block scope
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          python3 << 'PYEOF'
+          import os, sys, subprocess, re
+          import yaml  # PyYAML — pre-installed on ubuntu-latest
+          from pathlib import PurePosixPath
+
+          # ── 1. Extract "Blocks touched" from PR body ─────────────────────────
+          body = os.environ.get("PR_BODY", "")
+          match = re.search(r"## Blocks touched\s*\n([^\n#]+)", body)
+
+          if not match or not match.group(1).strip():
+              print("::error::PR body is missing a 'Blocks touched' section or it is empty.")
+              print("::error::Fill in .github/PULL_REQUEST_TEMPLATE.md.")
+              print("::error::Use 'shared' if only cross-cutting files (docs/, .github/, prisma/, etc.) were changed.")
+              sys.exit(1)
+
+          raw = match.group(1).strip()
+          declared = [b.strip().lower() for b in raw.split(",") if b.strip()]
+          print(f"Declared blocks: {', '.join(declared)}")
+
+          # ── 2. Load docs/blocks.yaml ─────────────────────────────────────────
+          with open("docs/blocks.yaml") as f:
+              config = yaml.safe_load(f)
+
+          # ── 3. Build allowed glob set ─────────────────────────────────────────
+          allowed = set()
+
+          # Always include shared paths
+          for p in (config.get("shared") or {}).get("paths", []):
+              allowed.add(p)
+
+          # Sentinels "shared" and "(none)" mean: only shared paths needed
+          real_blocks = [b for b in declared if b not in ("shared", "(none)")]
+
+          blocks_section = config.get("blocks", {})
+          for block_name in real_blocks:
+              if block_name not in blocks_section:
+                  valid = ", ".join(sorted(blocks_section.keys()))
+                  print(f"::error::Unknown block '{block_name}' in 'Blocks touched'.")
+                  print(f"::error::Valid blocks: {valid}")
+                  print(f"::error::Check spelling or add a new entry to docs/blocks.yaml.")
+                  sys.exit(1)
+              for p in blocks_section[block_name].get("paths", []):
+                  allowed.add(p)
+
+          # ── 4. Get changed files ──────────────────────────────────────────────
+          base_ref = os.environ.get("BASE_REF", "main")
+          result = subprocess.run(
+              ["git", "diff", "--name-only", f"origin/{base_ref}...HEAD"],
+              capture_output=True, text=True, check=True
+          )
+          changed = [f for f in result.stdout.strip().splitlines() if f]
+
+          if not changed:
+              print("No files changed — nothing to check.")
+              sys.exit(0)
+
+          print(f"Changed files ({len(changed)}): {', '.join(changed)}")
+          print(f"Allowed globs ({len(allowed)}): {', '.join(sorted(allowed))}")
+
+          # ── 5. Glob matching ──────────────────────────────────────────────────
+          def matches(filepath: str, pattern: str) -> bool:
+              """Match filepath against a glob pattern.
+              Supports trailing /**, intermediate **, and exact matches.
+              """
+              if pattern.endswith("/**"):
+                  prefix = pattern[:-3]
+                  return filepath == prefix or filepath.startswith(prefix + "/")
+              elif "**" in pattern:
+                  # Use pathlib for patterns with intermediate **
+                  return PurePosixPath(filepath).match(pattern)
+              else:
+                  return filepath == pattern
+
+          # ── 6. Find violations ────────────────────────────────────────────────
+          violations = [f for f in changed if not any(matches(f, g) for g in allowed)]
+
+          if violations:
+              print(f"\n::error::❌ {len(violations)} file(s) fall outside the declared block scope.")
+              for v in violations:
+                  print(f"::error::  • {v}")
+              print(f"::error::")
+              print(f"::error::Declared blocks: {', '.join(declared) or '(none)'}")
+              print(f"::error::")
+              print("::error::Fix options:")
+              print("::error::  1. Add the relevant block name to 'Blocks touched' in the PR body.")
+              print("::error::  2. Move the out-of-scope changes to a separate PR.")
+              print("::error::  3. If the file genuinely belongs to a block, add its glob to docs/blocks.yaml.")
+              sys.exit(1)
+          else:
+              print(f"\n✅ All {len(changed)} changed file(s) are within the declared block scope.")
+
+          PYEOF

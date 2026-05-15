@@ -22,3 +22,14 @@ npm run dev
 ## Deploy
 Push to main → Vercel auto-deploys. Set env vars in Vercel dashboard.
 Python worker is deployed separately as a Docker container.
+
+## Architecture & operations
+- System map: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+- Competitive analysis & roadmap: [`docs/COMPETITIVE_ANALYSIS.md`](docs/COMPETITIVE_ANALYSIS.md)
+- PMF measurement: [`docs/PMF_FRAMEWORK.md`](docs/PMF_FRAMEWORK.md)
+- Operations prompts (Claude Code playbook): [`docs/OPERATIONS_PROMPTS.md`](docs/OPERATIONS_PROMPTS.md)
+- Block ownership (machine-readable): [`docs/blocks.yaml`](docs/blocks.yaml)
+
+Every PR must follow the block-isolation protocol in
+`docs/ARCHITECTURE.md` § 3 — CI enforces it via
+`.github/workflows/block-isolation.yml`.

@@ -1,0 +1,113 @@
+# docs/blocks.yaml — declared file ownership per block.
+# Source: docs/ARCHITECTURE.md § 2.
+# Update this file in the same PR as any change to that table.
+
+blocks:
+  auth:
+    paths:
+      - "app/api/auth/**"
+      - "app/(auth)/**"
+      - "lib/auth.ts"
+      - "auth.config.ts"
+      - "middleware.ts"
+
+  billing:
+    paths:
+      - "app/api/stripe/**"
+      - "app/api/billing/**"
+      - "app/dashboard/billing/**"
+      - "app/(marketing)/pricing/**"
+      - "app/refund-policy/**"
+      - "lib/stripe.ts"
+      - "lib/pricing.ts"
+      - "lib/subscription.ts"
+      - "lib/billing/**"
+
+  resume-domain:
+    paths:
+      - "app/dashboard/resumes/**"
+      - "app/api/resumes/**"
+      - "app/api/applications/[id]/preview/**"
+      - "lib/resume.ts"
+      - "lib/crypto.ts"
+      - "worker/ai/resume.py"
+      - "worker/ai/tailor.py"
+      - "worker/ai/prompts/resume.txt"
+      - "worker/ai/prompts/tailor_resume.txt"
+
+  cover-letter:
+    paths:
+      - "app/api/cover-letters/**"
+      - "worker/ai/cover_letter.py"
+      - "worker/ai/prompts/cover_letter.txt"
+      - "worker/ai/prompts/tailor_cover_letter.txt"
+
+  autoapply-campaign:
+    paths:
+      - "app/dashboard/campaigns/**"
+      - "app/api/campaigns/**"
+      - "lib/quota.ts"
+      - "worker/autoapply/__init__.py"
+      - "worker/autoapply/common.py"
+
+  scraping:
+    paths:
+      - "worker/scrapers/**"
+
+  sender:
+    paths:
+      - "worker/autoapply/linkedin.py"
+      - "worker/autoapply/careerops.py"
+      - "worker/autoapply/CHANGELOG.md"
+
+  dashboard:
+    paths:
+      - "app/dashboard/page.tsx"
+      - "app/dashboard/applications/**"
+      - "app/dashboard/layout.tsx"
+      - "app/api/applications/**"
+      - "app/admin/pmf/**"
+      - "lib/pmf/**"
+      - "components/SurveyModal.tsx"
+
+  ai:
+    paths:
+      - "worker/ai/__init__.py"
+      - "worker/ai/client.py"
+      - "worker/ai/classify_inbox.py"
+      - "worker/ai/prompts/**"
+
+  notifications:
+    paths:
+      - "app/dashboard/notifications/**"
+      - "app/api/notifications/**"
+      - "app/api/cron/daily-digest/**"
+      - "app/api/inbox/**"
+      - "app/dashboard/inbox/**"
+      - "lib/notifications/**"
+      - "lib/inbox/**"
+      - "notifier/**"
+      - "prisma/schema.prisma"
+      # Notifications block has wide write access because it spans web + worker + standalone notifier.
+
+  extension:
+    paths:
+      - "extension/**"
+      - "app/extension/**"
+      - "app/api/extension/**"
+      - "lib/extension-auth.ts"
+      - "docs/extension.md"
+
+# Cross-cutting — always allowed in any PR (no scope violation).
+shared:
+  paths:
+    - "prisma/schema.prisma"
+    - "prisma/migrations/**"
+    - "docs/**"
+    - ".github/**"
+    - "package.json"
+    - "package-lock.json"
+    - "tsconfig.json"
+    - ".env.example"
+    - ".env.production.template"
+    - "README.md"
