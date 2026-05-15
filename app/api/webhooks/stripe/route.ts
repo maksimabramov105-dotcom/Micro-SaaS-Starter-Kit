@@ -40,6 +40,12 @@ export async function POST(req: Request) {
         const priceId = stripeSubscription.items.data[0].price.id
         const plan = getPlanByPriceId(priceId)
 
+        // Set firstPaidAt only once — never overwrite it on renewals
+        const existingUser = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { firstPaidAt: true },
+        })
+
         await prisma.user.update({
           where: { id: userId },
           data: {
@@ -48,6 +54,8 @@ export async function POST(req: Request) {
             stripePriceId: priceId,
             stripeCurrentPeriodEnd: new Date(stripeSubscription.current_period_end * 1000),
             dailyApplicationLimit: plan.dailyLimit,
+            // Record first paid date for PMF cohort retention tracking
+            ...(existingUser?.firstPaidAt == null ? { firstPaidAt: new Date() } : {}),
           },
         })
       }
@@ -95,6 +103,8 @@ export async function POST(req: Request) {
           stripePriceId: null,
           stripeCurrentPeriodEnd: null,
           dailyApplicationLimit: freePlan.dailyLimit,
+          // Record cancellation date for PMF churn / exit-reason histogram
+          cancelledAt: new Date(),
         },
       })
       break

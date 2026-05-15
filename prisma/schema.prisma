@@ -80,15 +80,23 @@ model User {
   legacyId         Int?    @unique    // legacy: bot.db.users.telegram_id + autoapply.db.autoapply_users.telegram_id
   telegramUsername String?            // legacy: bot.db.users.username
 
+  // PMF tracking
+  firstPaidAt  DateTime?  // set once on first successful checkout; used for day-30 survey + cohort retention
+  cancelledAt  DateTime?  // set when subscription deleted; used for churn rate + exit-reason histogram
+  refundReason String?    // exit-reason captured in cancellation flow; one of the enum values in lib/pmf/types.ts
+
   // Resume domain relations
   resumes      Resume[]
   applications JobApplication[]
   campaigns    AutoApplyCampaign[]
+  surveys      Survey[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([email])
+  @@index([firstPaidAt])
+  @@index([cancelledAt])
 }
 
 model VerificationToken {
@@ -445,6 +453,24 @@ model JobListing {
   @@unique([source, externalId])
   @@index([source])
   @@index([scrapedAt])
+}
+
+// ---------------------------------------------------------------------------
+// PMF — Surveys
+// ---------------------------------------------------------------------------
+
+model Survey {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type         String                           // "interview_day30"
+  scheduledFor DateTime
+  shownAt      DateTime?                        // set when modal first displayed
+  answeredAt   DateTime?                        // set when user submits an answer
+  response     Json?                            // { answer: "yes"|"no"|"not_sure", interviewCount?: number }
+
+  @@index([userId, type])
+  @@index([scheduledFor, shownAt])
 }
 
 // ---------------------------------------------------------------------------
