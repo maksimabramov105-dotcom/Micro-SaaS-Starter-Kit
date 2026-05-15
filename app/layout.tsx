@@ -7,18 +7,18 @@ import { Analytics } from '@vercel/analytics/react'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Micro SaaS Starter Kit',
-  description: 'Production-ready boilerplate for launching subscription-based web tools',
+  title: 'ResumeAI',
+  description: 'AI-generated resumes and automated job applications',
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
   openGraph: {
-    title: 'Micro SaaS Starter Kit',
-    description: 'Production-ready boilerplate for launching subscription-based web tools',
+    title: 'ResumeAI',
+    description: 'AI-generated resumes and automated job applications',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Micro SaaS Starter Kit',
-    description: 'Production-ready boilerplate for launching subscription-based web tools',
+    title: 'ResumeAI',
+    description: 'AI-generated resumes and automated job applications',
   },
 }
 
