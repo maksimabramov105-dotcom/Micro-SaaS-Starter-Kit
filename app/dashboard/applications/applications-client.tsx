@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 
@@ -13,6 +14,7 @@ interface Application {
   status: string
   appliedAt: string | null
   resumeTitle: string | null
+  tailored: boolean
 }
 
 interface Props {
@@ -121,6 +123,7 @@ export default function ApplicationsClient({ applications }: Props) {
                     <th className="px-4 py-3 text-left font-medium text-slate-500">Status</th>
                     <th className="px-4 py-3 text-left font-medium text-slate-500">Applied</th>
                     <th className="px-4 py-3 text-left font-medium text-slate-500">Resume</th>
+                    <th className="px-4 py-3 text-left font-medium text-slate-500">AI</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -129,7 +132,14 @@ export default function ApplicationsClient({ applications }: Props) {
                       key={app.id}
                       className="border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors"
                     >
-                      <td className="px-4 py-3 font-medium text-slate-900">{app.jobTitle}</td>
+                      <td className="px-4 py-3 font-medium text-slate-900">
+                        <Link
+                          href={`/dashboard/applications/${app.id}`}
+                          className="hover:text-emerald-600 hover:underline"
+                        >
+                          {app.jobTitle}
+                        </Link>
+                      </td>
                       <td className="px-4 py-3 text-slate-600">{app.company}</td>
                       <td className="px-4 py-3 text-slate-400">{app.location || '—'}</td>
                       <td className="px-4 py-3 text-slate-400">{app.source}</td>
@@ -144,6 +154,11 @@ export default function ApplicationsClient({ applications }: Props) {
                         {app.appliedAt ? new Date(app.appliedAt).toLocaleDateString() : '—'}
                       </td>
                       <td className="px-4 py-3 text-slate-400">{app.resumeTitle ?? '—'}</td>
+                      <td className="px-4 py-3">
+                        {app.tailored && (
+                          <span className="text-violet-600 text-xs font-medium" title="AI tailored">✦</span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

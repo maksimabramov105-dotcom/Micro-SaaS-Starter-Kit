@@ -22,6 +22,7 @@ from pydantic import BaseModel
 from worker.ai.cover_letter import generate_cover_letter
 from worker.ai.resume import generate_tailored_resume
 from worker.autoapply.careerops import CareerOpsApplicator
+from worker.autoapply.common import prepare_application
 from worker.autoapply.linkedin import LinkedInApplicator
 from worker.config import settings
 from worker.deps import verify_bearer
@@ -111,6 +112,21 @@ class ScrapeRequest(BaseModel):
     since: str | None = None  # reserved for future filtering
 
 
+class TailorRequest(BaseModel):
+    """
+    Request body for POST /jobs/autoapply/prepare.
+
+    The web app calls this BEFORE submitting an application to get the
+    tailored resume + cover letter. It then saves both to JobApplication
+    and passes the tailored text to the ATS applicator.
+    """
+    base_resume: dict           # Resume.generated JSON from DB
+    job: dict                   # {title, company, description, id?}
+    plan_tier: str = "free"     # "free" | "trial" | "pro" | "unlimited"
+    application_count: int = 0  # 0-indexed count in session (for trial gate)
+    job_id: str = ""            # stable job identifier for cache key
+
+
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @router.post("/resume/generate", dependencies=[Depends(verify_bearer)])
@@ -153,6 +169,46 @@ async def cover_letter(body: CoverLetterRequest) -> dict:
     except Exception as exc:
         _fail(job, str(exc))
         logger.error("job.cover_letter.error", job_id=job.job_id, error=str(exc))
+
+    return job.model_dump()
+
+
+@router.post("/autoapply/prepare", dependencies=[Depends(verify_bearer)])
+async def autoapply_prepare(body: TailorRequest) -> dict:
+    """
+    Tailor a resume + generate a cover letter for a specific job.
+
+    Called by the web app before each autoapply submission.  Returns:
+      tailored_resume (dict), tailored_cover_letter (str),
+      tokens_used (int), model_used (str), tailoring_skipped (bool).
+
+    Cost guardrail: gpt-4o-mini only; plan_tier gates Free/Trial users.
+    """
+    job = _new_job()
+    logger.info(
+        "job.autoapply_prepare.started",
+        job_id=job.job_id,
+        plan_tier=body.plan_tier,
+        company=body.job.get("company"),
+    )
+    try:
+        result = await prepare_application(
+            base_resume=body.base_resume,
+            job=body.job,
+            plan_tier=body.plan_tier,
+            application_count=body.application_count,
+            job_id=body.job_id,
+        )
+        _finish(job, result)
+        logger.info(
+            "job.autoapply_prepare.done",
+            job_id=job.job_id,
+            tokens=result.get("tokens_used", 0),
+            skipped=result.get("tailoring_skipped", False),
+        )
+    except Exception as exc:
+        _fail(job, str(exc))
+        logger.error("job.autoapply_prepare.error", job_id=job.job_id, error=str(exc))
 
     return job.model_dump()
 

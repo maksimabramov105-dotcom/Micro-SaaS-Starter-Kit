@@ -23,6 +23,7 @@ export default async function ApplicationsPage() {
     status: app.status,
     appliedAt: app.appliedAt ? app.appliedAt.toISOString() : null,
     resumeTitle: app.resume?.title ?? null,
+    tailored: app.tailoredResume !== null,
   }))
 
   return (
