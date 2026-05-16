@@ -33,12 +33,11 @@ export const authOptions: NextAuthOptions = {
     error: '/login',
   },
   callbacks: {
-    async session({ session, user }) {
-      if (session.user) {
-        session.user.id = user.id
-        session.user.role = (user as any).role
+    async session({ session, token }) {
+      if (session.user && token.sub) {
+        session.user.id = token.sub
         const dbUser = await prisma.user.findUnique({
-          where: { id: user.id },
+          where: { id: token.sub },
           select: {
             stripeCustomerId: true,
             stripeSubscriptionId: true,
@@ -59,7 +58,7 @@ export const authOptions: NextAuthOptions = {
     },
   },
   session: {
-    strategy: 'database',
+    strategy: 'jwt',
   },
   secret: process.env.NEXTAUTH_SECRET,
 }
