@@ -368,6 +368,13 @@ model JobApplication {
   errorMessage String?  @db.Text
   appliedAt   DateTime?                // legacy: autoapply.db.applications.sent_at
   responseAt  DateTime?                // legacy: autoapply.db.applications.response_at
+
+  // Per-application AI tailoring (Prompt 19)
+  tailoredResume      Json?           // tailored version of resume.generated submitted to ATS
+  tailoredCoverLetter String?  @db.Text  // per-job cover letter generated at submit time
+  tailoringTokensUsed Int?            // total tokens consumed (resume + cover) for cost tracking
+  tailoringModelUsed  String?         // e.g. "gpt-4o-mini"
+
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 

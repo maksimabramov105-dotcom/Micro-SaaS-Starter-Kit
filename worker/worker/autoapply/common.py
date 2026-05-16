@@ -2,10 +2,20 @@
 common.py — Shared helpers for autoapply modules.
 
 Provides:
-  - _clean_user_data()  : validate / normalise user_data dicts before submission
+  - clean_user_data()    : validate / normalise user_data dicts before submission
   - not_available_result(): standard error dict when a dependency is missing
+  - prepare_application(): run AI tailoring before submit, return enriched user_data
+                           + tailoring metadata for DB persistence
 """
+import json
 from typing import Any
+
+import structlog
+
+from worker.ai.tailor import should_tailor, tailor_cover_letter, tailor_resume
+from worker.config import settings
+
+logger = structlog.get_logger(__name__)
 
 
 def not_available_result(reason: str, context: str = "") -> dict[str, Any]:
@@ -42,4 +52,76 @@ def clean_user_data(data: dict[str, Any]) -> dict[str, Any]:
         "portfolio_url": data.get("portfolio_url", ""),
         "location": data.get("location", ""),
         "experience_years": str(data.get("experience_years", "1")),
+    }
+
+
+async def prepare_application(
+    base_resume: dict,
+    job: dict,
+    plan_tier: str = "free",
+    application_count: int = 0,
+    job_id: str = "",
+    api_key: str = "",
+) -> dict[str, Any]:
+    """
+    Run AI tailoring BEFORE submitting an application.
+
+    Called by autoapply routes immediately before passing user_data to an
+    ATS applicator (CareerOps, LinkedIn).  Returns an enriched dict with:
+
+        tailored_resume (dict)       — resume JSON to submit (may equal base_resume)
+        tailored_cover_letter (str)  — per-job cover letter (may be "")
+        tokens_used (int)            — total tokens consumed across both calls
+        model_used (str)             — model name for cost tracking
+        tailoring_skipped (bool)     — True when plan_tier gates tailoring off
+
+    Never raises — all failures fall back to base_resume / empty cover letter.
+
+    Args:
+        base_resume:       Resume.generated JSON dict from DB.
+        job:               Dict with keys: title, company, description, id (optional).
+        plan_tier:         "free" | "trial" | "pro" | "unlimited"
+        application_count: 0-indexed position in current session (for trial gate).
+        job_id:            Stable job identifier for cache keying.
+        api_key:           OpenAI API key override; falls back to settings.
+    """
+    if not should_tailor(plan_tier, application_count):
+        logger.info(
+            "prepare_application.skipped",
+            plan_tier=plan_tier,
+            application_count=application_count,
+        )
+        return {
+            "tailored_resume": base_resume,
+            "tailored_cover_letter": "",
+            "tokens_used": 0,
+            "model_used": "",
+            "tailoring_skipped": True,
+        }
+
+    key = api_key or settings.openai_api_key
+
+    # Run both tailoring calls concurrently to halve wall-clock time
+    import asyncio
+    resume_coro = tailor_resume(base_resume, job, key, job_id)
+    cover_coro = tailor_cover_letter(base_resume, job, key, job_id)
+    (tailored_resume, resume_tokens, model), (cover_letter, cover_tokens, _) = (
+        await asyncio.gather(resume_coro, cover_coro)
+    )
+
+    total_tokens = resume_tokens + cover_tokens
+    logger.info(
+        "prepare_application.done",
+        job_id=job_id,
+        plan_tier=plan_tier,
+        total_tokens=total_tokens,
+        model=model,
+    )
+
+    return {
+        "tailored_resume": tailored_resume,
+        "tailored_cover_letter": cover_letter,
+        "tokens_used": total_tokens,
+        "model_used": model,
+        "tailoring_skipped": False,
     }
