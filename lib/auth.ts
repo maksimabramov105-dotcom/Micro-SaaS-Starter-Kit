@@ -43,6 +43,8 @@ export const authOptions: NextAuthOptions = {
             stripeSubscriptionId: true,
             stripePriceId: true,
             stripeCurrentPeriodEnd: true,
+            firstPaidAt: true,
+            refundedAt: true,
             role: true,
           },
         })
@@ -51,6 +53,8 @@ export const authOptions: NextAuthOptions = {
           session.user.stripeSubscriptionId = dbUser.stripeSubscriptionId
           session.user.stripePriceId = dbUser.stripePriceId
           session.user.stripeCurrentPeriodEnd = dbUser.stripeCurrentPeriodEnd
+          session.user.firstPaidAt = dbUser.firstPaidAt
+          session.user.refundedAt = dbUser.refundedAt
           session.user.role = dbUser.role
         }
       }

@@ -9,22 +9,19 @@ export const PRICING_PLANS = [
     features: ['3 applications/day', '1 resume', 'Adzuna + RemoteOK jobs'],
   },
   {
-    id: 'trial',
-    name: 'Trial',
-    price: 2.99,
-    period: '14 days',
-    dailyLimit: 10,
-    priceId: process.env.STRIPE_PRICE_ID_TRIAL || null,
-    features: ['10 applications/day', '3 resumes', 'All job boards', '14-day access'],
-  },
-  {
     id: 'pro',
     name: 'Pro',
     price: 19.99,
     period: 'month',
     dailyLimit: 25,
     priceId: process.env.STRIPE_PRICE_ID_PRO || null,
-    features: ['25 applications/day', 'Unlimited resumes', 'LinkedIn autoapply', 'Priority support'],
+    features: [
+      '25 applications/day',
+      'Unlimited resumes',
+      'LinkedIn autoapply',
+      'Priority support',
+      '30-day money-back guarantee',
+    ],
   },
   {
     id: 'unlimited',
@@ -33,7 +30,13 @@ export const PRICING_PLANS = [
     period: 'month',
     dailyLimit: 9999,
     priceId: process.env.STRIPE_PRICE_ID_UNLIMITED || null,
-    features: ['Unlimited applications', 'Unlimited resumes', 'All platforms', 'API access'],
+    features: [
+      'Unlimited applications',
+      'Unlimited resumes',
+      'All platforms',
+      'API access',
+      '30-day money-back guarantee',
+    ],
   },
 ] as const
 

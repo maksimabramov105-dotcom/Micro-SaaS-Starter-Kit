@@ -12,6 +12,8 @@ declare module 'next-auth' {
       stripeSubscriptionId?: string | null
       stripePriceId?: string | null
       stripeCurrentPeriodEnd?: Date | null
+      firstPaidAt?: Date | string | null
+      refundedAt?: Date | string | null
     }
   }
 }

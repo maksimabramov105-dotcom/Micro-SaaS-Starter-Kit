@@ -13,16 +13,30 @@ export default function BillingPage() {
 
   const [portalLoading, setPortalLoading] = useState(false)
   const [showCancelDialog, setShowCancelDialog] = useState(false)
+  const [showRefundDialog, setShowRefundDialog] = useState(false)
   const [selectedReason, setSelectedReason] = useState<ExitReason | ''>('')
   const [otherText, setOtherText] = useState('')
   const [cancelling, setCancelling] = useState(false)
+  const [refunding, setRefunding] = useState(false)
   const [cancelError, setCancelError] = useState('')
+  const [refundError, setRefundError] = useState('')
   const [cancelled, setCancelled] = useState(false)
+  const [refunded, setRefunded] = useState(false)
 
   const hasActiveSubscription =
     session?.user?.stripeSubscriptionId &&
     session?.user?.stripeCurrentPeriodEnd &&
     new Date(session.user.stripeCurrentPeriodEnd) > new Date()
+
+  // 30-day guarantee eligibility: firstPaidAt within last 30 days and not yet refunded
+  const firstPaidAt = session?.user?.firstPaidAt ? new Date(session.user.firstPaidAt) : null
+  const daysSinceFirstPayment = firstPaidAt
+    ? (Date.now() - firstPaidAt.getTime()) / (1000 * 60 * 60 * 24)
+    : Infinity
+  const canRequestRefund =
+    hasActiveSubscription &&
+    !refunded &&
+    daysSinceFirstPayment <= 30
 
   const handleManageBilling = async () => {
     setPortalLoading(true)
@@ -64,6 +78,24 @@ export default function BillingPage() {
     }
   }
 
+  const handleRefund = async () => {
+    setRefundError('')
+    setRefunding(true)
+    try {
+      const res = await fetch('/api/billing/refund', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) {
+        setRefundError(data.error ?? 'Something went wrong. Please contact support.')
+        return
+      }
+      setRefunded(true)
+      setShowRefundDialog(false)
+      router.refresh()
+    } finally {
+      setRefunding(false)
+    }
+  }
+
   if (!session?.user) return null
 
   return (
@@ -82,6 +114,13 @@ export default function BillingPage() {
             testimonial
           </a>
           !
+        </div>
+      )}
+
+      {refunded && (
+        <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          Your refund has been processed. You&apos;ll receive a confirmation email shortly.
+          Bank processing typically takes 5–10 business days.
         </div>
       )}
 
@@ -113,7 +152,29 @@ export default function BillingPage() {
               </Button>
             </div>
 
-            {hasActiveSubscription && !cancelled && (
+            {/* 30-day money-back guarantee banner */}
+            {canRequestRefund && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+                <p className="text-sm font-medium text-amber-900 mb-1">
+                  30-day money-back guarantee
+                </p>
+                <p className="text-xs text-amber-800 mb-2">
+                  Not getting interviews? You have{' '}
+                  <strong>{Math.max(0, Math.ceil(30 - daysSinceFirstPayment))} days</strong>{' '}
+                  left to claim your full refund.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-amber-400 text-amber-900 hover:bg-amber-100 text-xs"
+                  onClick={() => setShowRefundDialog(true)}
+                >
+                  Cancel &amp; request refund
+                </Button>
+              </div>
+            )}
+
+            {hasActiveSubscription && !cancelled && !refunded && (
               <div className="pt-2">
                 <Button
                   variant="ghost"
@@ -150,7 +211,6 @@ export default function BillingPage() {
               everyone.
             </p>
 
-            {/* Reason selector — required */}
             <fieldset className="space-y-2 mb-4">
               <legend className="text-sm font-medium mb-2">
                 Why are you cancelling?{' '}
@@ -209,6 +269,54 @@ export default function BillingPage() {
                 disabled={cancelling || !selectedReason}
               >
                 {cancelling ? 'Cancelling…' : 'Cancel subscription'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Refund confirmation dialog */}
+      {showRefundDialog && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="refund-title"
+          className="fixed inset-0 z-50 flex items-center justify-center"
+        >
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setShowRefundDialog(false)}
+            aria-hidden="true"
+          />
+          <div className="relative z-10 w-full max-w-md rounded-2xl bg-background border shadow-xl p-6 mx-4">
+            <h2 id="refund-title" className="text-lg font-semibold mb-1">
+              Claim your 30-day refund
+            </h2>
+            <p className="text-sm text-muted-foreground mb-5">
+              We&apos;ll cancel your subscription immediately and issue a full refund to your
+              original payment method. Bank processing takes <strong>5–10 business days</strong>.
+              This action cannot be undone.
+            </p>
+
+            {refundError && (
+              <p className="mb-3 text-sm text-destructive">{refundError}</p>
+            )}
+
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setShowRefundDialog(false)}
+                disabled={refunding}
+              >
+                Go back
+              </Button>
+              <Button
+                className="flex-1 bg-amber-600 hover:bg-amber-700 text-white"
+                onClick={handleRefund}
+                disabled={refunding}
+              >
+                {refunding ? 'Processing…' : 'Confirm refund'}
               </Button>
             </div>
           </div>
