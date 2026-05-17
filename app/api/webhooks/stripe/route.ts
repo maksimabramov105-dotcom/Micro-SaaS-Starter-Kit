@@ -110,6 +110,30 @@ export async function POST(req: Request) {
       break
     }
 
+    case 'charge.refunded': {
+      // Out-of-band reconciliation — fires when a refund is issued outside the
+      // self-serve route (e.g. manual refund from Stripe Dashboard).
+      // Sets refundedAt only if not already set to stay idempotent.
+      const charge = event.data.object as Stripe.Charge
+      const customerId = typeof charge.customer === 'string'
+        ? charge.customer
+        : charge.customer?.id
+
+      if (customerId) {
+        const user = await prisma.user.findFirst({
+          where: { stripeCustomerId: customerId },
+          select: { id: true, refundedAt: true },
+        })
+        if (user && user.refundedAt == null) {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { refundedAt: new Date() },
+          })
+        }
+      }
+      break
+    }
+
     default:
       console.log(`Unhandled event type: ${event.type}`)
   }

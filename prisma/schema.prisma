@@ -84,6 +84,7 @@ model User {
   firstPaidAt  DateTime?  // set once on first successful checkout; used for day-30 survey + cohort retention
   cancelledAt  DateTime?  // set when subscription deleted; used for churn rate + exit-reason histogram
   refundReason String?    // exit-reason captured in cancellation flow; one of the enum values in lib/pmf/types.ts
+  refundedAt   DateTime?  // set when a refund is issued; guards the one-refund-per-customer rule
 
   // Resume domain relations
   resumes      Resume[]
