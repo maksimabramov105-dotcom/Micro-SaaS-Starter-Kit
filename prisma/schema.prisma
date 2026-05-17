@@ -86,6 +86,10 @@ model User {
   refundReason String?    // exit-reason captured in cancellation flow; one of the enum values in lib/pmf/types.ts
   refundedAt   DateTime?  // set when a refund is issued; guards the one-refund-per-customer rule
 
+  // Notification preferences
+  dailyDigestEnabled Boolean @default(true)  // opt-out of daily activity digest email
+  timezone           String  @default("UTC") // IANA timezone (e.g. "Europe/Moscow") for sending digest at 8am local
+
   // Resume domain relations
   resumes      Resume[]
   applications JobApplication[]
