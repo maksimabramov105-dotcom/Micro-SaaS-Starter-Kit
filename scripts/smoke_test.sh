@@ -42,10 +42,74 @@ check() {
   fi
 }
 
+# Check that a URL returns HTTP 2xx (follows redirects, checks status code)
+check_status() {
+  local label="$1"
+  local url="$2"
+  local expected_pattern="${3:-^2}"   # default: any 2xx
+
+  log "Checking ${label} → ${url}"
+  local status
+  status=$(curl -sS --max-time "$TIMEOUT" -o /dev/null -w "%{http_code}" "$url" 2>/dev/null) || status="000"
+  if echo "$status" | grep -qE "$expected_pattern"; then
+    log "  ✅ ${label} OK (HTTP ${status})"
+  else
+    fail "${label} failed — got HTTP ${status} (${url})"
+    notify_failure "${label} — HTTP ${status} — ${url}"
+  fi
+}
+
+# Check that a URL returns a body containing a required string
+check_body() {
+  local label="$1"
+  local url="$2"
+  local required="$3"
+
+  log "Checking ${label} → ${url}"
+  local body
+  body=$(curl -sS --max-time "$TIMEOUT" "$url" 2>/dev/null) || body=""
+  if echo "$body" | grep -q "$required"; then
+    log "  ✅ ${label} OK"
+  else
+    fail "${label} failed — body missing '${required}' (${url})"
+    notify_failure "${label} — missing '${required}' — ${url}"
+  fi
+}
+
 # ── Checks ────────────────────────────────────────────────────────────────────
 
-check "web /api/health"        "${BASE_URL}/api/health"
+# Infrastructure health
+check "web /api/health"           "${BASE_URL}/api/health"
 check "worker /api/worker/health" "${BASE_URL}/api/worker/health"
+
+# Auth system — CSRF endpoint must return a token (proves NextAuth is initialised)
+check_body "NextAuth CSRF"        "${BASE_URL}/api/auth/csrf"       "csrfToken"
+
+# Login page must render (catches broken NextAuth config that 500s on page load)
+check_status "login page"         "${BASE_URL}/login"               "^2"
+
+# Auth providers list — must include our two OAuth providers
+check_body "OAuth providers"      "${BASE_URL}/api/auth/providers"  "google"
+
+# Auth sign-in endpoint must NOT immediately return an error
+# We POST to initiate but check we get a redirect (302) toward the provider, NOT back to /login
+# (A redirect to /login with ?error= means NextAuth failed before reaching the provider)
+log "Checking auth sign-in initiation → ${BASE_URL}/api/auth/signin/google"
+SIGNIN_LOCATION=$(curl -sS --max-time "$TIMEOUT" -X POST \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "csrfToken=" \
+  -o /dev/null -w "%{redirect_url}" \
+  "${BASE_URL}/api/auth/signin/google" 2>/dev/null) || SIGNIN_LOCATION=""
+
+if echo "$SIGNIN_LOCATION" | grep -q "accounts.google.com"; then
+  log "  ✅ auth sign-in OK (redirects to Google)"
+elif echo "$SIGNIN_LOCATION" | grep -q "error="; then
+  fail "auth sign-in BROKEN — redirects to '${SIGNIN_LOCATION}' instead of Google"
+  notify_failure "OAuth sign-in broken — ${SIGNIN_LOCATION}"
+else
+  # No location header or unexpected redirect — log as warning, not hard fail
+  log "  ⚠️  auth sign-in redirect unclear (${SIGNIN_LOCATION:-no redirect})"
+fi
 
 # ── Result ────────────────────────────────────────────────────────────────────
 

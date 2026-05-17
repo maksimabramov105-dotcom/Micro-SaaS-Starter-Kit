@@ -35,25 +35,25 @@ describe('getCurrentHourInTimezone', () => {
 
   it('returns the correct UTC hour for a fixed moment', () => {
     // Freeze time to 2026-05-17 08:00:00 UTC
-    const fixed = new Date('2026-05-17T08:00:00Z')
-    jest.spyOn(global, 'Date').mockImplementation(() => fixed as unknown as string)
+    jest.useFakeTimers()
+    jest.setSystemTime(new Date('2026-05-17T08:00:00Z'))
 
     const hour = getCurrentHourInTimezone('UTC')
     expect(hour).toBe(8)
 
-    jest.restoreAllMocks()
+    jest.useRealTimers()
   })
 
   it('returns UTC+3 offset correctly (Moscow time = UTC+3)', () => {
     // 05:00 UTC → 08:00 Moscow
-    const fixed = new Date('2026-05-17T05:00:00Z')
-    jest.spyOn(global, 'Date').mockImplementation(() => fixed as unknown as string)
+    jest.useFakeTimers()
+    jest.setSystemTime(new Date('2026-05-17T05:00:00Z'))
 
     const hour = getCurrentHourInTimezone('Europe/Moscow')
     // Moscow is UTC+3 (no DST), so 05:00 UTC = 08:00 Moscow
     expect(hour).toBe(8)
 
-    jest.restoreAllMocks()
+    jest.useRealTimers()
   })
 })
 
@@ -81,14 +81,14 @@ describe('getYesterdayWindow', () => {
   })
 
   it('is deterministic when called twice in the same millisecond', () => {
-    const fixed = new Date('2026-05-17T12:34:56.789Z')
-    jest.spyOn(global, 'Date').mockImplementation(() => fixed as unknown as string)
+    jest.useFakeTimers()
+    jest.setSystemTime(new Date('2026-05-17T12:34:56.789Z'))
 
     const first = getYesterdayWindow()
     const second = getYesterdayWindow()
     expect(first.periodStart.getTime()).toBe(second.periodStart.getTime())
     expect(first.periodEnd.getTime()).toBe(second.periodEnd.getTime())
 
-    jest.restoreAllMocks()
+    jest.useRealTimers()
   })
 })
