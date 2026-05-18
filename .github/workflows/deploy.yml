@@ -128,8 +128,96 @@ jobs:
             systemctl stop nginx 2>/dev/null || true
             systemctl disable nginx 2>/dev/null || true
 
-            # ── Sync deploy.sh from CI (always latest, never stale) ─────────────
+            # ── Sync scripts from CI (always latest, never stale) ───────────────
             mkdir -p /opt/resumeai/scripts
+
+            # smoke_test.sh — synced from repo so CSRF fix (and any future
+            # improvements) take effect without a manual VPS update
+            cat > /opt/resumeai/scripts/smoke_test.sh << 'SMOKE_EOF'
+            #!/usr/bin/env bash
+            # smoke_test.sh — post-deploy health checks.
+            set -euo pipefail
+            BASE_URL="${BASE_URL:-https://resumeai-bot.ru}"
+            ADMIN_WEBHOOK_URL="${ADMIN_WEBHOOK_URL:-}"
+            TIMEOUT=15
+            FAILED=0
+            log()  { echo "[$(date -u +%T)] $*"; }
+            fail() { echo "[$(date -u +%T)] FAILED: $*" >&2; FAILED=1; }
+            notify_failure() {
+              local msg="$1"
+              if [[ -n "$ADMIN_WEBHOOK_URL" ]]; then
+                curl -fsS --max-time 5 -X POST "$ADMIN_WEBHOOK_URL" \
+                  -H "Content-Type: application/json" \
+                  -d "{\"text\":\"ResumeAI smoke test FAILED: ${msg}\"}" || true
+              fi
+            }
+            check() {
+              local label="$1" url="$2"
+              log "Checking ${label} -> ${url}"
+              if curl -fsS --max-time "$TIMEOUT" "$url" > /dev/null 2>&1; then
+                log "  OK ${label}"
+              else
+                fail "${label} failed (${url})"
+                notify_failure "${label} -- ${url}"
+              fi
+            }
+            check_status() {
+              local label="$1" url="$2" expected_pattern="${3:-^2}"
+              log "Checking ${label} -> ${url}"
+              local status
+              status=$(curl -sS --max-time "$TIMEOUT" -o /dev/null -w "%{http_code}" "$url" 2>/dev/null) || status="000"
+              if echo "$status" | grep -qE "$expected_pattern"; then
+                log "  OK ${label} (HTTP ${status})"
+              else
+                fail "${label} failed -- got HTTP ${status} (${url})"
+                notify_failure "${label} -- HTTP ${status} -- ${url}"
+              fi
+            }
+            check_body() {
+              local label="$1" url="$2" required="$3"
+              log "Checking ${label} -> ${url}"
+              local body
+              body=$(curl -sS --max-time "$TIMEOUT" "$url" 2>/dev/null) || body=""
+              if echo "$body" | grep -q "$required"; then
+                log "  OK ${label}"
+              else
+                fail "${label} failed -- body missing '${required}' (${url})"
+                notify_failure "${label} -- missing '${required}' -- ${url}"
+              fi
+            }
+            check "web /api/health"           "${BASE_URL}/api/health"
+            check "worker /api/worker/health" "${BASE_URL}/api/worker/health"
+            check_body "NextAuth CSRF"        "${BASE_URL}/api/auth/csrf"       "csrfToken"
+            check_status "login page"         "${BASE_URL}/login"               "^2"
+            check_body "OAuth providers"      "${BASE_URL}/api/auth/providers"  "google"
+            log "Checking auth sign-in initiation"
+            CSRF_TOKEN=$(curl -sS --max-time "$TIMEOUT" "${BASE_URL}/api/auth/csrf" 2>/dev/null \
+              | grep -o '"csrfToken":"[^"]*"' | cut -d'"' -f4) || CSRF_TOKEN=""
+            if [[ -z "$CSRF_TOKEN" ]]; then
+              log "  WARNING: auth sign-in check skipped -- could not obtain CSRF token"
+            else
+              SIGNIN_LOCATION=$(curl -sS --max-time "$TIMEOUT" -X POST \
+                -H "Content-Type: application/x-www-form-urlencoded" \
+                -d "csrfToken=${CSRF_TOKEN}" \
+                -o /dev/null -w "%{redirect_url}" \
+                "${BASE_URL}/api/auth/signin/google" 2>/dev/null) || SIGNIN_LOCATION=""
+              if echo "$SIGNIN_LOCATION" | grep -q "accounts.google.com"; then
+                log "  OK auth sign-in (redirects to Google)"
+              elif echo "$SIGNIN_LOCATION" | grep -q "error="; then
+                fail "auth sign-in BROKEN -- redirects to '${SIGNIN_LOCATION}' instead of Google"
+                notify_failure "OAuth sign-in broken -- ${SIGNIN_LOCATION}"
+              else
+                log "  WARNING: auth sign-in redirect unclear (${SIGNIN_LOCATION:-no redirect})"
+              fi
+            fi
+            if [[ "$FAILED" -ne 0 ]]; then
+              log "Smoke tests FAILED -- check container logs"
+              exit 1
+            fi
+            log "All smoke tests passed"
+            SMOKE_EOF
+            chmod +x /opt/resumeai/scripts/smoke_test.sh
+
             cat > /opt/resumeai/scripts/deploy.sh << 'DEPLOY_EOF'
             #!/usr/bin/env bash
             set -euo pipefail
