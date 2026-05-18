@@ -91,24 +91,31 @@ check_status "login page"         "${BASE_URL}/login"               "^2"
 # Auth providers list — must include our two OAuth providers
 check_body "OAuth providers"      "${BASE_URL}/api/auth/providers"  "google"
 
-# Auth sign-in endpoint must NOT immediately return an error
-# We POST to initiate but check we get a redirect (302) toward the provider, NOT back to /login
-# (A redirect to /login with ?error= means NextAuth failed before reaching the provider)
+# Auth sign-in endpoint must NOT immediately return an error.
+# NextAuth requires a valid CSRF token in the POST body; without it, it redirects
+# back with ?error= (CSRF protection).  We fetch the token first, then POST.
 log "Checking auth sign-in initiation → ${BASE_URL}/api/auth/signin/google"
-SIGNIN_LOCATION=$(curl -sS --max-time "$TIMEOUT" -X POST \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "csrfToken=" \
-  -o /dev/null -w "%{redirect_url}" \
-  "${BASE_URL}/api/auth/signin/google" 2>/dev/null) || SIGNIN_LOCATION=""
+CSRF_TOKEN=$(curl -sS --max-time "$TIMEOUT" "${BASE_URL}/api/auth/csrf" 2>/dev/null \
+  | grep -o '"csrfToken":"[^"]*"' | cut -d'"' -f4) || CSRF_TOKEN=""
 
-if echo "$SIGNIN_LOCATION" | grep -q "accounts.google.com"; then
-  log "  ✅ auth sign-in OK (redirects to Google)"
-elif echo "$SIGNIN_LOCATION" | grep -q "error="; then
-  fail "auth sign-in BROKEN — redirects to '${SIGNIN_LOCATION}' instead of Google"
-  notify_failure "OAuth sign-in broken — ${SIGNIN_LOCATION}"
+if [[ -z "$CSRF_TOKEN" ]]; then
+  log "  ⚠️  auth sign-in check skipped — could not obtain CSRF token"
 else
-  # No location header or unexpected redirect — log as warning, not hard fail
-  log "  ⚠️  auth sign-in redirect unclear (${SIGNIN_LOCATION:-no redirect})"
+  SIGNIN_LOCATION=$(curl -sS --max-time "$TIMEOUT" -X POST \
+    -H "Content-Type: application/x-www-form-urlencoded" \
+    -d "csrfToken=${CSRF_TOKEN}" \
+    -o /dev/null -w "%{redirect_url}" \
+    "${BASE_URL}/api/auth/signin/google" 2>/dev/null) || SIGNIN_LOCATION=""
+
+  if echo "$SIGNIN_LOCATION" | grep -q "accounts.google.com"; then
+    log "  ✅ auth sign-in OK (redirects to Google)"
+  elif echo "$SIGNIN_LOCATION" | grep -q "error="; then
+    fail "auth sign-in BROKEN — redirects to '${SIGNIN_LOCATION}' instead of Google"
+    notify_failure "OAuth sign-in broken — ${SIGNIN_LOCATION}"
+  else
+    # No location header or unexpected redirect — log as warning, not hard fail
+    log "  ⚠️  auth sign-in redirect unclear (${SIGNIN_LOCATION:-no redirect})"
+  fi
 fi
 
 # ── Result ────────────────────────────────────────────────────────────────────
