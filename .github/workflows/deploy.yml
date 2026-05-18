@@ -253,8 +253,18 @@ jobs:
             WEB_IMAGE="$WEB_IMAGE" WORKER_IMAGE="$WORKER_IMAGE" docker compose up -d --remove-orphans --no-build
             log "Running Prisma migrations..."
             docker compose exec -T web node node_modules/prisma/build/index.js migrate deploy
-            log "Waiting 15s for services to stabilise..."
-            sleep 15
+            log "Waiting for web container to become healthy (max 90s)..."
+            for i in $(seq 1 18); do
+              STATUS=$(docker inspect --format='{{.State.Health.Status}}' resumeai-web 2>/dev/null || echo "unknown")
+              if [ "$STATUS" = "healthy" ]; then
+                log "  web is healthy after ~$((i*5))s"
+                break
+              fi
+              log "  t=$((i*5))s — status: ${STATUS}"
+              sleep 5
+            done
+            # Show container state for CI debugging
+            docker compose ps
             log "Running smoke tests..."
             bash "${DEPLOY_DIR}/scripts/smoke_test.sh"
             # ── Post-deploy cleanup: remove images from previous deploys ────────
