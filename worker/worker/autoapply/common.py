@@ -40,10 +40,19 @@ def clean_user_data(data: dict[str, Any]) -> dict[str, Any]:
     name = data.get("name", "")
     parts = name.strip().split() if name else []
 
+    # Build a plus-addressed reply-to so recruiter replies land in the user's
+    # job-email inbox (Prompt 22).  Falls back to the real email when no
+    # inboxHandle is set (e.g. legacy users not yet migrated).
+    inbox_domain = "inbox.resumeai-bot.ru"
+    handle = data.get("inbox_handle", "")
+    app_id = data.get("application_id", "")
+    reply_to = (f"{handle}+{app_id}@{inbox_domain}" if handle and app_id else (f"{handle}@{inbox_domain}" if handle else data.get("email", "")))  # noqa: E501
+
     return {
         "first_name": data.get("first_name") or (parts[0] if parts else ""),
         "last_name": data.get("last_name") or (" ".join(parts[1:]) if len(parts) > 1 else ""),
         "email": data.get("email", ""),
+        "reply_to": reply_to,
         "phone": data.get("phone", ""),
         "linkedin_url": data.get("linkedin_url", ""),
         "resume_text": data.get("resume_text", ""),

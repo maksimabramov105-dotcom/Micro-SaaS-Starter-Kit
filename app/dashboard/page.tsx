@@ -13,7 +13,7 @@ export default async function DashboardPage() {
 
   const userId = session.user.id
 
-  const [resumes, campaigns, recentApplications] = await Promise.all([
+  const [resumes, campaigns, recentApplications, replyCount] = await Promise.all([
     prisma.resume.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
@@ -29,6 +29,7 @@ export default async function DashboardPage() {
       take: 20,
       include: { resume: { select: { title: true } } },
     }),
+    prisma.inboxMessage.count({ where: { userId } }),
   ])
 
   const now = new Date()
@@ -53,7 +54,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* KPI strip */}
-      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-slate-500">Total Applications</CardTitle>
@@ -76,6 +77,17 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{interviews}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-slate-500">Recruiter Replies</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{replyCount}</div>
+            <Link href="/dashboard/inbox" className="text-xs text-emerald-600 hover:underline">
+              Open inbox →
+            </Link>
           </CardContent>
         </Card>
         <Card>

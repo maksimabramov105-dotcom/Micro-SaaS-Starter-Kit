@@ -90,6 +90,10 @@ model User {
   dailyDigestEnabled Boolean @default(true)  // opt-out of daily activity digest email
   timezone           String  @default("UTC") // IANA timezone (e.g. "Europe/Moscow") for sending digest at 8am local
 
+  // Job-email inbox (Prompt 22)
+  inboxHandle   String?       @unique        // forwarding alias, e.g. "alex-7g3k" → alex-7g3k@inbox.resumeai-bot.ru
+  inboxMessages InboxMessage[]
+
   // Resume domain relations
   resumes      Resume[]
   applications JobApplication[]
@@ -383,7 +387,8 @@ model JobApplication {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  events ApplicationEvent[]
+  events        ApplicationEvent[]
+  inboxMessages InboxMessage[]
 
   @@index([userId, createdAt])
   @@index([status])
@@ -483,6 +488,38 @@ model Survey {
 
   @@index([userId, type])
   @@index([scheduledFor, shownAt])
+}
+
+// ---------------------------------------------------------------------------
+// Job-email inbox (Prompt 22)
+// ---------------------------------------------------------------------------
+
+enum InboxClass {
+  INTERVIEW_REQUEST
+  REJECTION
+  QUESTION
+  AUTOMATED
+  OTHER
+  UNCLASSIFIED
+}
+
+model InboxMessage {
+  id             String          @id @default(cuid())
+  userId         String
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  applicationId  String?
+  application    JobApplication? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  fromEmail      String
+  fromName       String?
+  subject        String
+  bodyText       String          @db.Text
+  bodyHtml       String?         @db.Text
+  classification InboxClass      @default(UNCLASSIFIED)
+  receivedAt     DateTime        @default(now())
+  isRead         Boolean         @default(false)
+
+  @@index([userId, receivedAt])
+  @@index([applicationId])
 }
 
 // ---------------------------------------------------------------------------

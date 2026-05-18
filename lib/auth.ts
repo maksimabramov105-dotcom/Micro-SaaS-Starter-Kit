@@ -4,6 +4,7 @@ import GitHubProvider from 'next-auth/providers/github'
 import EmailProvider from 'next-auth/providers/email'
 import { PrismaAdapter } from '@next-auth/prisma-adapter'
 import { prisma } from './prisma'
+import { mintInboxHandle } from './auth/handle-mint'
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -65,4 +66,21 @@ export const authOptions: NextAuthOptions = {
     strategy: 'jwt',
   },
   secret: process.env.NEXTAUTH_SECRET,
+  events: {
+    /**
+     * Fires exactly once per user — when their account is first created via
+     * the Prisma adapter.  We mint the inbox forwarding handle here so it is
+     * always set before the user reaches the dashboard.
+     */
+    async createUser({ user }) {
+      if (user.id && user.email) {
+        try {
+          await mintInboxHandle(user.id, user.email)
+        } catch (err) {
+          // Non-fatal — user can still sign in; handle can be minted later
+          console.error('[auth] failed to mint inboxHandle for', user.id, err)
+        }
+      }
+    },
+  },
 }
