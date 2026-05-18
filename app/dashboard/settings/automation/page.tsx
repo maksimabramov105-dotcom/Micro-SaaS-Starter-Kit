@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
+import Link from 'next/link'
 import {
   Card,
   CardContent,
@@ -175,7 +176,7 @@ export default function AutomationSettingsPage() {
           </div>
           <div className="flex gap-3">
             <span className="mt-0.5 shrink-0 h-5 w-5 rounded-full bg-emerald-100 text-emerald-700 text-xs flex items-center justify-center font-bold">4</span>
-            <p>Both are saved to your application so you can inspect exactly what was submitted from the <a href="/dashboard/applications" className="underline">Applications</a> page.</p>
+            <p>Both are saved to your application so you can inspect exactly what was submitted from the <Link href="/dashboard/applications" className="underline">Applications</Link> page.</p>
           </div>
         </CardContent>
       </Card>

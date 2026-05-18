@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -30,8 +30,12 @@ export default function BillingPage() {
 
   // 30-day guarantee eligibility: firstPaidAt within last 30 days and not yet refunded
   const firstPaidAt = session?.user?.firstPaidAt ? new Date(session.user.firstPaidAt) : null
+  // Snapshot time once at page load — billing eligibility only needs to be accurate
+  // at the moment the page is first viewed, not on every re-render.
+  // eslint-disable-next-line react-hooks/purity -- intentional one-time snapshot
+  const nowMs = useMemo(() => Date.now(), [])
   const daysSinceFirstPayment = firstPaidAt
-    ? (Date.now() - firstPaidAt.getTime()) / (1000 * 60 * 60 * 24)
+    ? (nowMs - firstPaidAt.getTime()) / (1000 * 60 * 60 * 24)
     : Infinity
   const canRequestRefund =
     hasActiveSubscription &&
