@@ -114,11 +114,11 @@ All C-section checks require a live deployment with real OAuth, Stripe, and Link
 
 | Check | Status | Detail |
 |-------|--------|--------|
-| G1. Sentry smoke test | ✅ ROUTE CREATED | Temp route at `/api/_debug/raise` created with `CRON_SECRET` guard. **TODO: Hit the route on VPS, verify in Sentry, then DELETE the file.** |
+| G1. Sentry smoke test | ⚠️ PENDING | Route was at `app/api/_debug/raise` — 404 because Next.js private-folder convention (`_` prefix). Fixed 2026-05-19: moved to `app/api/debug-smoke/raise`. **TODO: `curl "https://resumeai-bot.ru/api/debug-smoke/raise?secret=$CRON_SECRET"` → confirm in Sentry → delete `app/api/debug-smoke/raise/route.ts` → deploy.** |
 | G2. PostHog / Plausible events | ⚠️ MANUAL | PostHog client in `sentry.client.config.ts`. Events (`page_view`, `signup`, etc.) need browser verification. |
 | G3. Daily reporter cron | ⚠️ MANUAL | Cron endpoint at `/api/cron/daily-digest`. Logs to VPS. |
 | G4. Uptime Kuma monitors GREEN | ⚠️ MANUAL | Requires Uptime Kuma dashboard access. |
-| G5. PMF dashboard `/admin/pmf` | ⚠️ BLOCKED | **Prompt 23 (PMF dashboard) NOT YET DONE.** `/admin/pmf` route was verified live in P26 audit (2026-05-16) — all 12 tiles render. Confirm not regressed by P22 merge. |
+| G5. PMF dashboard `/admin/pmf` | ✅ VERIFIED | Browser-verified 2026-05-19: all 12 tiles render correctly (0 values, expected for empty DB). Not regressed by P22 merge. |
 | G6. `/api/surveys/interview-check` | ⚠️ BLOCKED | **Prompt 23 (interview-rate survey) NOT YET DONE.** Route path `/api/surveys/respond` exists (P23 audit confirmed). Check spec endpoint name vs actual. |
 | G7. Exit-reason modal on cancel | ✅ CODE | Cancel dialog with 6 exit reasons confirmed in `app/dashboard/billing/page.tsx` via `EXIT_REASONS` from `lib/pmf/types.ts`. Modal forces selection before cancel. |
 
@@ -154,7 +154,7 @@ All C-section checks require a live deployment with real OAuth, Stripe, and Link
 | D. Country/quality gates | ⚠️ | Manual VPS test |
 | E. Performance | ⚠️ | Manual VPS benchmark |
 | F. Security | ✅ / ⚠️ | F1/F2/F3/F5 code-verified ✅; F4/F6/F7 manual |
-| G. Observability | ⚠️ 🔴 | **G1 needs Sentry trigger + delete route; G5/G6 need P23 to be built** |
+| G. Observability | ⚠️ 🔴 | G1 route fixed (path renamed), needs trigger + delete; G5 ✅ verified 2026-05-19; G6 blocked on P23 |
 | H. Marketing readiness | ✅ / ⚠️ | H1/H4/H5 ✅; H2/H3 manual |
 | I. Rollback drill | ⚠️ | Manual VPS |
 
@@ -164,10 +164,10 @@ All C-section checks require a live deployment with real OAuth, Stripe, and Link
 
 | # | Blocker | Fix |
 |---|---------|-----|
-| 🔴 1 | **G1: Sentry not verified** | SSH to VPS → `curl -s "https://resumeai-bot.ru/api/_debug/raise?secret=$CRON_SECRET"` → confirm error appears in Sentry → delete `app/api/_debug/raise/route.ts` → deploy |
-| 🔴 2 | **C1: OAuth sign-in must work** | Last verified: P21 deploy. Smoke test added to CI. Manual browser test required to confirm. |
+| 🔴 1 | **G1: Sentry not yet triggered** | Route was 404 (fixed 2026-05-19). Now: `curl "https://resumeai-bot.ru/api/debug-smoke/raise?secret=$CRON_SECRET"` → confirm error in Sentry dashboard → tell Claude to delete `app/api/debug-smoke/raise/route.ts` |
+| 🔴 2 | **C1: OAuth full flow** | Login page renders ✅ (verified 2026-05-19). Still need to click "Continue with Google", complete OAuth, and confirm landing on dashboard. |
 | 🔴 3 | **C8: Stripe Checkout → PRO** | Full payment flow not yet verified end-to-end in production with real Stripe test key |
-| 🔴 4 | **G5: PMF dashboard regression check** | P22 merge may not have broken it but needs a quick browser check at `/admin/pmf` |
+| ✅ 4 | ~~G5: PMF dashboard~~ | CLEARED 2026-05-19 — all 12 tiles render, not regressed by P22 |
 | 🟡 5 | **B5: Restore drill** | Verify backup + restore works before real user data accumulates |
 | 🟡 6 | **H2: Lighthouse scores** | Run `npx lighthouse https://resumeai-bot.ru --output json` and confirm Perf ≥ 80, SEO ≥ 90 |
 | 🟡 7 | **A3/A4: Coverage < 70%** | Not a hard blocker but worth improving before scale. Classify.ts (16%) and worker crypto (0%) are gaps. |
@@ -198,7 +198,14 @@ These features are referenced in the QA spec but not yet implemented. Completing
 | `app/api/_debug/raise/route.ts` | Created — TEMP Sentry smoke-test endpoint (DELETE after G1 verification) |
 | `scripts/smoke_test.sh` | Fixed CSRF-less sign-in check (now fetches token first) |
 
+### 2026-05-19 updates
+
+| File | Change |
+|------|--------|
+| `app/api/{_debug→debug-smoke}/raise/route.ts` | Moved from Next.js private folder (404) to routable path |
+| `.github/workflows/deploy.yml` | Fixed deploy: poll for container healthy (was fixed 15s sleep); prune all unused images pre-pull (was dangling-only — caused disk exhaustion after repeated failures) |
+
 ---
 
-_Signed: Claude Code — Prompt 15 QA pass — 2026-05-18_  
-_Status: **PARTIALLY SIGNED OFF** — blockers 1/2/3/4 must clear before launch_
+_Signed: Claude Code — Prompt 15 QA pass — 2026-05-18; updated 2026-05-19_  
+_Status: **PARTIALLY SIGNED OFF** — blockers 1/2/3 remain (G1 trigger, C1 full OAuth flow, C8 Stripe)_
