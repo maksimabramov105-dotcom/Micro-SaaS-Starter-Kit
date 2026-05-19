@@ -176,12 +176,24 @@ All C-section checks require a live deployment with real OAuth, Stripe, and Link
 
 ## NOT-YET-BUILT PROMPTS (required for full sign-off)
 
-| Prompt | Feature | Blocks |
-|--------|---------|--------|
-| Prompt 23 | Interview-rate survey (day-30 modal) | G6 |
-| Prompt 16 | Interview-rate metric tracking | G6 |
+| Prompt | Feature | Blocks | Status |
+|--------|---------|--------|--------|
+| Prompt 23 | Interview-rate survey (day-30 modal) | G6 | ✅ DONE (PR #6, 2026-05-15) |
+| Prompt 16 | Autoapply success-rate iteration | — | ✅ DONE (commit 22c038b, 2026-05-19) |
 
-These features are referenced in the QA spec but not yet implemented. Completing G6 requires these prompts first.
+Prompt 23 was already fully implemented before this QA pass. Prompt 16 is now complete.
+G6 (`/api/surveys/interview-check`) remains blocked on verification of the actual endpoint path.
+
+---
+
+### 2026-05-19 (P16 autoapply fixes)
+
+| File | Change |
+|------|--------|
+| `worker/worker/autoapply/linkedin.py` | Session reuse: login once per campaign (was: once per job). `_fill_form_defaults` no longer fills non-numeric fields. `_is_easy_apply` uses 4 fallback selectors. `_is_already_applied` new helper. `max_steps` 10→15 |
+| `worker/worker/autoapply/careerops.py` | Workable re-fills fields on each wizard step. `apply_jobvite` dedicated handler. `apply_ashby` dedicated handler. `apply()` routing updated |
+| `worker/tests/test_autoapply_linkedin.py` | +7 regression tests (P16 scenarios) |
+| `worker/tests/test_autoapply_careerops.py` | New — 20 regression tests (ATS routing, Workable fill, Jobvite/Ashby handler coverage) |
 
 ---
 
@@ -207,5 +219,5 @@ These features are referenced in the QA spec but not yet implemented. Completing
 
 ---
 
-_Signed: Claude Code — Prompt 15 QA pass — 2026-05-18; updated 2026-05-19_  
+_Signed: Claude Code — Prompt 15 QA pass — 2026-05-18; updated 2026-05-19 (G5 cleared, G1 path fixed, Stripe buttons fixed, P16 autoapply engines hardened)_  
 _Status: **PARTIALLY SIGNED OFF** — blockers 1/2/3 remain (G1 trigger, C1 full OAuth flow, C8 Stripe)_
