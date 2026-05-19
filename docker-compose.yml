@@ -74,6 +74,10 @@ services:
       CRON_SECRET: ${CRON_SECRET}
       # P22 inbox
       RESEND_WEBHOOK_SECRET: ${RESEND_WEBHOOK_SECRET:-}
+      # P18 Telegram notifications
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -105,6 +109,7 @@ services:
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
       ADZUNA_APP_ID: ${ADZUNA_APP_ID:-}
       ADZUNA_APP_KEY: ${ADZUNA_APP_KEY:-}
+      REDIS_URL: redis://redis:6379
       # ENGLISH_JOB_SOURCES must be valid JSON if overridden, e.g.:
       # ENGLISH_JOB_SOURCES: '["adzuna","themuse","arbeitnow","remoteok"]'
     depends_on:
@@ -120,6 +125,28 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+
+  # ── Telegram notifier ─────────────────────────────────────────────────────
+  notifier:
+    image: ${NOTIFIER_IMAGE:-resumeai-notifier:local}
+    build:
+      context: notifier
+      dockerfile: Dockerfile
+    container_name: resumeai-notifier
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://resumeai:resumeai@postgres:5432/resumeai
+      REDIS_URL: redis://redis:6379
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-}
+      APP_URL: ${NEXT_PUBLIC_APP_URL:-https://resumeai-bot.ru}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - resumeai_net
 
   # ── Caddy reverse proxy ────────────────────────────────────────────────────
   caddy:

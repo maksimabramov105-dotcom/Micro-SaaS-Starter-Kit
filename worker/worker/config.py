@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     # Which job boards to query (comma-separated in env, list in code)
     english_job_sources: list[str] = ["adzuna", "themuse", "arbeitnow", "remoteok"]
 
+    # Redis (optional — used by P18 Telegram notifier pub/sub)
+    redis_url: str = ""
+
     # LinkedIn automation rate-limit delays (seconds)
     min_apply_delay: int = 30
     max_apply_delay: int = 90
