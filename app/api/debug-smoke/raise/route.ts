@@ -2,7 +2,7 @@
  * TEMPORARY QA-only endpoint — created for Prompt 15 Sentry smoke test (G1).
  * DELETE THIS FILE AFTER CONFIRMING SENTRY RECEIVED THE ERROR.
  *
- * Usage:  GET /api/_debug/raise?secret=<CRON_SECRET>
+ * Usage:  GET /api/debug-smoke/raise?secret=<CRON_SECRET>
  * Returns 500 and throws a tagged error that Sentry will capture.
  */
 import { NextResponse } from 'next/server'
