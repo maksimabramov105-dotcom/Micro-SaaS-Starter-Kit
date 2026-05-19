@@ -6,6 +6,8 @@ Supports:
   Lever           — jobs.lever.co
   Workable        — apply.workable.com
   SmartRecruiters — jobs.smartrecruiters.com
+  Jobvite         — jobs.jobvite.com
+  Ashby           — jobs.ashbyhq.com
   Generic         — heuristic detection for any unknown ATS
 
 Usage:
@@ -30,6 +32,13 @@ Changes vs source:
   - Replaced logging with structlog
   - Renamed class ATSFiller -> CareerOpsApplicator
   - All log messages in English (source was already English)
+
+P16 improvements (2026-05-19):
+  - Workable: re-fills all fields on every step (not just step 0) so late-
+    appearing required fields are never left blank.
+  - Jobvite: dedicated handler (was falling through to apply_generic_form).
+  - Ashby: dedicated handler (was falling through to apply_generic_form).
+  - apply(): routes jobvite and ashby to their dedicated handlers.
 """
 import random
 import re
@@ -118,6 +127,13 @@ async def _click_apply_button(page: Page) -> bool:
     return False
 
 
+async def _fill_standard_fields(page: Page, user_data: dict, field_map: dict) -> None:
+    """Fill a dict of selector→value pairs, skipping empty values."""
+    for sel, val in field_map.items():
+        if val:
+            await _fill(page, sel, val)
+
+
 class CareerOpsApplicator:
     """Playwright-based form filler for major ATS platforms."""
 
@@ -166,6 +182,10 @@ class CareerOpsApplicator:
                 return await self.apply_workable(job_url, user_data)
             if ats == "smartrecruiters":
                 return await self.apply_smartrecruiters(job_url, user_data)
+            if ats == "jobvite":
+                return await self.apply_jobvite(job_url, user_data)
+            if ats == "ashby":
+                return await self.apply_ashby(job_url, user_data)
             return await self.apply_generic_form(job_url, user_data)
         except Exception as exc:
             logger.exception("careerops.apply.unhandled_error", url=job_url, error=str(exc))
@@ -282,7 +302,15 @@ class CareerOpsApplicator:
     # ── Workable ─────────────────────────────────────────────────────────────
 
     async def apply_workable(self, job_url: str, user_data: dict) -> dict:
-        """Workable: apply.workable.com/*/j/*/apply — multi-step wizard."""
+        """
+        Workable: apply.workable.com/*/j/*/apply — multi-step wizard.
+
+        KEY FIX (P16): Re-fills form fields on every step, not just before
+        the loop.  Workable's wizard conditionally shows fields based on step
+        (e.g. step 1: personal info; step 2: questions; step 3: resume).
+        The original code filled once then only clicked Next, so anything
+        appearing on step 2+ was left blank.
+        """
         page = await self.context.new_page()
         try:
             apply_url = (
@@ -292,35 +320,37 @@ class CareerOpsApplicator:
             await page.wait_for_load_state("networkidle", timeout=15000)
             await page.wait_for_timeout(random.randint(1000, 2000))
 
-            field_map = {
-                'input[name="firstname"]': user_data.get("first_name", ""),
-                'input[name="lastname"]': user_data.get("last_name", ""),
-                'input[name="email"]': user_data.get("email", ""),
-                'input[name="phone"]': user_data.get("phone", ""),
-                'input[name="address"]': user_data.get("location", ""),
-            }
-            for sel, val in field_map.items():
-                if val:
-                    await _fill(page, sel, val)
+            for _step in range(5):
+                # Re-fill standard fields on every step (new ones may have appeared)
+                field_map = {
+                    'input[name="firstname"]': user_data.get("first_name", ""),
+                    'input[name="lastname"]': user_data.get("last_name", ""),
+                    'input[name="email"]': user_data.get("email", ""),
+                    'input[name="phone"]': user_data.get("phone", ""),
+                    'input[name="address"]': user_data.get("location", ""),
+                }
+                for sel, val in field_map.items():
+                    if val:
+                        await _fill(page, sel, val)
 
-            resume_text = user_data.get("resume_text", "")
-            if resume_text:
-                for sel in ['input[type="file"]']:
-                    if await page.locator(sel).count() > 0:
-                        await _upload_resume(page, sel, resume_text)
+                resume_text = user_data.get("resume_text", "")
+                if resume_text:
+                    for sel in ['input[type="file"]']:
+                        if await page.locator(sel).count() > 0:
+                            await _upload_resume(page, sel, resume_text)
+                            break
+
+                cover_letter = user_data.get("cover_letter", "")
+                for sel in [
+                    'textarea[name*="cover"]',
+                    'textarea[placeholder*="cover"]',
+                ]:
+                    if cover_letter and await _fill(page, sel, cover_letter[:2000]):
                         break
 
-            cover_letter = user_data.get("cover_letter", "")
-            for sel in [
-                'textarea[name*="cover"]',
-                'textarea[placeholder*="cover"]',
-            ]:
-                if cover_letter and await _fill(page, sel, cover_letter[:2000]):
-                    break
-
-            # Multi-step: click Next up to 3 times, then Submit
-            for _step in range(4):
-                for txt in ["Submit Application", "Submit", "Next", "Continue"]:
+                # Try Submit first (highest priority)
+                submitted = False
+                for txt in ["Submit Application", "Submit"]:
                     btn = page.locator(
                         f'button:has-text("{txt}"), input[value="{txt}"]'
                     ).first
@@ -328,14 +358,28 @@ class CareerOpsApplicator:
                         await btn.click()
                         await page.wait_for_load_state("networkidle", timeout=10000)
                         await page.wait_for_timeout(1500)
-                        if txt in ("Submit Application", "Submit"):
-                            logger.info("careerops.workable.submitted", url=job_url)
-                            return {
-                                "status": "submitted",
-                                "url": job_url,
-                                "ats": "workable",
-                            }
+                        logger.info("careerops.workable.submitted", url=job_url)
+                        return {
+                            "status": "submitted",
+                            "url": job_url,
+                            "ats": "workable",
+                        }
+
+                # Then try Next / Continue
+                advanced = False
+                for txt in ["Next", "Continue", "Next Step"]:
+                    btn = page.locator(
+                        f'button:has-text("{txt}"), input[value="{txt}"]'
+                    ).first
+                    if await btn.count() > 0:
+                        await btn.click()
+                        await page.wait_for_load_state("networkidle", timeout=10000)
+                        await page.wait_for_timeout(1500)
+                        advanced = True
                         break
+
+                if not advanced:
+                    break  # No button found — bail out
 
             return {"status": "form_not_found", "url": job_url, "ats": "workable"}
         finally:
@@ -379,6 +423,149 @@ class CareerOpsApplicator:
                 return {"status": "submitted", "url": job_url, "ats": "smartrecruiters"}
 
             return {"status": "form_not_found", "url": job_url, "ats": "smartrecruiters"}
+        finally:
+            await page.close()
+
+    # ── Jobvite ───────────────────────────────────────────────────────────────
+
+    async def apply_jobvite(self, job_url: str, user_data: dict) -> dict:
+        """
+        Jobvite: jobs.jobvite.com — click Apply, fill form, submit.
+
+        NEW in P16: dedicated handler (was falling through to apply_generic_form).
+        Jobvite uses id-prefixed inputs and a multi-step flow with a submit
+        button type of "submit".
+        """
+        page = await self.context.new_page()
+        try:
+            await page.goto(job_url, timeout=30000)
+            await page.wait_for_load_state("networkidle", timeout=15000)
+            await page.wait_for_timeout(random.randint(1000, 2000))
+
+            await _click_apply_button(page)
+            await page.wait_for_timeout(1500)
+
+            field_map = {
+                'input#first-name, input[name="firstName"], input[id*="first"]': user_data.get("first_name", ""),
+                'input#last-name, input[name="lastName"], input[id*="last"]': user_data.get("last_name", ""),
+                'input#email, input[name="email"], input[type="email"]': user_data.get("email", ""),
+                'input#phone, input[name="phone"], input[type="tel"]': user_data.get("phone", ""),
+                'input[name*="linkedin"], input[id*="linkedin"]': user_data.get("linkedin_url", ""),
+            }
+            for sel, val in field_map.items():
+                if val:
+                    await _fill(page, sel, val)
+
+            resume_text = user_data.get("resume_text", "")
+            if resume_text:
+                for sel in ['input[type="file"]']:
+                    if await page.locator(sel).count() > 0:
+                        await _upload_resume(page, sel, resume_text)
+                        break
+
+            cover_letter = user_data.get("cover_letter", "")
+            for sel in [
+                'textarea[name*="cover"]',
+                'textarea[id*="cover"]',
+                'textarea[placeholder*="cover"]',
+            ]:
+                if cover_letter and await _fill(page, sel, cover_letter[:2000]):
+                    break
+
+            # Jobvite may have multiple pages; click Next/Submit up to 4 times
+            for _step in range(4):
+                for txt in ["Submit Application", "Submit", "Apply"]:
+                    btn = page.locator(
+                        f'button[type="submit"]:has-text("{txt}"), '
+                        f'input[type="submit"][value*="{txt}"]'
+                    ).first
+                    if await btn.count() > 0:
+                        await btn.click()
+                        await page.wait_for_load_state("networkidle", timeout=15000)
+                        await page.wait_for_timeout(2000)
+                        logger.info("careerops.jobvite.submitted", url=job_url)
+                        return {"status": "submitted", "url": job_url, "ats": "jobvite"}
+
+                # Try next page
+                advanced = False
+                for txt in ["Next", "Continue", "Next Step"]:
+                    btn = page.locator(f'button:has-text("{txt}")').first
+                    if await btn.count() > 0:
+                        await btn.click()
+                        await page.wait_for_load_state("networkidle", timeout=10000)
+                        await page.wait_for_timeout(1500)
+                        advanced = True
+                        break
+                if not advanced:
+                    break
+
+            return {"status": "form_not_found", "url": job_url, "ats": "jobvite"}
+        finally:
+            await page.close()
+
+    # ── Ashby ─────────────────────────────────────────────────────────────────
+
+    async def apply_ashby(self, job_url: str, user_data: dict) -> dict:
+        """
+        Ashby HQ: jobs.ashbyhq.com — click Apply, fill React form, submit.
+
+        NEW in P16: dedicated handler (was falling through to apply_generic_form).
+        Ashby uses data-field-id attributes on inputs; falls back to
+        placeholder-based selectors for flexibility.
+        """
+        page = await self.context.new_page()
+        try:
+            await page.goto(job_url, timeout=30000)
+            await page.wait_for_load_state("networkidle", timeout=15000)
+            await page.wait_for_timeout(random.randint(1000, 2000))
+
+            await _click_apply_button(page)
+            await page.wait_for_load_state("networkidle", timeout=10000)
+            await page.wait_for_timeout(1500)
+
+            # Try data-field-id attrs first, fall back to placeholder/type selectors
+            fields: list[tuple[str, str]] = [
+                ('input[data-field-id="firstName"], input[placeholder*="First"]', user_data.get("first_name", "")),
+                ('input[data-field-id="lastName"], input[placeholder*="Last"]', user_data.get("last_name", "")),
+                ('input[data-field-id="email"], input[type="email"]', user_data.get("email", "")),
+                ('input[data-field-id="phone"], input[type="tel"]', user_data.get("phone", "")),
+                ('input[data-field-id="linkedIn"], input[placeholder*="LinkedIn"]', user_data.get("linkedin_url", "")),
+            ]
+            for sel, val in fields:
+                if val:
+                    await _fill(page, sel, val)
+
+            resume_text = user_data.get("resume_text", "")
+            if resume_text:
+                for sel in [
+                    'input[type="file"][aria-label*="resume"]',
+                    'input[type="file"]',
+                ]:
+                    if await page.locator(sel).count() > 0:
+                        await _upload_resume(page, sel, resume_text)
+                        break
+
+            cover_letter = user_data.get("cover_letter", "")
+            for sel in [
+                'textarea[data-field-id="coverLetter"]',
+                'textarea[placeholder*="cover"]',
+                'textarea[placeholder*="Cover"]',
+                'textarea',
+            ]:
+                if cover_letter and await _fill(page, sel, cover_letter[:2000]):
+                    break
+
+            submit = page.locator(
+                'button[type="submit"], button:has-text("Submit Application"), button:has-text("Submit")'
+            ).first
+            if await submit.count() > 0:
+                await submit.click()
+                await page.wait_for_load_state("networkidle", timeout=15000)
+                await page.wait_for_timeout(2000)
+                logger.info("careerops.ashby.submitted", url=job_url)
+                return {"status": "submitted", "url": job_url, "ats": "ashby"}
+
+            return {"status": "form_not_found", "url": job_url, "ats": "ashby"}
         finally:
             await page.close()
 

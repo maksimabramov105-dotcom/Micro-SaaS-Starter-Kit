@@ -13,6 +13,14 @@ Changes vs source:
   - Replaced Russian strings/comments with English
   - Wrapped as a class (LinkedInApplicator) for use by the FastAPI worker route
   - _fill_form_defaults: removed Russian placeholder keywords
+
+P16 improvements (2026-05-19):
+  - _run_application_session: single browser context, login once for the whole session
+  - _apply_to_job_in_context: reuses an existing authenticated context (no re-login per job)
+  - _fill_form_defaults: only fills fields whose label/placeholder indicate numeric/year values
+  - _is_easy_apply: tries 4 fallback selectors; longer timeout per selector
+  - max_steps bumped 10 → 15
+  - _is_already_applied: detect "You applied" / duplicate-apply state
 """
 import asyncio
 import random
@@ -23,12 +31,13 @@ import structlog
 logger = structlog.get_logger(__name__)
 
 try:
-    from playwright.async_api import async_playwright
+    from playwright.async_api import async_playwright, BrowserContext
     from playwright.async_api import TimeoutError as PWTimeout
 
     PLAYWRIGHT_AVAILABLE = True
 except ImportError:
     PLAYWRIGHT_AVAILABLE = False
+    BrowserContext = None  # type: ignore[assignment,misc]
     logger.warning("linkedin.playwright_not_installed", detail="LinkedIn automation disabled")
 
 LINKEDIN_BASE = "https://www.linkedin.com"
@@ -36,6 +45,24 @@ LOGIN_URL = f"{LINKEDIN_BASE}/login"
 JOBS_SEARCH_URL = f"{LINKEDIN_BASE}/jobs/search/"
 
 MAX_APPS_PER_SESSION = 30
+# Bumped from 10 → 15 to handle longer multi-step Easy Apply forms
+_MAX_FORM_STEPS = 15
+
+# Keywords that indicate a text field is asking for a numeric / year value.
+# Only fill blank text inputs that match; leave others untouched.
+_NUMERIC_FIELD_KEYWORDS = (
+    "year",
+    "years",
+    "experience",
+    "how many",
+    "month",
+    "months",
+    "number",
+    "salary",
+    "compensation",
+    "gpa",
+    "grade",
+)
 
 
 class CaptchaDetectedError(Exception):
@@ -110,15 +137,49 @@ async def _check_captcha(page: Any) -> None:
 
 
 async def _is_easy_apply(page: Any) -> bool:
-    """Return True if the current job posting has an Easy Apply button."""
-    try:
-        btn = await page.wait_for_selector(
-            'button.jobs-apply-button:has-text("Easy Apply")',
-            timeout=3000,
-        )
-        return btn is not None
-    except (PWTimeout, Exception):
-        return False
+    """
+    Return True if the current job posting has an Easy Apply button.
+
+    Tries multiple selectors in sequence to handle LinkedIn UI variations;
+    returns True as soon as any match is found.
+    """
+    # Ordered from most-specific to most-generic to avoid false positives
+    selectors = [
+        'button.jobs-apply-button:has-text("Easy Apply")',
+        'button[aria-label*="Easy Apply"]',
+        '.jobs-apply-button--top-card',
+        'button:has-text("Easy Apply")',
+    ]
+    for selector in selectors:
+        try:
+            btn = await page.wait_for_selector(selector, timeout=2000)
+            if btn:
+                return True
+        except (PWTimeout, Exception):
+            pass
+    return False
+
+
+async def _is_already_applied(page: Any) -> bool:
+    """
+    Return True if the user has already applied to this job.
+    LinkedIn shows 'Applied' badge or 'You applied' message.
+    """
+    already_applied_selectors = [
+        '[aria-label*="Applied"]',
+        'span:has-text("Applied")',
+        'span:has-text("You applied")',
+        '.jobs-apply-button--applied',
+        '.artdeco-inline-feedback--success',
+    ]
+    for selector in already_applied_selectors:
+        try:
+            el = await page.query_selector(selector)
+            if el:
+                return True
+        except Exception:
+            pass
+    return False
 
 
 async def _fill_contact_info(page: Any, user_profile: dict[str, Any]) -> None:
@@ -167,10 +228,16 @@ async def _upload_resume(page: Any, resume_pdf_path: str) -> None:
 
 
 async def _fill_form_defaults(page: Any, user_profile: dict[str, Any]) -> None:
-    """Fill text questions and select elements with sensible defaults."""
+    """
+    Fill text questions and select elements with sensible defaults.
+
+    KEY CHANGE vs original: only fills text inputs whose label/placeholder
+    indicates a numeric or year-type field.  The original code filled ALL
+    empty text inputs with experience_years, which polluted unrelated fields
+    (city, address, portfolio URL, etc.) and caused ATS validation failures.
+    """
     experience_years = str(user_profile.get("experience_years", "1"))
 
-    # Fill empty text inputs using experience years for numeric-looking fields
     try:
         text_inputs = await page.query_selector_all(
             'input[type="text"]:not([aria-label*="ame"]):not([aria-label*="hone"])'
@@ -179,13 +246,18 @@ async def _fill_form_defaults(page: Any, user_profile: dict[str, Any]) -> None:
         for inp in text_inputs:
             try:
                 val = await inp.input_value()
-                if not val:
-                    placeholder = await inp.get_attribute("placeholder") or ""
-                    if any(kw in placeholder.lower() for kw in ["year", "experience"]):
-                        await inp.fill(experience_years)
-                    else:
-                        await inp.fill(experience_years)
+                if val:
+                    continue  # already filled — skip
+
+                # Only fill if the field label/placeholder suggests a numeric / year value
+                placeholder = (await inp.get_attribute("placeholder") or "").lower()
+                aria_label = (await inp.get_attribute("aria-label") or "").lower()
+                label_hint = placeholder + " " + aria_label
+
+                if any(kw in label_hint for kw in _NUMERIC_FIELD_KEYWORDS):
+                    await inp.fill(experience_years)
                     await asyncio.sleep(random.uniform(0.1, 0.3))
+                # else: leave the field blank — don't guess
             except Exception:
                 pass
     except Exception as exc:
@@ -250,7 +322,7 @@ class LinkedInApplicator:
                 "detail": "No Easy Apply jobs found for the given criteria",
             }
 
-        # Step 2: apply to each job
+        # Step 2: apply to each job (single browser session — login once)
         results = await _run_application_session(
             email=email,
             password=password,
@@ -388,6 +460,154 @@ async def _search_jobs(
     return jobs
 
 
+async def _apply_to_job_in_context(
+    context: Any,
+    job_url: str,
+    user_profile: dict[str, Any],
+    resume_pdf_path: str,
+) -> dict[str, Any]:
+    """
+    Apply to a single LinkedIn job using Easy Apply within an EXISTING
+    authenticated browser context.  Opens a new page, applies, then closes it.
+
+    This avoids logging in for every job (the main CAPTCHA risk source).
+    Returns {"success": bool, "error": str|None, "job_url": str}
+    """
+    logger.info("linkedin.apply_to_job.started", job_url=job_url)
+
+    page = await context.new_page()
+    try:
+        await page.goto(job_url, wait_until="domcontentloaded", timeout=30000)
+        await asyncio.sleep(random.uniform(2.0, 3.0))
+        await _check_captcha(page)
+
+        # Skip already-applied jobs
+        if await _is_already_applied(page):
+            logger.info("linkedin.apply_to_job.already_applied", url=job_url)
+            return {
+                "success": False,
+                "error": "already_applied",
+                "job_url": job_url,
+            }
+
+        if not await _is_easy_apply(page):
+            logger.warning("linkedin.apply_to_job.no_easy_apply_button", url=job_url)
+            return {
+                "success": False,
+                "error": "no_easy_apply_button",
+                "job_url": job_url,
+            }
+
+        # Click whichever Easy Apply selector matched
+        clicked = False
+        for selector in [
+            'button.jobs-apply-button:has-text("Easy Apply")',
+            'button[aria-label*="Easy Apply"]',
+            '.jobs-apply-button--top-card',
+            'button:has-text("Easy Apply")',
+        ]:
+            try:
+                btn = await page.query_selector(selector)
+                if btn:
+                    await btn.click()
+                    clicked = True
+                    break
+            except Exception:
+                pass
+
+        if not clicked:
+            return {
+                "success": False,
+                "error": "easy_apply_click_failed",
+                "job_url": job_url,
+            }
+
+        await asyncio.sleep(random.uniform(1.5, 2.5))
+
+        for step in range(1, _MAX_FORM_STEPS + 1):
+            logger.debug("linkedin.apply_to_job.step", step=step, url=job_url)
+
+            await _fill_contact_info(page, user_profile)
+            await _upload_resume(page, resume_pdf_path)
+            await _fill_form_defaults(page, user_profile)
+            await asyncio.sleep(random.uniform(0.8, 1.5))
+
+            # Check for Submit button
+            submit_btn = None
+            try:
+                submit_btn = await page.wait_for_selector(
+                    'button[aria-label="Submit application"], '
+                    'button:has-text("Submit application")',
+                    timeout=2000,
+                )
+            except PWTimeout:
+                pass
+
+            if submit_btn:
+                await submit_btn.click()
+                await asyncio.sleep(random.uniform(2.0, 3.0))
+                logger.info("linkedin.apply_to_job.submitted", url=job_url)
+                return {"success": True, "error": None, "job_url": job_url}
+
+            # Check for Next / Continue / Review
+            next_btn = None
+            for selector in [
+                'button[aria-label="Continue to next step"]',
+                'button[aria-label="Review your application"]',
+                'button:has-text("Next")',
+                'button:has-text("Continue")',
+                'button:has-text("Review")',
+            ]:
+                try:
+                    next_btn = await page.wait_for_selector(selector, timeout=1500)
+                    if next_btn:
+                        break
+                except PWTimeout:
+                    pass
+
+            if next_btn:
+                await next_btn.click()
+                await asyncio.sleep(random.uniform(1.0, 2.0))
+            else:
+                # No recognizable button — check if modal was dismissed
+                try:
+                    await page.wait_for_selector(".artdeco-modal", timeout=1500)
+                except PWTimeout:
+                    logger.info(
+                        "linkedin.apply_to_job.modal_closed_assuming_success",
+                        url=job_url,
+                    )
+                    return {"success": True, "error": None, "job_url": job_url}
+                break
+
+        logger.warning("linkedin.apply_to_job.max_steps_reached", url=job_url)
+        return {"success": False, "error": "max_steps_reached", "job_url": job_url}
+
+    except CaptchaDetectedError as exc:
+        logger.warning("linkedin.apply_to_job.captcha", error=str(exc))
+        return {
+            "success": False,
+            "error": f"captcha_detected: {exc}",
+            "job_url": job_url,
+        }
+    except PWTimeout as exc:
+        logger.error("linkedin.apply_to_job.playwright_timeout", error=str(exc))
+        return {
+            "success": False,
+            "error": f"playwright_timeout: {exc}",
+            "job_url": job_url,
+        }
+    except Exception as exc:
+        logger.exception("linkedin.apply_to_job.inner_error", error=str(exc))
+        return {
+            "success": False,
+            "error": f"unexpected_error: {exc}",
+            "job_url": job_url,
+        }
+    finally:
+        await page.close()
+
+
 async def _apply_to_job(
     email: str,
     password: str,
@@ -396,13 +616,12 @@ async def _apply_to_job(
     resume_pdf_path: str,
 ) -> dict[str, Any]:
     """
-    Apply to a single LinkedIn job using Easy Apply.
-    Returns {"success": bool, "error": str|None, "job_url": str}
+    Standalone apply to a single job (creates its own browser + logs in).
+    Kept for backwards-compatibility; _run_application_session now uses
+    _apply_to_job_in_context for efficiency.
     """
     if not PLAYWRIGHT_AVAILABLE:
         return _not_available_result("_apply_to_job")
-
-    logger.info("linkedin.apply_to_job.started", job_url=job_url)
 
     try:
         async with async_playwright() as pw:
@@ -415,109 +634,28 @@ async def _apply_to_job(
                 ),
                 viewport={"width": 1280, "height": 800},
             )
-            page = await context.new_page()
             try:
-                await _login(page, email, password)
-
-                await page.goto(job_url, wait_until="domcontentloaded", timeout=30000)
-                await asyncio.sleep(random.uniform(2.0, 3.0))
-                await _check_captcha(page)
-
-                if not await _is_easy_apply(page):
-                    logger.warning("linkedin.apply_to_job.no_easy_apply_button", url=job_url)
-                    return {
-                        "success": False,
-                        "error": "no_easy_apply_button",
-                        "job_url": job_url,
-                    }
-
-                await page.click('button.jobs-apply-button:has-text("Easy Apply")')
-                await asyncio.sleep(random.uniform(1.5, 2.5))
-
-                max_steps = 10
-                for step in range(1, max_steps + 1):
-                    logger.debug("linkedin.apply_to_job.step", step=step, url=job_url)
-
-                    await _fill_contact_info(page, user_profile)
-                    await _upload_resume(page, resume_pdf_path)
-                    await _fill_form_defaults(page, user_profile)
-                    await asyncio.sleep(random.uniform(0.8, 1.5))
-
-                    # Check for Submit button
-                    submit_btn = None
-                    try:
-                        submit_btn = await page.wait_for_selector(
-                            'button[aria-label="Submit application"], '
-                            'button:has-text("Submit application")',
-                            timeout=2000,
-                        )
-                    except PWTimeout:
-                        pass
-
-                    if submit_btn:
-                        await submit_btn.click()
-                        await asyncio.sleep(random.uniform(2.0, 3.0))
-                        logger.info("linkedin.apply_to_job.submitted", url=job_url)
-                        return {"success": True, "error": None, "job_url": job_url}
-
-                    # Check for Next / Continue / Review
-                    next_btn = None
-                    for selector in [
-                        'button[aria-label="Continue to next step"]',
-                        'button[aria-label="Review your application"]',
-                        'button:has-text("Next")',
-                        'button:has-text("Continue")',
-                        'button:has-text("Review")',
-                    ]:
-                        try:
-                            next_btn = await page.wait_for_selector(selector, timeout=1500)
-                            if next_btn:
-                                break
-                        except PWTimeout:
-                            pass
-
-                    if next_btn:
-                        await next_btn.click()
-                        await asyncio.sleep(random.uniform(1.0, 2.0))
-                    else:
-                        # No recognizable button — check if modal was dismissed
-                        try:
-                            await page.wait_for_selector(".artdeco-modal", timeout=1500)
-                        except PWTimeout:
-                            logger.info(
-                                "linkedin.apply_to_job.modal_closed_assuming_success",
-                                url=job_url,
-                            )
-                            return {"success": True, "error": None, "job_url": job_url}
-                        break
-
-                logger.warning("linkedin.apply_to_job.max_steps_reached", url=job_url)
-                return {"success": False, "error": "max_steps_reached", "job_url": job_url}
-
-            except CaptchaDetectedError as exc:
-                logger.warning("linkedin.apply_to_job.captcha", error=str(exc))
-                return {
-                    "success": False,
-                    "error": f"captcha_detected: {exc}",
-                    "job_url": job_url,
-                }
-            except PWTimeout as exc:
-                logger.error("linkedin.apply_to_job.playwright_timeout", error=str(exc))
-                return {
-                    "success": False,
-                    "error": f"playwright_timeout: {exc}",
-                    "job_url": job_url,
-                }
-            except Exception as exc:
-                logger.exception("linkedin.apply_to_job.inner_error", error=str(exc))
-                return {
-                    "success": False,
-                    "error": f"unexpected_error: {exc}",
-                    "job_url": job_url,
-                }
+                login_page = await context.new_page()
+                await _login(login_page, email, password)
+                await login_page.close()
+                return await _apply_to_job_in_context(
+                    context=context,
+                    job_url=job_url,
+                    user_profile=user_profile,
+                    resume_pdf_path=resume_pdf_path,
+                )
+            except CaptchaDetectedError:
+                raise
             finally:
                 await browser.close()
 
+    except CaptchaDetectedError as exc:
+        logger.warning("linkedin.apply_to_job.captcha", error=str(exc))
+        return {
+            "success": False,
+            "error": f"captcha_detected: {exc}",
+            "job_url": job_url,
+        }
     except Exception as exc:
         logger.exception("linkedin.apply_to_job.outer_error", error=str(exc))
         return {"success": False, "error": f"browser_error: {exc}", "job_url": job_url}
@@ -532,6 +670,12 @@ async def _run_application_session(
 ) -> list[dict[str, Any]]:
     """
     Run a full application session for a list of jobs.
+
+    KEY CHANGE (P16): Creates ONE browser context, logs in ONCE, then
+    calls _apply_to_job_in_context for each job using the shared, already-
+    authenticated context.  The original code re-created the browser and
+    re-logged-in per job, which multiplied CAPTCHA exposure by ~30×.
+
     Respects MAX_APPS_PER_SESSION and 2-3 minute delays between applications.
     """
     if not PLAYWRIGHT_AVAILABLE:
@@ -540,46 +684,78 @@ async def _run_application_session(
     results: list[dict[str, Any]] = []
     applied_count = 0
 
-    for idx, job in enumerate(jobs):
-        if applied_count >= MAX_APPS_PER_SESSION:
-            logger.info("linkedin.session.limit_reached", limit=MAX_APPS_PER_SESSION)
-            break
-
-        job_url = job.get("url", "")
-        if not job_url:
-            logger.warning("linkedin.session.job_no_url")
-            continue
-
-        result = await _apply_to_job(
-            email=email,
-            password=password,
-            job_url=job_url,
-            user_profile=user_profile,
-            resume_pdf_path=resume_pdf_path,
-        )
-        result["job_title"] = job.get("title", "")
-        result["company"] = job.get("company", "")
-        results.append(result)
-
-        if result["success"]:
-            applied_count += 1
-            logger.info(
-                "linkedin.session.applied",
-                count=f"{applied_count}/{MAX_APPS_PER_SESSION}",
-                title=job.get("title"),
-                company=job.get("company"),
+    try:
+        async with async_playwright() as pw:
+            browser = await pw.chromium.launch(headless=True)
+            context = await browser.new_context(
+                user_agent=(
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/120.0.0.0 Safari/537.36"
+                ),
+                viewport={"width": 1280, "height": 800},
             )
-        else:
-            error = result.get("error", "")
-            if "captcha_detected" in error:
-                logger.warning("linkedin.session.captcha_pausing")
-                break
+            try:
+                # Login ONCE for the whole session
+                login_page = await context.new_page()
+                await _login(login_page, email, password)
+                await login_page.close()
+                logger.info("linkedin.session.logged_in_once")
 
-        # 2-3 minute delay between applications
-        if applied_count < MAX_APPS_PER_SESSION and idx < len(jobs) - 1:
-            delay = random.uniform(120, 180)
-            logger.info("linkedin.session.delay_between_applications", delay_s=round(delay))
-            await asyncio.sleep(delay)
+                for idx, job in enumerate(jobs):
+                    if applied_count >= MAX_APPS_PER_SESSION:
+                        logger.info(
+                            "linkedin.session.limit_reached", limit=MAX_APPS_PER_SESSION
+                        )
+                        break
+
+                    job_url = job.get("url", "")
+                    if not job_url:
+                        logger.warning("linkedin.session.job_no_url")
+                        continue
+
+                    result = await _apply_to_job_in_context(
+                        context=context,
+                        job_url=job_url,
+                        user_profile=user_profile,
+                        resume_pdf_path=resume_pdf_path,
+                    )
+                    result["job_title"] = job.get("title", "")
+                    result["company"] = job.get("company", "")
+                    results.append(result)
+
+                    if result["success"]:
+                        applied_count += 1
+                        logger.info(
+                            "linkedin.session.applied",
+                            count=f"{applied_count}/{MAX_APPS_PER_SESSION}",
+                            title=job.get("title"),
+                            company=job.get("company"),
+                        )
+                    else:
+                        error = result.get("error", "")
+                        if "captcha_detected" in error:
+                            logger.warning("linkedin.session.captcha_pausing")
+                            break
+
+                    # 2-3 minute delay between applications
+                    if applied_count < MAX_APPS_PER_SESSION and idx < len(jobs) - 1:
+                        delay = random.uniform(120, 180)
+                        logger.info(
+                            "linkedin.session.delay_between_applications",
+                            delay_s=round(delay),
+                        )
+                        await asyncio.sleep(delay)
+
+            except CaptchaDetectedError as exc:
+                logger.warning("linkedin.session.captcha_halted", error=str(exc))
+            except Exception as exc:
+                logger.exception("linkedin.session.inner_error", error=str(exc))
+            finally:
+                await browser.close()
+
+    except Exception as exc:
+        logger.exception("linkedin.session.outer_error", error=str(exc))
 
     logger.info(
         "linkedin.session.complete",
