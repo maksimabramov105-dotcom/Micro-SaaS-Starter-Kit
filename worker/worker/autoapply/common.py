@@ -43,7 +43,11 @@ def clean_user_data(data: dict[str, Any]) -> dict[str, Any]:
     # Build a plus-addressed reply-to so recruiter replies land in the user's
     # job-email inbox (Prompt 22).  Falls back to the real email when no
     # inboxHandle is set (e.g. legacy users not yet migrated).
-    inbox_domain = "inbox.resumeai-bot.ru"
+    # P22: use root domain (free Resend plan supports only one domain).
+    # inbox.resumeai-bot.ru requires a paid second-domain slot; root domain
+    # resumeai-bot.ru has no personal mailboxes so enabling Resend receiving
+    # on it is safe.
+    inbox_domain = "resumeai-bot.ru"
     handle = data.get("inbox_handle", "")
     app_id = data.get("application_id", "")
     reply_to = (f"{handle}+{app_id}@{inbox_domain}" if handle and app_id else (f"{handle}@{inbox_domain}" if handle else data.get("email", "")))  # noqa: E501
