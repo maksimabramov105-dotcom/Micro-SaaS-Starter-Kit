@@ -124,6 +124,7 @@ model ApiKey {
   id        String    @id @default(cuid())
   name      String
   key       String    @unique
+  scope     String?   // e.g. "extension" — null means general-purpose key
   userId    String
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   lastUsed  DateTime?
@@ -131,6 +132,7 @@ model ApiKey {
   expiresAt DateTime?
 
   @@index([userId])
+  @@index([scope])
 }
 
 // ---------------------------------------------------------------------------
