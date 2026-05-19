@@ -100,6 +100,9 @@ model User {
   campaigns    AutoApplyCampaign[]
   surveys      Survey[]
 
+  // Telegram notification (Prompt 18)
+  telegramChat  TelegramChat?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -133,6 +136,26 @@ model ApiKey {
 
   @@index([userId])
   @@index([scope])
+}
+
+// ---------------------------------------------------------------------------
+// Telegram Notifications (Prompt 18)
+// ---------------------------------------------------------------------------
+
+model TelegramChat {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chatId      String                  // Telegram chat_id (numeric, stored as string)
+  username    String?                 // @username if available
+  connectedAt DateTime @default(now())
+
+  // Per-type notification toggles (user can opt out individually)
+  notifyOnSubmit         Boolean @default(true)
+  notifyOnInterviewReply Boolean @default(true)
+  notifyOnLinkedInIssue  Boolean @default(true)
+
+  @@index([chatId])
 }
 
 // ---------------------------------------------------------------------------

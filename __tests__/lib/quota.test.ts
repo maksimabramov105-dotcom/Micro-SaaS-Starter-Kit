@@ -7,8 +7,14 @@ jest.mock('@/lib/prisma', () => ({
     jobApplication: {
       count: jest.fn(),
       updateMany: jest.fn(),
+      findUnique: jest.fn(),
     },
   },
+}))
+
+// Mock Redis publishEvent so tests don't require a live Redis connection
+jest.mock('@/lib/redis', () => ({
+  publishEvent: jest.fn().mockResolvedValue(undefined),
 }))
 
 import { canSendApplication, consumeQuota } from '@/lib/quota'
@@ -16,7 +22,7 @@ import { prisma } from '@/lib/prisma'
 
 const mockPrisma = prisma as unknown as {
   user: { findUnique: jest.Mock }
-  jobApplication: { count: jest.Mock; updateMany: jest.Mock }
+  jobApplication: { count: jest.Mock; updateMany: jest.Mock; findUnique: jest.Mock }
 }
 
 beforeEach(() => {
@@ -71,6 +77,7 @@ describe('canSendApplication', () => {
 describe('consumeQuota', () => {
   it('calls updateMany with null appliedAt filter', async () => {
     mockPrisma.jobApplication.updateMany.mockResolvedValue({ count: 1 })
+    mockPrisma.jobApplication.findUnique.mockResolvedValue({ jobTitle: 'SWE', company: 'Acme' })
     await consumeQuota('user-1', 'app-1')
     expect(mockPrisma.jobApplication.updateMany).toHaveBeenCalledWith({
       where: { id: 'app-1', userId: 'user-1', appliedAt: null },

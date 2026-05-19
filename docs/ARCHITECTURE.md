@@ -14,6 +14,7 @@ High-level map of the system's major subsystems and how they relate.
 | Payments | Stripe (subscriptions + webhooks) |
 | Email | Resend (via `lib/email.ts`) |
 | Background jobs | GitHub Actions (cron → HTTP) |
+| Notifications | Telegram Bot (outbound-only, Redis pub/sub) |
 | Hosting | Docker on VPS (`resumeai-bot.ru`) |
 
 ---
@@ -53,6 +54,52 @@ Key DB fields on `User`: `stripeCustomerId`, `stripeSubscriptionId`, `stripePric
 | `lib/pmf/survey.ts` | `seedDay30Survey()` — idempotent survey creation |
 | `app/api/cron/seed-surveys/route.ts` | Cron endpoint seeding day-30 surveys |
 | `.github/workflows/seed-surveys.yml` | Daily 9am UTC GitHub Actions trigger |
+
+---
+
+### Telegram Notifications (`notifier/`, `lib/redis.ts`, `lib/telegram-token.ts`)
+
+Outbound-only Telegram bot that pings users for key application events. Users connect once from the dashboard; thereafter they receive real-time notifications without logging in.
+
+**Architecture:**
+
+```
+Next.js (web) ──publishEvent()──► Redis channel "application_events"
+                                        │
+                           notifier/ (Python asyncio)
+                           subscribes, handles 3 event types
+                                        │
+                           Telegram Bot API sendMessage
+```
+
+| File | Responsibility |
+|---|---|
+| `lib/redis.ts` | Singleton ioredis client; `publishEvent(channel, payload)` |
+| `lib/telegram-token.ts` | HMAC-signed 5-min connect tokens; `signTelegramToken` / `verifyTelegramToken` |
+| `app/api/notifications/telegram/connect/route.ts` | GET status, POST deep-link, PATCH toggles, DELETE disconnect |
+| `app/api/notifications/telegram/webhook/route.ts` | Telegram webhook receiver; handles `/start <token>`, `/stop` |
+| `app/dashboard/notifications/page.tsx` | Connect/disconnect UI + per-type toggle switches |
+| `notifier/main.py` | Redis subscriber; dispatches events to Telegram |
+| `notifier/templates.py` | HTML message templates for 3 event types |
+| `notifier/rate_limiter.py` | 30 msg/user/hour Redis counter |
+| `notifier/database.py` | asyncpg pool; `get_telegram_chat(pool, user_id)` |
+
+**Event types:**
+- `application_submitted` — fired from `lib/quota.ts` after successful application
+- `interview_reply` — fired from `app/api/inbox/inbound/route.ts` on recruiter email parse
+- `linkedin_issue` — fired from `worker/worker/autoapply/common.py` on auth failure
+
+**Connection flow:**
+1. User clicks "Connect Telegram" on `/dashboard/notifications`
+2. API generates `https://t.me/<BOT>?start=<hmac-token>` deep link (5 min TTL)
+3. User taps link → Telegram opens bot chat → `/start <token>`
+4. Webhook verifies token → upserts `TelegramChat` → confirms in chat
+
+**DB model:** `TelegramChat` (userId unique, chatId, notifyOnSubmit, notifyOnInterviewReply, notifyOnLinkedInIssue)
+
+**Rate limit:** 30 messages/user/hour via Redis INCR+EXPIRE.
+
+**Security:** Webhook protected by `X-Telegram-Bot-Api-Secret-Token` header (`TELEGRAM_WEBHOOK_SECRET`). Token HMAC uses `NEXTAUTH_SECRET`. Bot token in env var only — never in code.
 
 ---
 

@@ -27,6 +27,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { classifyEmail } from '@/lib/inbox/classify'
 import { verifyResendSignature, parseFrom, parseToAddress } from '@/lib/inbox/inbound-utils'
+import { publishEvent } from '@/lib/redis'
 
 const INBOX_DOMAIN = process.env.INBOX_DOMAIN ?? 'inbox.resumeai-bot.ru'
 
@@ -129,6 +130,14 @@ export async function POST(req: Request) {
           data: { status: 'INTERVIEW', responseAt: new Date() },
         }),
       ])
+      // P18: notify via Telegram
+      await publishEvent('application_events', {
+        type: 'interview_reply',
+        userId: user.id,
+        applicationId,
+        company: fromName || fromEmail,
+        timestamp: new Date().toISOString(),
+      })
     } else if (classification === 'REJECTION') {
       await prisma.jobApplication.update({
         where: { id: applicationId },

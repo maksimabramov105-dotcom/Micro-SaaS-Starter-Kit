@@ -2,12 +2,14 @@
 common.py — Shared helpers for autoapply modules.
 
 Provides:
-  - clean_user_data()    : validate / normalise user_data dicts before submission
-  - not_available_result(): standard error dict when a dependency is missing
-  - prepare_application(): run AI tailoring before submit, return enriched user_data
-                           + tailoring metadata for DB persistence
+  - clean_user_data()          : validate / normalise user_data dicts before submission
+  - not_available_result()     : standard error dict when a dependency is missing
+  - prepare_application()      : run AI tailoring before submit, return enriched user_data
+                                 + tailoring metadata for DB persistence
+  - publish_linkedin_issue()   : P18 — fire-and-forget Redis event for LinkedIn auth failures
 """
 import json
+from datetime import datetime, timezone
 from typing import Any
 
 import structlog
@@ -16,6 +18,23 @@ from worker.ai.tailor import should_tailor, tailor_cover_letter, tailor_resume
 from worker.config import settings
 
 logger = structlog.get_logger(__name__)
+
+
+async def publish_linkedin_issue(user_id: str) -> None:  # P18: ONE LINE publish
+    """Publish a linkedin_issue event so the Telegram notifier can alert the user."""
+    try:
+        import redis.asyncio as aioredis  # lazy import — only if Redis available
+        redis_url = getattr(settings, "redis_url", "")
+        if not redis_url:
+            return
+        async with aioredis.from_url(redis_url, decode_responses=True) as r:
+            await r.publish("application_events", json.dumps({
+                "type": "linkedin_issue",
+                "userId": user_id,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }))
+    except Exception as exc:  # never let Redis outage break the autoapply flow
+        logger.warning("publish_linkedin_issue.failed", error=str(exc))
 
 
 def not_available_result(reason: str, context: str = "") -> dict[str, Any]:

@@ -1,4 +1,5 @@
 import { prisma } from './prisma'
+import { publishEvent } from './redis'
 
 export async function canSendApplication(userId: string): Promise<boolean> {
   const user = await prisma.user.findUnique({
@@ -22,8 +23,26 @@ export async function canSendApplication(userId: string): Promise<boolean> {
 }
 
 export async function consumeQuota(userId: string, jobApplicationId: string): Promise<void> {
-  await prisma.jobApplication.updateMany({
+  const updated = await prisma.jobApplication.updateMany({
     where: { id: jobApplicationId, userId, appliedAt: null },
     data: { appliedAt: new Date() },
   })
+
+  // P18: publish to notifier when an application is officially submitted
+  if (updated.count > 0) {
+    const app = await prisma.jobApplication.findUnique({
+      where: { id: jobApplicationId },
+      select: { jobTitle: true, company: true },
+    })
+    if (app) {
+      await publishEvent('application_events', {
+        type: 'application_submitted',
+        userId,
+        applicationId: jobApplicationId,
+        jobTitle: app.jobTitle,
+        company: app.company,
+        timestamp: new Date().toISOString(),
+      })
+    }
+  }
 }
