@@ -99,6 +99,18 @@ jobs:
           cache-from: type=gha,scope=worker
           cache-to:   type=gha,scope=worker,mode=max
 
+      # ── notifier image ────────────────────────────────────────────────────
+      - name: Build & push notifier
+        uses: docker/build-push-action@v5
+        with:
+          context: ./notifier
+          push: true
+          tags: |
+            ghcr.io/${{ env.OWNER }}/resumeai-notifier:${{ github.sha }}
+            ghcr.io/${{ env.OWNER }}/resumeai-notifier:latest
+          cache-from: type=gha,scope=notifier
+          cache-to:   type=gha,scope=notifier,mode=max
+
   # ── 3. Deploy to VPS ─────────────────────────────────────────────────────────
   deploy:
     name: Deploy to VPS
@@ -228,6 +240,7 @@ jobs:
             OWNER="${OWNER:-maksimabramov105-dotcom}"
             WEB_IMAGE="${REGISTRY}/${OWNER}/resumeai-web:${IMAGE_TAG}"
             WORKER_IMAGE="${REGISTRY}/${OWNER}/resumeai-worker:${IMAGE_TAG}"
+            NOTIFIER_IMAGE="${REGISTRY}/${OWNER}/resumeai-notifier:${IMAGE_TAG}"
             log() { echo "[$(date -u +%T)] $*"; }
             log "Deploying tag=${IMAGE_TAG}"
             cd "$DEPLOY_DIR"
@@ -248,9 +261,9 @@ jobs:
             fi
 
             log "Pulling images..."
-            WEB_IMAGE="$WEB_IMAGE" WORKER_IMAGE="$WORKER_IMAGE" docker compose pull web worker
+            WEB_IMAGE="$WEB_IMAGE" WORKER_IMAGE="$WORKER_IMAGE" NOTIFIER_IMAGE="$NOTIFIER_IMAGE" docker compose pull web worker notifier
             log "Restarting services..."
-            WEB_IMAGE="$WEB_IMAGE" WORKER_IMAGE="$WORKER_IMAGE" docker compose up -d --remove-orphans --no-build
+            WEB_IMAGE="$WEB_IMAGE" WORKER_IMAGE="$WORKER_IMAGE" NOTIFIER_IMAGE="$NOTIFIER_IMAGE" docker compose up -d --remove-orphans --no-build
             log "Running Prisma migrations..."
             docker compose exec -T web node node_modules/prisma/build/index.js migrate deploy
             log "Waiting for web container to become healthy (max 90s)..."
