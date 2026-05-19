@@ -69,6 +69,11 @@ services:
       SENTRY_ORG: ${SENTRY_ORG:-}
       SENTRY_PROJECT: ${SENTRY_PROJECT:-}
       REDIS_URL: redis://redis:6379
+      # PMF / admin
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      CRON_SECRET: ${CRON_SECRET}
+      # P22 inbox
+      RESEND_WEBHOOK_SECRET: ${RESEND_WEBHOOK_SECRET:-}
     depends_on:
       postgres:
         condition: service_healthy
