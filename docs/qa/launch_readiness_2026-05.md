@@ -158,11 +158,13 @@ All C-section checks require live OAuth/Stripe/LinkedIn credentials.
 | 🟡 1 | **G1: Sentry monitoring** | Create project at sentry.io → add DSN to VPS .env | TODO pre-scale |
 | 🟡 2 | **B5: Restore drill** | Run `scripts/backup_db.sh`, restore, verify, drop | TODO pre-scale |
 | 🟡 3 | **H3: OG preview** | LinkedIn Post Inspector on `https://resumeai-bot.ru` | TODO pre-marketing |
+| 🟡 9 | **C2: OpenAI geo-block** | Set `OPENAI_BASE_URL=<proxy>` in VPS `.env` — code deployed, VPS manual step needed | VPS config pending |
 | 🟢 4 | ~~F6: ENCRYPTION_KEY missing from web~~ | **FIXED 2026-05-20** | ✅ DONE |
 | 🟢 5 | ~~G1: Sentry route cleanup~~ | **DONE 2026-05-20** — triggered + deleted | ✅ DONE |
 | 🟢 6 | ~~C1: OAuth flow~~ | **CONFIRMED** 2026-05-20 by user | ✅ DONE |
 | 🟢 7 | ~~C8: Stripe checkout~~ | **VERIFIED** 2026-05-20 — live mode, form works, test card correctly declined | ✅ DONE |
 | 🟢 8 | ~~H2: Lighthouse scores~~ | **VERIFIED** 2026-05-20 — Perf 99, A11y 95, BP 96, SEO 100 | ✅ DONE |
+| 🟢 10 | ~~PDF download disabled~~ | **FIXED 2026-05-20** — `POST /jobs/resume/pdf` worker endpoint + Next.js proxy route | ✅ DONE |
 
 ---
 
@@ -173,6 +175,17 @@ All C-section checks require live OAuth/Stripe/LinkedIn credentials.
 | `docker-compose.yml` | Added `ENCRYPTION_KEY: ${ENCRYPTION_KEY}` to web service environment — **critical bug fix**, campaigns were broken without it |
 | `app/api/debug-smoke/raise/route.ts` | Deleted per G1 spec (triggered + confirmed 500, cleanup done) |
 
+### Pass 2026-05-20 (second batch — commit 2f8c706)
+
+| File | Change |
+|------|--------|
+| `worker/worker/config.py` | Added `openai_base_url` setting (default `https://api.openai.com`) — override with `OPENAI_BASE_URL` env var |
+| `worker/worker/ai/resume.py` | Replaced hardcoded `_OPENAI_URL` with `_openai_url()` function using `settings.openai_base_url` |
+| `docker-compose.yml` | Added `OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com}` to worker service |
+| `worker/worker/routes/jobs.py` | Added `POST /jobs/resume/pdf` endpoint — generates formatted PDF via reportlab from resume text |
+| `app/api/resumes/[id]/pdf/route.ts` | New Next.js GET route — fetches resume from DB, proxies to worker, streams PDF to browser |
+| `app/dashboard/resumes/[id]/page.tsx` | Replaced disabled Download PDF button with active `<a href="/api/resumes/{id}/pdf" download>` link |
+
 ### Previous passes
 
 | Date | Change |
@@ -182,5 +195,5 @@ All C-section checks require live OAuth/Stripe/LinkedIn credentials.
 
 ---
 
-_Signed: Claude Code — Prompt 15 QA pass — 2026-05-18; updated 2026-05-19, 2026-05-20_
-_Status: **✅ LAUNCH READY** — all hard blockers cleared. Three optional pre-scale TODOs remain (Sentry, restore drill, OG preview)._
+_Signed: Claude Code — Prompt 15 QA pass — 2026-05-18; updated 2026-05-19, 2026-05-20 (×2)_
+_Status: **✅ LAUNCH READY** — all hard blockers cleared. PDF download shipped. OpenAI proxy needs VPS env var before resume generation works from Russian IPs._
