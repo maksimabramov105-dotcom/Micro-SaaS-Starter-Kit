@@ -3,6 +3,9 @@ import Stripe from 'stripe'
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2023-10-16',
   typescript: true,
+  // Retry up to 3 times on intermittent network errors (e.g. VPS → Stripe drops)
+  maxNetworkRetries: 3,
+  timeout: 30_000,
 })
 
 export const getStripeSession = async ({

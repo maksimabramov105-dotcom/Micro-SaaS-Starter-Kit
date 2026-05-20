@@ -47,6 +47,18 @@ export async function POST(req: Request) {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error)
     console.error('Error creating checkout session:', message)
-    return new NextResponse('Internal Server Error', { status: 500 })
+
+    // Distinguish Stripe network errors (intermittent) from config errors
+    if (message.includes('connection') || message.includes('network') || message.includes('ETIMEDOUT') || message.includes('ECONNRESET')) {
+      return new NextResponse(
+        'Payment service temporarily unavailable — please try again in a moment.',
+        { status: 503 }
+      )
+    }
+
+    return new NextResponse(
+      'Unable to start checkout. Please try again or contact support.',
+      { status: 500 }
+    )
   }
 }
