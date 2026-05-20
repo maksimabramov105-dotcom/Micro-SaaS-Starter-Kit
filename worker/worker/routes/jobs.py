@@ -12,11 +12,13 @@ In-memory storage resets on worker restart.  A persistent job queue
 """
 import uuid
 from datetime import datetime, timezone
+from io import BytesIO
 from typing import Any
 from typing import Literal
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import Response as FastAPIResponse
 from pydantic import BaseModel
 
 from worker.ai.cover_letter import generate_cover_letter
@@ -127,6 +129,11 @@ class TailorRequest(BaseModel):
     job_id: str = ""            # stable job identifier for cache key
 
 
+class ResumePdfRequest(BaseModel):
+    resume_text: str
+    title: str = "Resume"
+
+
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @router.post("/resume/generate", dependencies=[Depends(verify_bearer)])
@@ -149,6 +156,86 @@ async def resume_generate(body: ResumeGenerateRequest) -> dict:
         logger.error("job.resume_generate.error", job_id=job.job_id, error=str(exc))
 
     return job.model_dump()
+
+
+@router.post("/resume/pdf", dependencies=[Depends(verify_bearer)])
+async def resume_pdf(body: ResumePdfRequest) -> FastAPIResponse:
+    """Generate a downloadable PDF from resume plain text using reportlab."""
+    from reportlab.lib.enums import TA_LEFT
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+    from reportlab.lib.units import inch
+    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
+
+    logger.info("job.resume_pdf.started", title=body.title)
+    try:
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=letter,
+            rightMargin=inch,
+            leftMargin=inch,
+            topMargin=inch,
+            bottomMargin=inch,
+        )
+
+        styles = getSampleStyleSheet()
+        body_style = ParagraphStyle(
+            "ResumeBody",
+            parent=styles["Normal"],
+            fontSize=10,
+            leading=14,
+            alignment=TA_LEFT,
+        )
+        heading_style = ParagraphStyle(
+            "ResumeHeading",
+            parent=styles["Normal"],
+            fontSize=12,
+            leading=16,
+            spaceBefore=8,
+            spaceAfter=2,
+            fontName="Helvetica-Bold",
+            alignment=TA_LEFT,
+        )
+
+        elements = []
+        for line in body.resume_text.split("\n"):
+            stripped = line.strip()
+            if not stripped:
+                elements.append(Spacer(1, 4))
+                continue
+            # Escape XML special chars for reportlab's Paragraph
+            safe = (
+                stripped
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+            )
+            # Heuristic: ALL-CAPS short lines are section headers
+            if stripped.isupper() and len(stripped) < 50:
+                elements.append(Paragraph(safe, heading_style))
+            else:
+                elements.append(Paragraph(safe, body_style))
+
+        doc.build(elements)
+        pdf_bytes = buffer.getvalue()
+
+        # Sanitise filename
+        safe_title = "".join(
+            c for c in body.title if c.isalnum() or c in " _-"
+        ).strip()[:60] or "resume"
+
+        logger.info("job.resume_pdf.done", bytes=len(pdf_bytes))
+        return FastAPIResponse(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{safe_title}.pdf"'
+            },
+        )
+    except Exception as exc:
+        logger.error("job.resume_pdf.error", error=str(exc))
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {exc}")
 
 
 @router.post("/cover-letter", dependencies=[Depends(verify_bearer)])

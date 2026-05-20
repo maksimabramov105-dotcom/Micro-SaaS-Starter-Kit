@@ -22,7 +22,9 @@ from worker.config import settings
 
 logger = structlog.get_logger(__name__)
 
-_OPENAI_URL = "https://api.openai.com/v1/chat/completions"
+def _openai_url() -> str:
+    """Return the chat/completions URL, respecting any configured proxy base."""
+    return f"{settings.openai_base_url.rstrip('/')}/v1/chat/completions"
 
 # Load system prompt once at import time
 _PROMPTS_DIR = Path(__file__).parent / "prompts"
@@ -57,7 +59,7 @@ async def _call_openai(
     try:
         async with httpx.AsyncClient(timeout=60) as client:
             r = await client.post(
-                _OPENAI_URL,
+                _openai_url(),
                 headers={
                     "Authorization": f"Bearer {api_key}",
                     "Content-Type": "application/json",

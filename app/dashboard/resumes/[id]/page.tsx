@@ -37,13 +37,10 @@ export default async function ResumeDetailPage({ params }: PageProps) {
           <Button asChild variant="outline" size="sm">
             <Link href="/dashboard">← Dashboard</Link>
           </Button>
-          <Button
-            size="sm"
-            disabled
-            title="Coming soon"
-            className="cursor-not-allowed opacity-60"
-          >
-            Download PDF
+          <Button asChild size="sm">
+            <a href={`/api/resumes/${id}/pdf`} download>
+              Download PDF
+            </a>
           </Button>
         </div>
       </div>

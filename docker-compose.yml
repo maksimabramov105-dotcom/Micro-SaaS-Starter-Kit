@@ -107,6 +107,9 @@ services:
       WORKER_SECRET: ${WORKER_SECRET}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      # Set to a proxy URL if the VPS cannot reach api.openai.com directly
+      # e.g. OPENAI_BASE_URL=https://your-openai-proxy.com
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
       ADZUNA_APP_ID: ${ADZUNA_APP_ID:-}
       ADZUNA_APP_KEY: ${ADZUNA_APP_KEY:-}

@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     # OpenAI
     openai_api_key: str = ""
     openai_model: str = "gpt-4o-mini"
+    # Override to route through a proxy (e.g. for geo-restricted deployments).
+    # Must NOT have a trailing slash.  Default = official OpenAI API.
+    openai_base_url: str = "https://api.openai.com"
 
     # Encryption — MUST match old .env to decrypt existing LinkedIn passwords
     encryption_key: str = ""
