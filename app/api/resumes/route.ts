@@ -40,21 +40,45 @@ export async function POST(req: Request) {
 
   if (!targetRole) return new NextResponse('targetRole is required', { status: 400 })
 
+  // Build a plain-text user profile from form fields to send to the worker.
+  const profileParts: string[] = []
+  if (workHistory)  profileParts.push(`Work History:\n${workHistory}`)
+  if (education)    profileParts.push(`Education:\n${education}`)
+  if (skills)       profileParts.push(`Skills:\n${skills}`)
+  if (yearsExp)     profileParts.push(`Years of experience: ${yearsExp}`)
+  if (location)     profileParts.push(`Preferred location: ${location}`)
+  if (remote)       profileParts.push('Open to remote work.')
+  if (tone)         profileParts.push(`Preferred tone: ${tone}`)
+  const resumeInput = profileParts.join('\n\n') || String(targetRole)
+
   let generated: unknown = {}
   try {
-    generated = await callWorker('/jobs/resume/generate', {
-      targetRole,
-      yearsExp,
-      location,
-      remote,
-      workHistory,
-      education,
-      skills,
-      tone,
+    type WorkerJob = {
+      status: string
+      result?: { resume_text?: string }
+      error?: string | null
+    }
+    const job = await callWorker<WorkerJob>('/jobs/resume/generate', {
+      user_id: session.user.id,
+      resume_input: resumeInput,
+      job_title: String(targetRole),
+      company: '',
+      job_description: `Target role: ${targetRole}`,
     })
-  } catch {
-    // If the worker is unavailable, store the raw input and continue
-    generated = { error: 'Worker unavailable — resume will be generated when the worker is back online.' }
+    // Unwrap the JobRecord envelope — store only the result payload
+    if (job.status === 'done' && job.result) {
+      generated = job.result          // { resume_text: "..." }
+    } else {
+      generated = { error: job.error ?? 'Generation failed — please try again.' }
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    // Distinguish a real network/timeout failure from a validation error
+    generated = {
+      error: msg.includes('Worker responded 4')
+        ? `Worker rejected request: ${msg}`
+        : 'Worker unavailable — resume will be generated when the worker is back online.',
+    }
   }
 
   const title = `${targetRole} — ${new Date().getFullYear()}`

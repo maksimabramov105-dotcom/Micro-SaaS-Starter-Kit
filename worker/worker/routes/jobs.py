@@ -75,19 +75,19 @@ def _fail(job: JobRecord, error: str) -> JobRecord:
 # ── Request bodies ────────────────────────────────────────────────────────────
 
 class ResumeGenerateRequest(BaseModel):
-    user_id: int
+    user_id: str          # Prisma CUID string (not int)
     resume_input: str
     job_title: str
-    company: str
-    job_description: str
+    company: str = ""
+    job_description: str = ""
 
 
 class CoverLetterRequest(BaseModel):
-    user_id: int
+    user_id: str          # Prisma CUID string (not int)
     resume_text: str
     job_title: str
-    company: str
-    job_description: str
+    company: str = ""
+    job_description: str = ""
 
 
 class LinkedInApplyRequest(BaseModel):

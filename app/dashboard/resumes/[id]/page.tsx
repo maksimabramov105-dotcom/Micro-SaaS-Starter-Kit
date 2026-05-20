@@ -65,6 +65,26 @@ function ResumeDisplay({ data }: { data: Record<string, unknown> }) {
     return <p className="text-slate-400">Resume content not yet generated.</p>
   }
 
+  // Error state — show message clearly
+  if (typeof data.error === 'string') {
+    return (
+      <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <p className="font-semibold">Error</p>
+        <p className="mt-1">{data.error}</p>
+      </div>
+    )
+  }
+
+  // Primary case: worker returned { resume_text: "..." }
+  if (typeof data.resume_text === 'string') {
+    return (
+      <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-slate-700">
+        {data.resume_text}
+      </pre>
+    )
+  }
+
+  // Fallback: render any other JSON structure key-by-key
   return (
     <div className="space-y-6 text-sm text-slate-700">
       {Object.entries(data).map(([section, value]) => (
@@ -81,7 +101,7 @@ function ResumeDisplay({ data }: { data: Record<string, unknown> }) {
 
 function SectionValue({ value }: { value: unknown }) {
   if (typeof value === 'string') {
-    return <p className="text-slate-600">{value}</p>
+    return <p className="whitespace-pre-wrap text-slate-600">{value}</p>
   }
   if (Array.isArray(value)) {
     return (
