@@ -367,6 +367,29 @@ export async function POST(req: Request) {
       }
     }
 
+    // Interleave by company so each cron run applies to jobs from multiple companies
+    // rather than exhausting one company (e.g. Cloudflare) before moving to the next.
+    //
+    // Round-robin: take one job from each company in turn until all are consumed.
+    // This ensures that with MAX_APPLIES_PER_RUN=3, applications go to 3 different
+    // companies whenever possible.
+    {
+      const byCompany = new Map<string, (ScrapedJob & { board: string })[]>()
+      for (const job of scrapedJobs) {
+        const key = job.company.toLowerCase()
+        if (!byCompany.has(key)) byCompany.set(key, [])
+        byCompany.get(key)!.push(job)
+      }
+      scrapedJobs.length = 0  // clear in-place
+      const columns = Array.from(byCompany.values())
+      let idx = 0
+      while (columns.some((col) => col.length > 0)) {
+        const col = columns[idx % columns.length]
+        if (col.length > 0) scrapedJobs.push(col.shift()!)
+        idx++
+      }
+    }
+
     console.log('[run-campaigns] scraped', { campaign: campaign.id, total: scrapedJobs.length })
 
     // Apply to each new job up to the remaining limit.
