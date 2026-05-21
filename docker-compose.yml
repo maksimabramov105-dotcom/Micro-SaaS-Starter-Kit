@@ -116,6 +116,13 @@ services:
       REDIS_URL: redis://redis:6379
       # ENGLISH_JOB_SOURCES must be valid JSON if overridden, e.g.:
       # ENGLISH_JOB_SOURCES: '["adzuna","themuse","arbeitnow","remoteok"]'
+    deploy:
+      resources:
+        limits:
+          # Playwright/Chrome uses ~400 MB per instance.
+          # Cap at 3 applies per cron run → max ~1.2 GB peak.
+          # 1.5 GB limit gives headroom without risking host OOM.
+          memory: 1500m
     depends_on:
       postgres:
         condition: service_healthy
