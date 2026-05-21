@@ -355,16 +355,39 @@ export async function POST(req: Request) {
 
     console.log('[run-campaigns] scraped', { campaign: campaign.id, total: scrapedJobs.length })
 
-    // Apply to each new job up to the remaining limit
+    // Apply to each new job up to the remaining limit.
+    //
+    // TWO separate counters:
+    //   appliedThisCampaign — successful SUBMITTED apps (used for daily-limit tracking)
+    //   attemptsThisRun     — every Playwright call, success or fail (used for OOM cap)
+    //
+    // MAX_APPLIES_PER_RUN MUST check attempts, not successes — otherwise 100 consecutive
+    // Playwright timeouts would all start before the cap fires, crashing the VPS with OOM.
     let appliedThisCampaign = 0
     const globalApplied = summary.reduce((s, c) => s + c.applied, 0)
+    const globalAttempts = summary.reduce((s, c) => s + c.applied + c.failed, 0)
+    let attemptsThisCampaign = 0
+
+    // Job boards whose "apply_url" is their own listing page, not a direct ATS URL.
+    // CareerOps fills ATS forms (Greenhouse, Lever, Workable, etc.) and cannot work on
+    // these aggregator pages — skip them to avoid spending Playwright budget on timeouts.
+    const BOARD_HOSTS = ['remoteok.com', 'themuse.com', 'adzuna.com', 'arbeitnow.com']
+    const isBoardUrl = (url: string): boolean =>
+      BOARD_HOSTS.some((host) => url.includes(host))
 
     for (const job of scrapedJobs) {
       if (appliedThisCampaign >= campaignRemaining) break
-      if (globalApplied + appliedThisCampaign >= MAX_APPLIES_PER_RUN) break
+      // Hard OOM cap: count every Playwright attempt (success + failure)
+      if (globalAttempts + attemptsThisCampaign >= MAX_APPLIES_PER_RUN) break
 
       const applyUrl = job.apply_url || job.url
       if (!applyUrl) {
+        campaignLog.skipped++
+        continue
+      }
+
+      // Skip board listing pages — CareerOps needs a direct ATS URL
+      if (isBoardUrl(applyUrl)) {
         campaignLog.skipped++
         continue
       }
@@ -435,6 +458,7 @@ export async function POST(req: Request) {
 
       // Call the CareerOps worker
       const result = await careeropsApply(workerUrl, workerSecret, applyUrl, userData)
+      attemptsThisCampaign++ // Always count every Playwright call for OOM cap
 
       if (result?.status === 'submitted') {
         // Success — mark SUBMITTED and stamp quota
