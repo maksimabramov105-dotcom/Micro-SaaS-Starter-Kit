@@ -16,7 +16,7 @@ jobs:
             -X POST "https://resumeai-bot.ru/api/cron/run-campaigns" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             -H "Content-Type: application/json" \
-            --max-time 300)
+            --max-time 600)
           BODY=$(cat /tmp/body.txt)
           echo "Status  : $HTTP_STATUS"
           echo "Response: $BODY"

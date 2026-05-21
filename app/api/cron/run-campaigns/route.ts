@@ -23,6 +23,16 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { canSendApplication, consumeQuota } from '@/lib/quota'
 
+// ── Config ────────────────────────────────────────────────────────────────────
+
+/**
+ * Hard cap on Playwright applications per cron run.
+ * Each application can take up to 120s; 3 × 120s = 360s — safely under the
+ * 600s GitHub Actions curl timeout.  The 2-hourly cron runs 12× per day,
+ * so campaigns can reach up to 36 applications/day across all triggers.
+ */
+const MAX_APPLIES_PER_RUN = 3
+
 // ── Types from worker API ─────────────────────────────────────────────────────
 
 interface ScrapedJob {
@@ -317,9 +327,11 @@ export async function POST(req: Request) {
 
     // Apply to each new job up to the remaining limit
     let appliedThisCampaign = 0
+    const globalApplied = summary.reduce((s, c) => s + c.applied, 0)
 
     for (const job of scrapedJobs) {
       if (appliedThisCampaign >= campaignRemaining) break
+      if (globalApplied + appliedThisCampaign >= MAX_APPLIES_PER_RUN) break
 
       const applyUrl = job.apply_url || job.url
       if (!applyUrl) {
