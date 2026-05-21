@@ -297,31 +297,61 @@ export async function POST(req: Request) {
       ).map((a) => a.jobUrl)
     )
 
-    // Scrape from multiple boards.
-    // - remoteok: uses tag-based search; multi-word queries need simplification
-    //   ("software engineer" → "engineer") to get results from the VPS IP.
-    // - arbeitnow: 403s from non-EU IPs — skip.
-    // - adzuna: requires API keys — skipped if keys not present (scraper handles it).
-    // - themuse: works without keys, good coverage.
+    // Scrape 100+ jobs from multiple boards with multiple keyword variations.
+    //
+    // RemoteOK: tag-based API.  "software-engineer" returns 0 — use single-word
+    //   synonyms.  Each returns ~30 jobs so 4 tags = ~120 unique jobs.
+    // TheMuse: keyword categories.  Returns 20 per page; 3 variations = ~60.
+    // Adzuna: included if API keys are set (skipped silently otherwise).
+    // Arbeitnow: 403 from VPS IP — skip.
     const keyword = campaign.keywords[0] ?? 'software engineer'
     const location = campaign.locations[0] ?? ''
 
-    // RemoteOK uses single-word tags; simplify multi-word queries.
-    const remoteokTag = keyword.trim().split(/\s+/).pop() ?? 'engineer'
+    // Build RemoteOK single-word tag variants from the campaign keywords
+    const remoteokTags = Array.from(new Set([
+      keyword.trim().split(/\s+/).pop() ?? 'engineer',  // last word of keyword
+      keyword.trim().split(/\s+/)[0] ?? 'software',     // first word of keyword
+      'engineer',
+      'dev',
+    ])).slice(0, 4)
+
+    // TheMuse keyword variants
+    const museKeywords = Array.from(new Set([
+      keyword,
+      keyword.replace(/engineer/i, 'developer'),
+      'Software Engineer',
+    ])).slice(0, 3)
 
     const scrapedJobs: (ScrapedJob & { board: string })[] = []
 
-    const [adzunaJobs, remoteokJobs, museJobs] = await Promise.all([
-      scrapeBoard(workerUrl, workerSecret, 'adzuna', keyword, location),
-      scrapeBoard(workerUrl, workerSecret, 'remoteok', remoteokTag, location),
-      scrapeBoard(workerUrl, workerSecret, 'themuse', keyword, location),
+    // Run all board/keyword combos in parallel for speed
+    const allScrapes = await Promise.all([
+      // Adzuna (with keys) — one call with primary keyword
+      scrapeBoard(workerUrl, workerSecret, 'adzuna', keyword, location)
+        .then((j) => j.map((x) => ({ ...x, board: 'adzuna' }))),
+      // RemoteOK — 4 tag variants
+      ...remoteokTags.map((tag) =>
+        scrapeBoard(workerUrl, workerSecret, 'remoteok', tag, location)
+          .then((j) => j.map((x) => ({ ...x, board: 'remoteok' })))
+      ),
+      // TheMuse — 3 keyword variants
+      ...museKeywords.map((kw) =>
+        scrapeBoard(workerUrl, workerSecret, 'themuse', kw, location)
+          .then((j) => j.map((x) => ({ ...x, board: 'themuse' })))
+      ),
     ])
 
-    scrapedJobs.push(
-      ...adzunaJobs.map((j) => ({ ...j, board: 'adzuna' })),
-      ...remoteokJobs.map((j) => ({ ...j, board: 'remoteok' })),
-      ...museJobs.map((j) => ({ ...j, board: 'themuse' })),
-    )
+    // Flatten and deduplicate by apply_url
+    const seenUrls = new Set<string>()
+    for (const batch of allScrapes) {
+      for (const job of batch) {
+        const url = job.apply_url || job.url
+        if (url && !seenUrls.has(url)) {
+          seenUrls.add(url)
+          scrapedJobs.push(job)
+        }
+      }
+    }
 
     console.log('[run-campaigns] scraped', { campaign: campaign.id, total: scrapedJobs.length })
 

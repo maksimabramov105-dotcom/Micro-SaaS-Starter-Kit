@@ -141,6 +141,54 @@ AI tailoring per application is toggled via `User.preferences.tailorApplications
 
 ---
 
+### CareerOps autoapply pipeline (`app/api/cron/run-campaigns/`, `worker/worker/autoapply/careerops.py`)
+
+End-to-end automated job application system.  Triggered every 2 hours by GitHub Actions (`.github/workflows/run-campaigns.yml`) via `POST /api/cron/run-campaigns`.
+
+**Run-campaigns flow:**
+```
+GitHub Actions (every 2h)
+  └─► POST /api/cron/run-campaigns   (Bearer CRON_SECRET)
+        │
+        ├─ Load active CAREEROPS campaigns (Prisma)
+        │
+        └─ For each campaign:
+             ├─ Scrape 100+ jobs from RemoteOK (4 tag variants) + TheMuse (3 keyword variants) + Adzuna (if keys set)
+             │   → all boards called in parallel via Promise.all
+             │   → dedup by apply_url
+             │   → upsert to JobListing table
+             │
+             ├─ Skip: already-applied URLs, blocked companies, quota exhausted
+             │
+             ├─ Cap: MAX 3 Playwright applies per cron run (prevents OOM)
+             │
+             └─ For each new job (up to cap):
+                  ├─ Create JobApplication (QUEUED)
+                  ├─ POST /jobs/autoapply/careerops  → worker (Playwright ATS filler)
+                  │   Supports: Greenhouse, Lever, Workable, SmartRecruiters, Jobvite, Ashby, Generic
+                  ├─ Update status: SUBMITTED or FAILED
+                  ├─ consumeQuota() → stamps appliedAt + publishes Redis event
+                  └─ Telegram notification fires via notifier/
+```
+
+**Key limits:**
+- `campaign.dailyLimit` — per-campaign cap (default 20/day)
+- `user.dailyApplicationLimit` — per-user cap (admin: 50, free: 3)
+- `MAX_APPLIES_PER_RUN = 3` — hard cap per 2h cron trigger (prevents Playwright OOM)
+- 12 triggers/day × 3 = up to 36 applications/day through normal operation
+
+**Playwright in Docker:**
+- Worker Dockerfile installs Chromium via `playwright install chromium` into `/ms-playwright`
+- `ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright` ensures the worker process finds the binary
+- Worker container has `memory: 1500m` Docker limit to prevent host OOM
+
+**Job boards (no API keys needed):**
+- RemoteOK: public JSON API, tag-based search — 30 jobs/tag
+- TheMuse: public API, keyword categories — 20 jobs/keyword
+- Adzuna: requires `ADZUNA_APP_ID` + `ADZUNA_APP_KEY` env vars (silently skipped if absent)
+
+---
+
 ### Audit & observability
 
 | Model | Purpose |
