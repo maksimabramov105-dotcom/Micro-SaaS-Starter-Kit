@@ -183,9 +183,15 @@ GitHub Actions (every 2h)
 - Worker container has `memory: 1500m` Docker limit to prevent host OOM
 
 **Job boards (no API keys needed):**
-- RemoteOK: public JSON API, tag-based search — 30 jobs/tag
-- TheMuse: public API, keyword categories — 20 jobs/keyword
-- Adzuna: requires `ADZUNA_APP_ID` + `ADZUNA_APP_KEY` env vars (silently skipped if absent)
+- **Greenhouse** (PRIMARY): queries 20 major tech companies' public Greenhouse boards in parallel via `boards-api.greenhouse.io/v1/boards/{company}/jobs`. Returns `job-boards.greenhouse.io/{company}/jobs/{id}` URLs that CareerOps can fill directly. 370+ engineering jobs per run. File: `worker/worker/scrapers/greenhouse.py`.
+- RemoteOK: public JSON API, tag-based search — 30 jobs/tag. Returns `remoteOK.com` listing pages (not direct ATS) — these are filtered out by `isBoardUrl()` in `run-campaigns/route.ts`.
+- TheMuse: public API, keyword categories — 20 jobs/keyword. Also returns listing pages (filtered out).
+- Adzuna: requires `ADZUNA_APP_ID` + `ADZUNA_APP_KEY` env vars (silently skipped if absent).
+
+**OOM protection (critical):**
+- `MAX_APPLIES_PER_RUN = 3` cap counts ALL Playwright attempts (not just successes). Previously only counted SUBMITTED apps — 100 failing timeouts would all start before cap fired.
+- `isBoardUrl()` filter uses case-insensitive match (`url.toLowerCase()`): RemoteOK returns `remoteOK.com` with capital letters that bypassed a lowercase-only check.
+- Docker memory limit `1500m` on worker container prevents host OOM.
 
 ---
 
