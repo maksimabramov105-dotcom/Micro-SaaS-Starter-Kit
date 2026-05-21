@@ -287,16 +287,31 @@ export async function POST(req: Request) {
       ).map((a) => a.jobUrl)
     )
 
-    // Scrape from multiple boards
+    // Scrape from multiple boards.
+    // - remoteok: uses tag-based search; multi-word queries need simplification
+    //   ("software engineer" → "engineer") to get results from the VPS IP.
+    // - arbeitnow: 403s from non-EU IPs — skip.
+    // - adzuna: requires API keys — skipped if keys not present (scraper handles it).
+    // - themuse: works without keys, good coverage.
     const keyword = campaign.keywords[0] ?? 'software engineer'
     const location = campaign.locations[0] ?? ''
-    const boards = ['adzuna', 'arbeitnow', 'remoteok']
+
+    // RemoteOK uses single-word tags; simplify multi-word queries.
+    const remoteokTag = keyword.trim().split(/\s+/).pop() ?? 'engineer'
 
     const scrapedJobs: (ScrapedJob & { board: string })[] = []
-    for (const board of boards) {
-      const jobs = await scrapeBoard(workerUrl, workerSecret, board, keyword, location)
-      scrapedJobs.push(...jobs.map((j) => ({ ...j, board })))
-    }
+
+    const [adzunaJobs, remoteokJobs, museJobs] = await Promise.all([
+      scrapeBoard(workerUrl, workerSecret, 'adzuna', keyword, location),
+      scrapeBoard(workerUrl, workerSecret, 'remoteok', remoteokTag, location),
+      scrapeBoard(workerUrl, workerSecret, 'themuse', keyword, location),
+    ])
+
+    scrapedJobs.push(
+      ...adzunaJobs.map((j) => ({ ...j, board: 'adzuna' })),
+      ...remoteokJobs.map((j) => ({ ...j, board: 'remoteok' })),
+      ...museJobs.map((j) => ({ ...j, board: 'themuse' })),
+    )
 
     console.log('[run-campaigns] scraped', { campaign: campaign.id, total: scrapedJobs.length })
 
