@@ -91,6 +91,7 @@ function toJobSource(
   const map: Record<string, 'ADZUNA' | 'ARBEITNOW' | 'REMOTEOK' | 'THEMUSE' | 'CAREEROPS'> = {
     adzuna: 'ADZUNA',
     arbeitnow: 'ARBEITNOW',
+    greenhouse: 'CAREEROPS',  // Greenhouse jobs brokered through CareerOps filler
     remoteok: 'REMOTEOK',
     themuse: 'THEMUSE',
   }
@@ -307,34 +308,47 @@ export async function POST(req: Request) {
     const keyword = campaign.keywords[0] ?? 'software engineer'
     const location = campaign.locations[0] ?? ''
 
-    // Build RemoteOK single-word tag variants from the campaign keywords
+    const scrapedJobs: (ScrapedJob & { board: string })[] = []
+
+    // Run all board/keyword combos in parallel for speed.
+    //
+    // Board strategy:
+    //   greenhouse — queries 20 major tech companies' Greenhouse ATS boards in
+    //                parallel; returns direct job-boards.greenhouse.io URLs that
+    //                CareerOps can fill without any page navigation.  This is
+    //                the PRIMARY source of workable ATS apply links.
+    //   remoteok   — public tag API, 30 jobs/tag; kept for job diversity but
+    //                returns remoteOK.com listing pages as apply_url — these
+    //                will be filtered out by isBoardUrl() below.
+    //   themuse    — kept for job diversity; also returns listing-page URLs so
+    //                they will be filtered out too.
+    //   adzuna     — included if ADZUNA_APP_ID + ADZUNA_APP_KEY are set.
     const remoteokTags = Array.from(new Set([
-      keyword.trim().split(/\s+/).pop() ?? 'engineer',  // last word of keyword
-      keyword.trim().split(/\s+/)[0] ?? 'software',     // first word of keyword
+      keyword.trim().split(/\s+/).pop() ?? 'engineer',
+      keyword.trim().split(/\s+/)[0] ?? 'software',
       'engineer',
       'dev',
     ])).slice(0, 4)
 
-    // TheMuse keyword variants
     const museKeywords = Array.from(new Set([
       keyword,
       keyword.replace(/engineer/i, 'developer'),
       'Software Engineer',
     ])).slice(0, 3)
 
-    const scrapedJobs: (ScrapedJob & { board: string })[] = []
-
-    // Run all board/keyword combos in parallel for speed
     const allScrapes = await Promise.all([
-      // Adzuna (with keys) — one call with primary keyword
+      // Greenhouse — direct ATS apply URLs (PRIMARY source)
+      scrapeBoard(workerUrl, workerSecret, 'greenhouse', keyword, location)
+        .then((j) => j.map((x) => ({ ...x, board: 'greenhouse' }))),
+      // Adzuna (with keys) — direct company apply URLs when configured
       scrapeBoard(workerUrl, workerSecret, 'adzuna', keyword, location)
         .then((j) => j.map((x) => ({ ...x, board: 'adzuna' }))),
-      // RemoteOK — 4 tag variants
+      // RemoteOK — tag variants (board-listing URLs, most will be skipped)
       ...remoteokTags.map((tag) =>
         scrapeBoard(workerUrl, workerSecret, 'remoteok', tag, location)
           .then((j) => j.map((x) => ({ ...x, board: 'remoteok' })))
       ),
-      // TheMuse — 3 keyword variants
+      // TheMuse — keyword variants (board-listing URLs, will be skipped)
       ...museKeywords.map((kw) =>
         scrapeBoard(workerUrl, workerSecret, 'themuse', kw, location)
           .then((j) => j.map((x) => ({ ...x, board: 'themuse' })))
@@ -371,9 +385,10 @@ export async function POST(req: Request) {
     // Job boards whose "apply_url" is their own listing page, not a direct ATS URL.
     // CareerOps fills ATS forms (Greenhouse, Lever, Workable, etc.) and cannot work on
     // these aggregator pages — skip them to avoid spending Playwright budget on timeouts.
-    const BOARD_HOSTS = ['remoteok.com', 'themuse.com', 'adzuna.com', 'arbeitnow.com']
+    // Note: RemoteOK returns "remoteOK.com" (capital letters) so comparison is lowercased.
+    const BOARD_HOSTS = ['remoteok.com', 'themuse.com', 'adzuna.com', 'arbeitnow.com', 'remotive.com']
     const isBoardUrl = (url: string): boolean =>
-      BOARD_HOSTS.some((host) => url.includes(host))
+      BOARD_HOSTS.some((host) => url.toLowerCase().includes(host))
 
     for (const job of scrapedJobs) {
       if (appliedThisCampaign >= campaignRemaining) break

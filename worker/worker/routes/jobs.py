@@ -28,7 +28,7 @@ from worker.autoapply.common import prepare_application
 from worker.autoapply.linkedin import LinkedInApplicator
 from worker.config import settings
 from worker.deps import verify_bearer
-from worker.scrapers import adzuna, arbeitnow, remoteok, themuse
+from worker.scrapers import adzuna, arbeitnow, greenhouse, remoteok, themuse
 
 logger = structlog.get_logger(__name__)
 router = APIRouter()
@@ -359,6 +359,7 @@ async def autoapply_careerops(body: CareerOpsApplyRequest) -> dict:
 _SCRAPER_MAP = {
     "adzuna": adzuna.search,
     "arbeitnow": arbeitnow.search,
+    "greenhouse": greenhouse.search,
     "remoteok": remoteok.search,
     "themuse": themuse.search,
 }
