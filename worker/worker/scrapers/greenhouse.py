@@ -14,6 +14,7 @@ Apply URL format (returned by this scraper):
 The CareerOps filler matches this via the ``greenhouse.io`` pattern.
 """
 import asyncio
+import random
 import re
 
 import httpx
@@ -109,16 +110,22 @@ async def _fetch_company(
 async def search(
     query: str = "",
     location: str = "",
-    limit: int = 50,
+    limit: int = 200,
 ) -> list[dict]:
     """
     Search all curated Greenhouse company boards in parallel.
     Returns up to ``limit`` jobs whose title matches ``query`` keywords.
     ``location`` is accepted for API compatibility but Greenhouse does not
     support server-side location filtering.
+
+    Companies are shuffled each call so repeated runs cycle through all
+    companies rather than always returning the same company's jobs first.
     """
+    companies = list(_COMPANIES)
+    random.shuffle(companies)
+
     async with httpx.AsyncClient(timeout=10, headers=_HEADERS) as client:
-        tasks = [_fetch_company(client, c) for c in _COMPANIES]
+        tasks = [_fetch_company(client, c) for c in companies]
         batches = await asyncio.gather(*tasks)
 
     all_jobs: list[dict] = []
