@@ -425,6 +425,77 @@ async def scrape_board(board: str, body: ScrapeRequest) -> dict:
     return job.model_dump()
 
 
+# ── WeasyPrint template renderer ─────────────────────────────────────────────
+
+_TEMPLATES_DIR = __import__("pathlib").Path(__file__).parent.parent / "templates" / "resumes"
+
+ALLOWED_TEMPLATES: set[str] = {
+    "modern_minimalist",
+    "classic_executive",
+    "tech_compact",
+    "creative_accent",
+    "new_grad",
+}
+
+
+class RenderRequest(BaseModel):
+    template_id: str
+    resume_data: dict
+
+
+@router.post("/resumes/{resume_id}/render", dependencies=[Depends(verify_bearer)])
+async def render_resume(resume_id: str, body: RenderRequest) -> FastAPIResponse:
+    """
+    Render a resume using a WeasyPrint/Jinja2 template.
+
+    Returns application/pdf.  The existing /resume/pdf (reportlab) route is
+    kept untouched as a fallback when PDF_TEMPLATES_V1 flag is OFF.
+    """
+    if body.template_id not in ALLOWED_TEMPLATES:
+        raise HTTPException(status_code=400, detail=f"Unknown template_id: {body.template_id!r}")
+
+    try:
+        from jinja2 import Environment, FileSystemLoader, select_autoescape
+        from weasyprint import HTML
+
+        env = Environment(
+            loader=FileSystemLoader(str(_TEMPLATES_DIR)),
+            autoescape=select_autoescape(["html"]),
+        )
+        template = env.get_template(f"{body.template_id}.html")
+        html_str = template.render(resume=body.resume_data)
+
+        pdf_bytes = HTML(
+            string=html_str,
+            base_url=str(_TEMPLATES_DIR),
+        ).write_pdf()
+
+        safe_title = (
+            "".join(
+                c for c in body.resume_data.get("name", resume_id)
+                if c.isalnum() or c in " _-"
+            ).strip()[:60] or "resume"
+        )
+        logger.info(
+            "resume.render.done",
+            resume_id=resume_id,
+            template=body.template_id,
+            bytes=len(pdf_bytes),
+        )
+        return FastAPIResponse(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{safe_title}.pdf"'
+            },
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("resume.render.error", resume_id=resume_id, error=str(exc))
+        raise HTTPException(status_code=500, detail=f"Render failed: {exc}")
+
+
 @router.get("/{job_id}", dependencies=[Depends(verify_bearer)])
 async def get_job(job_id: str) -> dict:
     """Return the current status and result of a previously submitted job."""

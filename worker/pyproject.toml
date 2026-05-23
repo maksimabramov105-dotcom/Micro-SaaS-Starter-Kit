@@ -15,6 +15,8 @@ dependencies = [
     "openai>=1.30",
     "reportlab>=4.2",
     "redis[hiredis]>=5.0",
+    "weasyprint>=62.0",
+    "jinja2>=3.1.4",
 ]
 
 [project.optional-dependencies]

@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libxdamage1 libxfixes3 libxrandr2 libgbm1 libpango-1.0-0 \
       libcairo2 libasound2 libx11-6 libx11-xcb1 libxcb1 libxext6 \
       libxss1 libxtst6 fonts-liberation ca-certificates wget \
+      libpangoft2-1.0-0 libgdk-pixbuf2.0-0 libffi-dev shared-mime-info \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -29,7 +30,9 @@ RUN pip install uv && uv pip install --system \
       "playwright>=1.44" \
       "openai>=1.30" \
       "reportlab>=4.2" \
-      "redis[hiredis]>=5.0"
+      "redis[hiredis]>=5.0" \
+      "weasyprint>=62.0" \
+      "jinja2>=3.1.4"
 
 # Download Chromium browser to a fixed, world-readable path.
 # PLAYWRIGHT_BROWSERS_PATH overrides the default ~/.cache/ms-playwright so the
