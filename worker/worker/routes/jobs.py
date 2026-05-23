@@ -3,12 +3,13 @@ jobs.py — All job-related API routes.
 
 All endpoints require Authorization: Bearer <WORKER_SECRET>.
 
-Job lifecycle (MVP — in-memory, synchronous async processing):
+Job lifecycle:
   POST  /jobs/...          creates job, runs work, returns {job_id, status, result}
   GET   /jobs/{job_id}     returns stored job status + result
 
-In-memory storage resets on worker restart.  A persistent job queue
-(e.g. Redis + ARQ or Celery) can replace this without changing the public API.
+Job records are persisted in Redis (24 h TTL) and mirrored in a local in-process
+dict for zero-latency same-process lookups.  Redis persistence survives worker
+restarts; the local dict is a fast-path cache only.
 """
 import uuid
 from datetime import datetime, timezone
@@ -16,6 +17,7 @@ from io import BytesIO
 from typing import Any
 from typing import Literal
 
+import redis.asyncio as aioredis
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import Response as FastAPIResponse
@@ -33,9 +35,11 @@ from worker.scrapers import adzuna, arbeitnow, greenhouse, remoteok, themuse
 logger = structlog.get_logger(__name__)
 router = APIRouter()
 
-# ── In-memory job store (MVP) ─────────────────────────────────────────────────
+# ── Job store (in-process cache + Redis persistence) ─────────────────────────
 
 JobStatusLiteral = Literal["pending", "running", "done", "error"]
+
+_JOB_TTL = 86_400  # 24 hours
 
 
 class JobRecord(BaseModel):
@@ -47,7 +51,33 @@ class JobRecord(BaseModel):
     completed_at: datetime | None = None
 
 
+# Local in-process mirror — fast path for same-process GET requests
 _jobs: dict[str, JobRecord] = {}
+
+
+async def _redis_save(job: JobRecord) -> None:
+    """Persist job record to Redis with 24 h TTL. Fails silently (non-critical)."""
+    if not settings.redis_url:
+        return
+    try:
+        async with aioredis.from_url(settings.redis_url, decode_responses=True) as r:
+            await r.setex(f"job:{job.job_id}", _JOB_TTL, job.model_dump_json())
+    except Exception as exc:
+        logger.warning("job_store.redis_write_failed", job_id=job.job_id, error=str(exc))
+
+
+async def _redis_load(job_id: str) -> "JobRecord | None":
+    """Load job record from Redis. Returns None on miss or error."""
+    if not settings.redis_url:
+        return None
+    try:
+        async with aioredis.from_url(settings.redis_url, decode_responses=True) as r:
+            data = await r.get(f"job:{job_id}")
+        if data:
+            return JobRecord.model_validate_json(data)
+    except Exception as exc:
+        logger.warning("job_store.redis_read_failed", job_id=job_id, error=str(exc))
+    return None
 
 
 def _new_job() -> JobRecord:
@@ -155,6 +185,7 @@ async def resume_generate(body: ResumeGenerateRequest) -> dict:
         _fail(job, str(exc))
         logger.error("job.resume_generate.error", job_id=job.job_id, error=str(exc))
 
+    await _redis_save(job)
     return job.model_dump()
 
 
@@ -257,6 +288,7 @@ async def cover_letter(body: CoverLetterRequest) -> dict:
         _fail(job, str(exc))
         logger.error("job.cover_letter.error", job_id=job.job_id, error=str(exc))
 
+    await _redis_save(job)
     return job.model_dump()
 
 
@@ -297,6 +329,7 @@ async def autoapply_prepare(body: TailorRequest) -> dict:
         _fail(job, str(exc))
         logger.error("job.autoapply_prepare.error", job_id=job.job_id, error=str(exc))
 
+    await _redis_save(job)
     return job.model_dump()
 
 
@@ -327,6 +360,7 @@ async def autoapply_linkedin(body: LinkedInApplyRequest) -> dict:
         _fail(job, str(exc))
         logger.error("job.linkedin.error", job_id=job.job_id, error=str(exc))
 
+    await _redis_save(job)
     return job.model_dump()
 
 
@@ -353,6 +387,7 @@ async def autoapply_careerops(body: CareerOpsApplyRequest) -> dict:
         _fail(job, str(exc))
         logger.error("job.careerops.error", job_id=job.job_id, error=str(exc))
 
+    await _redis_save(job)
     return job.model_dump()
 
 
@@ -386,13 +421,18 @@ async def scrape_board(board: str, body: ScrapeRequest) -> dict:
         _fail(job, str(exc))
         logger.error("job.scrape.error", job_id=job.job_id, error=str(exc))
 
+    await _redis_save(job)
     return job.model_dump()
 
 
 @router.get("/{job_id}", dependencies=[Depends(verify_bearer)])
 async def get_job(job_id: str) -> dict:
     """Return the current status and result of a previously submitted job."""
+    # Check in-process cache first (same-process fast path)
     record = _jobs.get(job_id)
+    if record is None:
+        # Fall back to Redis — handles cross-restart lookups
+        record = await _redis_load(job_id)
     if record is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

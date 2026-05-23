@@ -195,6 +195,61 @@ GitHub Actions (every 2h)
 
 ---
 
+### Chrome Extension (`extension/`)
+
+Manifest v3 browser extension — "ResumeAI Autofill" v1.0.0.  Lets users autofill job-application forms on ATS sites using their saved ResumeAI resume, without copy-pasting.
+
+**Supported ATS platforms:**
+- Greenhouse (`boards.greenhouse.io`, `*.greenhouse.io/jobs/*`)
+- Lever (`jobs.lever.co`)
+- Workable (`apply.workable.com`)
+- SmartRecruiters (`jobs.smartrecruiters.com`)
+- Jobvite (`jobs.jobvite.com`)
+- Ashby (`jobs.ashbyhq.com`)
+- LinkedIn Easy Apply (`linkedin.com/jobs`)
+- Workday (`*.myworkdayjobs.com`)
+- iCIMS (`*.icims.com`)
+- Taleo (`*.taleo.net`)
+
+**Architecture:**
+
+```
+popup/popup.html          ← "Autofill" button UI
+  └─► background.js       ← Service worker; fetches resume from API
+        └─► content/
+              detect.js   ← Detects which ATS the current page uses
+              autofill.js ← Fills form fields with resume data
+              overlay.js  ← Visual feedback overlay
+content/connect-bridge.js ← Handles OAuth connect flow from resumeai-bot.ru/extension/connect
+```
+
+**Connection flow:**
+1. User installs extension → clicks "Connect" in popup
+2. Extension opens `https://resumeai-bot.ru/extension/connect` in a tab
+3. `connect-bridge.js` fires a `postMessage` with a signed token back to the extension
+4. Extension stores the token in `chrome.storage.local` for subsequent API calls
+
+**Permissions:** `storage`, `activeTab`, `scripting`.  
+**Host permissions:** `https://resumeai-bot.ru/*` (API calls only — no cross-origin scraping).
+
+**Distribution:** Load unpacked from `extension/` in Chrome Developer Mode.  No Chrome Web Store listing yet.
+
+---
+
+### Auth (`lib/auth.ts`) — providers
+
+NextAuth.js with JWT strategy supports three providers:
+
+| Provider | Purpose |
+|---|---|
+| Google OAuth | Primary social login |
+| GitHub OAuth | Secondary social login |
+| Email (magic link) | Passwordless login via Resend |
+
+Session fields are enriched with Stripe billing data and PMF tracking fields. See `types/next-auth.d.ts`.
+
+---
+
 ### Audit & observability
 
 | Model | Purpose |

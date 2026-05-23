@@ -22,6 +22,16 @@ export async function POST(req: Request) {
     return new NextResponse(`Webhook Error: ${msg}`, { status: 400 })
   }
 
+  // ── Idempotency guard (RED-1 audit fix) ───────────────────────────────────
+  // Stripe may retry delivery; skip double-processing by recording the event ID.
+  const alreadyProcessed = await prisma.stripeEvent.findUnique({
+    where: { id: event.id },
+  })
+  if (alreadyProcessed) {
+    return new NextResponse(null, { status: 200 })
+  }
+  await prisma.stripeEvent.create({ data: { id: event.id } })
+
   const session = event.data.object as Stripe.Checkout.Session
   const subscription = event.data.object as Stripe.Subscription
 

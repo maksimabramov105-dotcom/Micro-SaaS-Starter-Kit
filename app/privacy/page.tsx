@@ -9,7 +9,7 @@ export default function PrivacyPage() {
           <h1 className="mb-8 text-4xl font-bold">Privacy Policy</h1>
 
           <div className="prose prose-gray max-w-none">
-            <p className="text-lg text-gray-600">Last updated: January 2024</p>
+            <p className="text-lg text-gray-600">Last updated: May 2026</p>
 
             <section className="mt-8">
               <h2 className="text-2xl font-semibold mb-4">1. Information We Collect</h2>

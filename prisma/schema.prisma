@@ -570,3 +570,15 @@ enum ApplicationStatus {
   OFFER
   WITHDRAWN
 }
+
+// ---------------------------------------------------------------------------
+// Stripe event deduplication (RED-1 audit fix)
+// Prevents double-processing when Stripe retries a webhook delivery.
+// ---------------------------------------------------------------------------
+
+model StripeEvent {
+  id          String   @id  // Stripe event ID, e.g. "evt_xxx" — globally unique
+  processedAt DateTime @default(now())
+
+  @@index([processedAt])
+}
