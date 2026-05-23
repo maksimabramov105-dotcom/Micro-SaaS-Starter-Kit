@@ -26,9 +26,14 @@ def _openai_url() -> str:
     """Return the chat/completions URL, respecting any configured proxy base."""
     return f"{settings.openai_base_url.rstrip('/')}/v1/chat/completions"
 
-# Load system prompt once at import time
+# Load system prompts once at import time.
+# V1 = original prompt (preserved for rollback / A/B).
+# V2 = STAR/CAR constraint prompt (enabled via RESUME_QUALITY_V2=true env var).
 _PROMPTS_DIR = Path(__file__).parent / "prompts"
-_RESUME_SYSTEM_PROMPT: str = (_PROMPTS_DIR / "resume.txt").read_text(encoding="utf-8").strip()
+_RESUME_SYSTEM_PROMPT_V1: str = (_PROMPTS_DIR / "resume.txt").read_text(encoding="utf-8").strip()
+_RESUME_SYSTEM_PROMPT_V2: str = (_PROMPTS_DIR / "resume_v2.txt").read_text(encoding="utf-8").strip()
+# Backward-compat alias used by any existing callers of this constant
+_RESUME_SYSTEM_PROMPT = _RESUME_SYSTEM_PROMPT_V1
 
 
 async def _call_openai(
@@ -149,11 +154,15 @@ async def generate_tailored_resume(
         company=company_name,
     )
 
+    system_prompt = (
+        _RESUME_SYSTEM_PROMPT_V2 if settings.resume_quality_v2 else _RESUME_SYSTEM_PROMPT_V1
+    )
+
     try:
         result = await asyncio.wait_for(
             _call_openai(
                 prompt=prompt,
-                system=_RESUME_SYSTEM_PROMPT,
+                system=system_prompt,
                 api_key=api_key,
                 max_tokens=1800,
             ),

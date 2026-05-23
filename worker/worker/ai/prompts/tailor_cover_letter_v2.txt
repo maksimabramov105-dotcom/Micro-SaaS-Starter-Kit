@@ -1,0 +1,24 @@
+Write a 200-300 word cover letter for the job described below.
+
+Tone: confident, specific, and authentic. No clichés ("I am writing to apply...", "I am a team player", "I am passionate about...", "results-driven", "synergize"). Reference 1-2 specific achievements from the resume (with numbers where possible) and 1-2 concrete details from the job description. Mirror one or more ATS keywords where natural.
+
+Rules:
+- Do not invent experience that is not in the resume.
+- Structure: hook → specific achievement that proves fit → why this company/role (not generic) → call to action.
+- Plain text only — no markdown, no salutation, no sign-off line.
+- 200-300 words.
+
+ATS KEYWORDS (mirror where natural):
+{ats_keywords}
+
+CANDIDATE RESUME (JSON):
+{base_resume}
+
+JOB:
+Title: {job_title}
+Company: {company}
+
+DESCRIPTION:
+{description}
+
+Write the cover letter body now (200-300 words, plain text):

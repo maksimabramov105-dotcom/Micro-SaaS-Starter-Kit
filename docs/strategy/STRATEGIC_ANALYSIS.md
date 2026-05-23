@@ -57,6 +57,23 @@ Prompt 01 makes Claude Code verify all of this against reality and produce a syn
 
 Total token cost increase per resume: ~2.5× (one extraction + one generation + one critique). At gpt-4o-mini pricing this is still <$0.01 per resume. Worth it.
 
+> **✅ COMPLETED — 2026-05-23 (Prompt 02)**
+>
+> All three steps above are now live behind the `RESUME_QUALITY_V2` feature flag:
+>
+> | Component | File | Status |
+> |-----------|------|--------|
+> | STAR/CAR system prompt (V2) | `worker/worker/ai/prompts/resume_v2.txt` | ✅ shipped |
+> | Per-job ATS keyword extraction | `worker/worker/ai/keywords.py` | ✅ shipped |
+> | Self-critique rubric pass | `worker/worker/ai/critique.py` | ✅ shipped |
+> | V2 tailor pipeline (`_tailor_resume_v2`) | `worker/worker/ai/tailor.py` | ✅ shipped |
+> | V2 cover letter pipeline | `worker/worker/ai/tailor.py` | ✅ shipped |
+> | Feature flag (`RESUME_QUALITY_V2`) | `worker/worker/config.py` + `docker-compose.yml` | ✅ shipped |
+> | Analytics tracking (`resume_generated` event) | `app/api/cron/run-campaigns/route.ts` | ✅ shipped |
+> | Tests (25 assertions) | `worker/tests/test_resume_quality.py` | ✅ 25/25 pass |
+>
+> **Next step:** enable flag on VPS — add `RESUME_QUALITY_V2=true` to `/opt/resumeai/.env` and restart the worker container.
+
 **ATS standards to bake in (from 2026 best practices):** single-column reverse-chronological, no tables/text boxes, contact info in body (not header), Arial/Calibri/Helvetica/Garamond/Cambria fonts only, .pdf (text-layer) and .docx export, all section headings standard ("Work Experience", "Education", "Skills"). ([Jobscan ATS guide 2026](https://www.jobscan.co/resume-templates/ats-templates))
 
 ---
