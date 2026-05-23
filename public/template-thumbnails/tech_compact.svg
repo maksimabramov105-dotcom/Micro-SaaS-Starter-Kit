@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="260" viewBox="0 0 200 260">
+  <rect width="200" height="260" fill="#fff" stroke="#e5e7eb" stroke-width="1"/>
+  <!-- Name smaller, dense -->
+  <rect x="12" y="12" width="80" height="7" rx="1" fill="#111"/>
+  <rect x="12" y="22" width="160" height="3" rx="1" fill="#9ca3af"/>
+  <!-- Thin grey divider -->
+  <rect x="12" y="30" width="176" height="1" fill="#6b7280"/>
+  <!-- Skills first (tech layout) -->
+  <rect x="12" y="35" width="36" height="4" rx="1" fill="#374151"/>
+  <rect x="12" y="43" width="176" height="3" rx="1" fill="#d1d5db"/>
+  <rect x="12" y="49" width="140" height="3" rx="1" fill="#d1d5db"/>
+  <!-- Divider -->
+  <rect x="12" y="57" width="176" height="1" fill="#6b7280"/>
+  <!-- Experience -->
+  <rect x="12" y="62" width="56" height="4" rx="1" fill="#374151"/>
+  <rect x="12" y="70" width="110" height="3" rx="1" fill="#374151"/>
+  <rect x="12" y="76" width="70" height="3" rx="1" fill="#9ca3af"/>
+  <rect x="14" y="82" width="168" height="2.5" rx="1" fill="#d1d5db"/>
+  <rect x="14" y="87" width="160" height="2.5" rx="1" fill="#d1d5db"/>
+  <rect x="14" y="92" width="150" height="2.5" rx="1" fill="#d1d5db"/>
+  <rect x="12" y="99" width="110" height="3" rx="1" fill="#374151"/>
+  <rect x="12" y="105" width="70" height="3" rx="1" fill="#9ca3af"/>
+  <rect x="14" y="111" width="168" height="2.5" rx="1" fill="#d1d5db"/>
+  <rect x="14" y="116" width="150" height="2.5" rx="1" fill="#d1d5db"/>
+  <!-- Divider -->
+  <rect x="12" y="124" width="176" height="1" fill="#6b7280"/>
+  <!-- Projects -->
+  <rect x="12" y="129" width="48" height="4" rx="1" fill="#374151"/>
+  <rect x="12" y="137" width="130" height="3" rx="1" fill="#374151"/>
+  <rect x="12" y="143" width="176" height="2.5" rx="1" fill="#d1d5db"/>
+  <!-- Education compact -->
+  <rect x="12" y="153" width="176" height="1" fill="#6b7280"/>
+  <rect x="12" y="158" width="50" height="4" rx="1" fill="#374151"/>
+  <rect x="12" y="166" width="150" height="3" rx="1" fill="#d1d5db"/>
+</svg>

@@ -119,6 +119,8 @@ services:
       # ENGLISH_JOB_SOURCES: '["adzuna","themuse","arbeitnow","remoteok"]'
       # Resume Quality v2 — STAR/CAR + ATS keywords + self-critique. Set to true to enable.
       RESUME_QUALITY_V2: ${RESUME_QUALITY_V2:-false}
+      # PDF Templates v1 — WeasyPrint-based 5-template picker UI. Set to true to enable.
+      PDF_TEMPLATES_V1: ${PDF_TEMPLATES_V1:-false}
     deploy:
       resources:
         limits:

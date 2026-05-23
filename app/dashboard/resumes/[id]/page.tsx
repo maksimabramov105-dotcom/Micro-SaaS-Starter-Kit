@@ -5,6 +5,9 @@ import { notFound } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
+import { isPdfTemplatesV1 } from '@/lib/flags'
+import { TemplatePicker } from '@/components/resume/TemplatePicker'
+import type { TemplateId } from '@/components/resume/TemplatePicker'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -23,9 +26,12 @@ export default async function ResumeDetailPage({ params }: PageProps) {
 
   // generated is a Json field — cast to a loose object for rendering
   const generated = resume.generated as Record<string, unknown>
+  const showTemplatePicker = isPdfTemplatesV1()
+  const templateId = ((resume as Record<string, unknown>).templateId as TemplateId | undefined)
+    ?? 'modern_minimalist'
 
   return (
-    <div className="container mx-auto max-w-3xl py-10 px-4">
+    <div className="container mx-auto max-w-4xl py-10 px-4">
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">{resume.title}</h1>
@@ -37,13 +43,27 @@ export default async function ResumeDetailPage({ params }: PageProps) {
           <Button asChild variant="outline" size="sm">
             <Link href="/dashboard">← Dashboard</Link>
           </Button>
-          <Button asChild size="sm">
-            <a href={`/api/resumes/${id}/pdf`} download>
-              Download PDF
-            </a>
-          </Button>
+          {!showTemplatePicker && (
+            <Button asChild size="sm">
+              <a href={`/api/resumes/${id}/pdf`} download>
+                Download PDF
+              </a>
+            </Button>
+          )}
         </div>
       </div>
+
+      {/* Template picker — shown only when PDF_TEMPLATES_V1=true */}
+      {showTemplatePicker && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Template</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <TemplatePicker resumeId={id} initialTemplateId={templateId} />
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -81,7 +101,7 @@ function ResumeDisplay({ data }: { data: Record<string, unknown> }) {
     )
   }
 
-  // Fallback: render any other JSON structure key-by-key
+  // Structured JSON from V2 pipeline — render section by section
   return (
     <div className="space-y-6 text-sm text-slate-700">
       {Object.entries(data).map(([section, value]) => (
