@@ -197,7 +197,7 @@ export async function POST(req: Request) {
     where: { isActive: true, source: 'CAREEROPS' },
     include: {
       user: {
-        select: { id: true, name: true, email: true, dailyApplicationLimit: true },
+        select: { id: true, name: true, email: true, dailyApplicationLimit: true, inboxHandle: true },
       },
       resume: {
         select: { id: true, generated: true, title: true },
@@ -255,12 +255,20 @@ export async function POST(req: Request) {
       continue
     }
 
-    // Build user_data for the ATS filler
+    // Build user_data for the ATS filler.
+    //
+    // Use inbox email (handle@inbox.resumeai-bot.ru) as the application email
+    // so company replies flow through the dashboard inbox system.
+    // Fall back to the user's personal email if inbox isn't configured yet.
     const { first_name, last_name } = splitName(user.name)
+    const inboxDomain = process.env.INBOX_DOMAIN ?? 'inbox.resumeai-bot.ru'
+    const applicationEmail = user.inboxHandle
+      ? `${user.inboxHandle}@${inboxDomain}`
+      : (user.email ?? '')
     const userData: Record<string, string> = {
       first_name,
       last_name,
-      email: user.email ?? '',
+      email: applicationEmail,
       phone: '',
       linkedin_url: '',
       resume_text: resumeText,
