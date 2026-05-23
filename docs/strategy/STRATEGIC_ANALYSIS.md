@@ -98,6 +98,20 @@ Recommend **5 templates** at launch, all single-column, all ATS-safe. Two engine
 
 Prompt 03 implements all 5 plus a template-picker UI and a "preview before download" flow.
 
+**✅ Prompt 03 — COMPLETE (2026-05-23)**
+
+Shipped:
+- 5 ATS-safe Jinja2/WeasyPrint HTML templates: `modern_minimalist`, `classic_executive`, `tech_compact`, `creative_accent`, `new_grad`
+- Shared `_common.css` (print margins, section headings, page-break rules, font stacks)
+- `POST /jobs/resumes/{id}/render` endpoint with auth, 400 on unknown template
+- `§3.2 adaptResumeData()` adapter — prefers `resume_structured`, falls back to line-parsed `resume_text`, minimal stub as last resort
+- DB migration: `Resume.templateId TEXT DEFAULT 'modern_minimalist'`
+- `PATCH /api/resumes/{id}/template` route to persist picker choice
+- `TemplatePicker` client component gated by `PDF_TEMPLATES_V1` feature flag
+- SVG placeholder thumbnails; `regenerate_thumbnails.py` for real PNGs on VPS
+- `lib/flags.ts` → `isPdfTemplatesV1()` / `isResumeQualityV2()`
+- Full test suite: 46 unit + template-sanity tests pass; 10 integration tests skip when system libs absent
+
 ---
 
 ## 4. Competition deep dive — top 3
