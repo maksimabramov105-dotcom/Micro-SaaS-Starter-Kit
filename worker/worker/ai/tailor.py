@@ -28,6 +28,8 @@ from typing import Any
 import structlog
 
 from worker.ai.resume import _call_openai
+from worker.ai.keywords import extract_ats_keywords
+from worker.ai.critique import critique_resume
 from worker.config import settings
 
 logger = structlog.get_logger(__name__)
@@ -37,11 +39,23 @@ TAILOR_MODEL = "gpt-4o-mini"
 
 # ── Prompt templates loaded once at import time ────────────────────────────────
 _PROMPTS_DIR = Path(__file__).parent / "prompts"
+
+# V1 templates (preserved for rollback / A/B)
 _RESUME_TEMPLATE: str = (
     (_PROMPTS_DIR / "tailor_resume.txt").read_text(encoding="utf-8").strip()
 )
 _COVER_TEMPLATE: str = (
     (_PROMPTS_DIR / "tailor_cover_letter.txt").read_text(encoding="utf-8").strip()
+)
+
+# V2 templates — STAR/CAR + ATS keyword injection
+# System prompt (STAR/CAR constraints) shared with resume.py
+from worker.ai.resume import _RESUME_SYSTEM_PROMPT_V2 as _TAILOR_SYSTEM_V2  # noqa: E402
+_RESUME_TEMPLATE_V2: str = (
+    (_PROMPTS_DIR / "tailor_resume_v2.txt").read_text(encoding="utf-8").strip()
+)
+_COVER_TEMPLATE_V2: str = (
+    (_PROMPTS_DIR / "tailor_cover_letter_v2.txt").read_text(encoding="utf-8").strip()
 )
 
 # ── In-process dedup cache ─────────────────────────────────────────────────────
@@ -89,6 +103,96 @@ def should_tailor(plan_tier: str, application_count: int = 0) -> bool:
     return True
 
 
+# ── V2 internal pipeline ──────────────────────────────────────────────────────
+
+async def _tailor_resume_v2(
+    base_resume: dict,
+    job: dict,
+    api_key: str,
+    job_id: str,
+) -> tuple[dict, int, str]:
+    """
+    V2 pipeline: extract keywords → generate (STAR/CAR) → verify coverage → critique.
+
+    Called only when settings.resume_quality_v2 is True.
+    Always returns a valid (dict, int, str) — errors bubble up to tailor_resume.
+    """
+    description = (job.get("description") or "")
+
+    # Step 1: Extract ATS keywords from job description
+    keywords = await extract_ats_keywords(description, api_key)
+    keywords_str = ", ".join(keywords) if keywords else "(none extracted)"
+    logger.info("tailor_resume_v2.keywords", job_id=job_id, count=len(keywords))
+
+    # Step 2: Build user prompt with keywords injected
+    base_json = json.dumps(base_resume, ensure_ascii=False)[:3500]
+    prompt = (
+        _RESUME_TEMPLATE_V2
+        .replace("{base_resume}", base_json)
+        .replace("{job_title}", job.get("title", ""))
+        .replace("{company}", job.get("company", ""))
+        .replace("{description}", description[:2000])
+        .replace("{ats_keywords}", keywords_str)
+    )
+
+    # Step 3: Generate with STAR/CAR system prompt
+    raw = await asyncio.wait_for(
+        _call_openai(
+            prompt=prompt,
+            system=_TAILOR_SYSTEM_V2,
+            api_key=api_key or settings.openai_api_key,
+            model=TAILOR_MODEL,
+            max_tokens=2500,
+        ),
+        timeout=60,
+    )
+    raw = raw.strip()
+    if raw.startswith("```"):
+        raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+
+    # Step 4: Verify keyword coverage — one retry if >50% of keywords are missing
+    if keywords:
+        raw_lower = raw.lower()
+        missing = [kw for kw in keywords if kw.lower() not in raw_lower]
+        if len(missing) > len(keywords) // 2:
+            logger.info(
+                "tailor_resume_v2.keyword_retry",
+                job_id=job_id,
+                missing_count=len(missing),
+            )
+            retry_prompt = (
+                prompt
+                + "\n\nCRITICAL — these keywords MUST appear verbatim at least once "
+                  "(add to Skills section if they don't fit elsewhere): "
+                + ", ".join(missing)
+            )
+            try:
+                raw = await asyncio.wait_for(
+                    _call_openai(
+                        prompt=retry_prompt,
+                        system=_TAILOR_SYSTEM_V2,
+                        api_key=api_key or settings.openai_api_key,
+                        model=TAILOR_MODEL,
+                        max_tokens=2500,
+                    ),
+                    timeout=60,
+                )
+                raw = raw.strip()
+                if raw.startswith("```"):
+                    raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+            except Exception as exc:
+                logger.warning("tailor_resume_v2.retry_failed", job_id=job_id, error=str(exc))
+
+    # Step 5: Parse JSON
+    tailored: dict = json.loads(raw)
+    tokens = max(1, int(len(raw.split()) * 0.75))
+
+    # Step 6: Self-critique pass — rewrites bullets failing STAR/CAR rubric
+    critiqued = await critique_resume(tailored, api_key or settings.openai_api_key)
+    logger.info("tailor_resume_v2.done", job_id=job_id, tokens=tokens)
+    return critiqued, tokens, TAILOR_MODEL
+
+
 # ── Core tailoring functions ───────────────────────────────────────────────────
 
 async def tailor_resume(
@@ -110,6 +214,26 @@ async def tailor_resume(
         (tailored_resume_dict, tokens_used_approx, model_name)
         On failure: (base_resume, 0, TAILOR_MODEL) — always non-destructive.
     """
+    # V2 pipeline — STAR/CAR + ATS keywords + self-critique
+    if settings.resume_quality_v2:
+        key_v2 = _cache_key(base_resume, job_id, "resume_v2")
+        cached_v2 = _get_cached(key_v2)
+        if cached_v2 is not None:
+            logger.info("tailor_resume.cache_hit_v2", job_id=job_id)
+            return cached_v2
+        try:
+            result_v2 = await _tailor_resume_v2(base_resume, job, api_key, job_id)
+            _set_cached(key_v2, result_v2)
+            return result_v2
+        except json.JSONDecodeError as exc:
+            logger.warning("tailor_resume_v2.json_error", job_id=job_id, error=str(exc))
+        except asyncio.TimeoutError:
+            logger.warning("tailor_resume_v2.timeout", job_id=job_id)
+        except Exception as exc:
+            logger.warning("tailor_resume_v2.error", job_id=job_id, error=str(exc))
+        # Non-destructive fallback to V1 if V2 fails
+        logger.warning("tailor_resume_v2.fallback_to_v1", job_id=job_id)
+
     key = _cache_key(base_resume, job_id, "resume")
     cached = _get_cached(key)
     if cached is not None:
@@ -187,6 +311,51 @@ async def tailor_cover_letter(
         (cover_letter_text, tokens_used_approx, model_name)
         On failure: ("", 0, TAILOR_MODEL) — caller uses generic fallback.
     """
+    # V2 pipeline — ATS-keyword-enriched cover letter
+    if settings.resume_quality_v2:
+        key_v2 = _cache_key(base_resume, job_id, "cover_v2")
+        cached_v2 = _get_cached(key_v2)
+        if cached_v2 is not None:
+            logger.info("tailor_cover_letter.cache_hit_v2", job_id=job_id)
+            return cached_v2
+        try:
+            description_v2 = (job.get("description") or "")
+            keywords = await extract_ats_keywords(description_v2, api_key or settings.openai_api_key)
+            keywords_str = ", ".join(keywords) if keywords else "(none extracted)"
+            logger.info("tailor_cover_letter_v2.keywords", job_id=job_id, count=len(keywords))
+
+            base_json_v2 = json.dumps(base_resume, ensure_ascii=False)[:2000]
+            prompt_v2 = (
+                _COVER_TEMPLATE_V2
+                .replace("{base_resume}", base_json_v2)
+                .replace("{job_title}", job.get("title", ""))
+                .replace("{company}", job.get("company", ""))
+                .replace("{description}", description_v2[:2000])
+                .replace("{ats_keywords}", keywords_str)
+            )
+            text_v2 = await asyncio.wait_for(
+                _call_openai(
+                    prompt=prompt_v2,
+                    system=_TAILOR_SYSTEM_V2,
+                    api_key=api_key or settings.openai_api_key,
+                    model=TAILOR_MODEL,
+                    max_tokens=600,
+                ),
+                timeout=45,
+            )
+            text_v2 = text_v2.strip()
+            tokens_v2 = max(1, int(len(text_v2.split()) * 0.75))
+            result_v2: tuple[str, int, str] = (text_v2, tokens_v2, TAILOR_MODEL)
+            _set_cached(key_v2, result_v2)
+            logger.info("tailor_cover_letter_v2.done", job_id=job_id, length=len(text_v2))
+            return result_v2
+        except asyncio.TimeoutError:
+            logger.warning("tailor_cover_letter_v2.timeout", job_id=job_id)
+        except Exception as exc:
+            logger.warning("tailor_cover_letter_v2.error", job_id=job_id, error=str(exc))
+        # Non-destructive fallback to V1 if V2 fails
+        logger.warning("tailor_cover_letter_v2.fallback_to_v1", job_id=job_id)
+
     key = _cache_key(base_resume, job_id, "cover")
     cached = _get_cached(key)
     if cached is not None:

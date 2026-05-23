@@ -22,6 +22,7 @@ export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { canSendApplication, consumeQuota } from '@/lib/quota'
+import { trackEvent } from '@/lib/analytics-advanced'
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -515,6 +516,24 @@ export async function POST(req: Request) {
         await consumeQuota(user.id, application.id)
         campaignLog.applied++
         appliedThisCampaign++
+
+        // Track resume generation event for quality-v2 A/B analysis
+        const usedV2 = process.env.RESUME_QUALITY_V2 === 'true'
+        trackEvent({
+          event: 'resume_generated',
+          userId: user.id,
+          properties: {
+            used_v2: usedV2,
+            campaign_id: campaign.id,
+            job_title: job.title,
+            company: job.company,
+            ats: result.ats ?? null,
+            application_id: application.id,
+          },
+        }).catch((err: unknown) =>
+          console.warn('[run-campaigns] analytics track failed', err)
+        )
+
         console.log('[run-campaigns] submitted', {
           campaign: campaign.id,
           title: job.title,

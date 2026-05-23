@@ -117,6 +117,8 @@ services:
       REDIS_URL: redis://redis:6379
       # ENGLISH_JOB_SOURCES must be valid JSON if overridden, e.g.:
       # ENGLISH_JOB_SOURCES: '["adzuna","themuse","arbeitnow","remoteok"]'
+      # Resume Quality v2 — STAR/CAR + ATS keywords + self-critique. Set to true to enable.
+      RESUME_QUALITY_V2: ${RESUME_QUALITY_V2:-false}
     deploy:
       resources:
         limits:

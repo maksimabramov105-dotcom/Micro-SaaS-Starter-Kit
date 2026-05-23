@@ -36,6 +36,10 @@ class Settings(BaseSettings):
 
     worker_version: str = "1.0.0"
 
+    # Resume quality v2 — STAR/CAR + ATS keywords + self-critique pipeline.
+    # Set RESUME_QUALITY_V2=true in environment to enable. Default OFF for safe rollout.
+    resume_quality_v2: bool = False
+
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
 
 
