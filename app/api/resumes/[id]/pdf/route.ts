@@ -47,7 +47,8 @@ export async function GET(_req: Request, { params }: RouteContext) {
       const resumeData = adaptResumeData(generated, resume.title)
 
       const pdfBytes = await renderResumePdf({ resumeId: id, templateId, resumeData })
-      return new Response(pdfBytes, {
+      // Buffer is not assignable to BodyInit in Next.js 16 — use Uint8Array view
+      return new Response(new Uint8Array(pdfBytes), {
         headers: {
           'Content-Type': 'application/pdf',
           'Content-Disposition': `attachment; filename="${safeTitle}.pdf"`,
