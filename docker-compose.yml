@@ -80,6 +80,8 @@ services:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-}
       TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
+      # PDF Templates v1 — WeasyPrint picker UI. Set to true to enable.
+      PDF_TEMPLATES_V1: ${PDF_TEMPLATES_V1:-false}
     depends_on:
       postgres:
         condition: service_healthy
