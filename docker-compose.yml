@@ -75,6 +75,7 @@ services:
       CRON_SECRET: ${CRON_SECRET}
       # P22 inbox
       RESEND_WEBHOOK_SECRET: ${RESEND_WEBHOOK_SECRET:-}
+      INBOX_DOMAIN: ${INBOX_DOMAIN:-resumeai-bot.ru}
       # P18 Telegram notifications
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-}
