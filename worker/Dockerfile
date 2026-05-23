@@ -28,7 +28,8 @@ RUN pip install uv && uv pip install --system \
       "cryptography>=42" \
       "playwright>=1.44" \
       "openai>=1.30" \
-      "reportlab>=4.2"
+      "reportlab>=4.2" \
+      "redis[hiredis]>=5.0"
 
 # Download Chromium browser to a fixed, world-readable path.
 # PLAYWRIGHT_BROWSERS_PATH overrides the default ~/.cache/ms-playwright so the
