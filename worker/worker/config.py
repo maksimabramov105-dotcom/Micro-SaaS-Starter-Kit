@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     # Set RESUME_QUALITY_V2=true in environment to enable. Default OFF for safe rollout.
     resume_quality_v2: bool = False
 
+    # PDF templates v1 — WeasyPrint + Jinja2 template rendering.
+    # Set PDF_TEMPLATES_V1=true to enable. Default OFF (legacy reportlab path used).
+    pdf_templates_v1: bool = False
+
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
 
 

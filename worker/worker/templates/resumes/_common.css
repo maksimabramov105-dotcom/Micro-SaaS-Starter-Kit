@@ -1,0 +1,144 @@
+/* _common.css — shared ATS-safe print CSS for all resume templates */
+
+/* Page setup */
+@page {
+    size: Letter;
+    margin: 0.55in 0.6in;
+}
+
+/* Reset */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-size: 11pt;
+    line-height: 1.4;
+    color: #000;
+    background: #fff;
+    -webkit-print-color-adjust: exact;
+}
+
+/* Single-column layout — no flexbox columns, no tables */
+.resume {
+    width: 100%;
+    max-width: 100%;
+}
+
+/* Contact block — always at top of body, NOT in <header> */
+.contact-block {
+    margin-bottom: 10pt;
+}
+
+.contact-block h1 {
+    font-size: 16pt;
+    font-weight: bold;
+    margin-bottom: 3pt;
+}
+
+.contact-block .contact-line {
+    font-size: 9.5pt;
+    color: #333;
+}
+
+/* Section headings — exact ATS-parseable names */
+.section-heading {
+    font-size: 11pt;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 1pt solid #000;
+    padding-bottom: 2pt;
+    margin-top: 10pt;
+    margin-bottom: 5pt;
+}
+
+/* Experience entries */
+.exp-entry {
+    margin-bottom: 7pt;
+}
+
+.exp-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+}
+
+.exp-title {
+    font-weight: bold;
+    font-size: 10.5pt;
+}
+
+.exp-dates {
+    font-size: 9.5pt;
+    color: #444;
+    white-space: nowrap;
+}
+
+.exp-company {
+    font-size: 10pt;
+    color: #222;
+    margin-bottom: 3pt;
+}
+
+/* Bullet list */
+ul.bullets {
+    margin-left: 14pt;
+    margin-top: 2pt;
+}
+
+ul.bullets li {
+    font-size: 10pt;
+    margin-bottom: 1.5pt;
+    line-height: 1.35;
+}
+
+/* Education */
+.edu-entry {
+    margin-bottom: 5pt;
+}
+
+.edu-degree {
+    font-weight: bold;
+    font-size: 10pt;
+}
+
+.edu-school {
+    font-size: 10pt;
+}
+
+.edu-year {
+    font-size: 9.5pt;
+    color: #444;
+}
+
+/* Skills */
+.skills-block {
+    font-size: 10pt;
+    line-height: 1.5;
+}
+
+.skill-category {
+    font-weight: bold;
+}
+
+/* Projects */
+.proj-entry {
+    margin-bottom: 5pt;
+}
+
+.proj-name {
+    font-weight: bold;
+    font-size: 10pt;
+}
+
+/* Avoid orphaned headings */
+.section-heading {
+    page-break-after: avoid;
+}
+
+.exp-entry, .edu-entry, .proj-entry {
+    page-break-inside: avoid;
+}

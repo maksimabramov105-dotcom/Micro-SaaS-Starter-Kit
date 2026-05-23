@@ -141,6 +141,61 @@ AI tailoring per application is toggled via `User.preferences.tailorApplications
 
 ---
 
+### PDF Template System (Prompt 03 — `PDF_TEMPLATES_V1`)
+
+WeasyPrint-based renderer with 5 ATS-safe templates, picker UI, and feature flag.
+
+**Architecture:**
+
+```
+Browser ──PATCH /api/resumes/{id}/template──► DB (Resume.templateId)
+Browser ──GET  /api/resumes/{id}/pdf       ──► Next.js API route
+                                                   │
+                                     isPdfTemplatesV1() = true?
+                                           YES ↓           NO ↓
+                                   adaptResumeData()   legacy reportlab
+                                           │
+                                   POST /jobs/resumes/{id}/render  (worker)
+                                           │
+                                   Jinja2 template → HTML string
+                                           │
+                                   WeasyPrint HTML.write_pdf()
+                                           │
+                                   application/pdf bytes ──► browser
+```
+
+**Key files:**
+
+| File | Responsibility |
+|---|---|
+| `worker/worker/routes/jobs.py` | `POST /jobs/resumes/{id}/render` — Jinja2 render + WeasyPrint PDF |
+| `worker/worker/templates/resumes/_common.css` | Shared print CSS (margins, headings, page-break rules) |
+| `worker/worker/templates/resumes/*.html` | 5 Jinja2 templates: `modern_minimalist`, `classic_executive`, `tech_compact`, `creative_accent`, `new_grad` |
+| `worker/worker/templates/resumes/_sample_resume.json` | Sample fixture for thumbnail generation + tests |
+| `app/api/resumes/[id]/pdf/route.ts` | PDF download endpoint; V1 path calls worker, falls back to reportlab |
+| `app/api/resumes/[id]/template/route.ts` | `PATCH` — validates and persists `templateId` to DB |
+| `lib/worker-client.ts` | `renderResumePdf()` + `adaptResumeData()` (§3.2 JSON shape adapter) |
+| `lib/flags.ts` | `isPdfTemplatesV1()` / `isResumeQualityV2()` env-flag helpers |
+| `components/resume/TemplatePicker.tsx` | Client component — grid of 5 templates, save + download buttons |
+| `app/dashboard/resumes/[id]/page.tsx` | Renders `<TemplatePicker>` when `PDF_TEMPLATES_V1=true` |
+| `public/template-thumbnails/*.svg` | SVG placeholder thumbnails (real PNGs via `regenerate_thumbnails.py`) |
+| `worker/scripts/regenerate_thumbnails.py` | WeasyPrint + pdf2image → PNG thumbnails (run on VPS) |
+
+**Feature flag:** `PDF_TEMPLATES_V1=true` in env. Set to `false` (default) to fall through to the legacy reportlab endpoint. Controlled independently in web (`lib/flags.ts`) and worker (`worker/worker/config.py`).
+
+**§3.2 JSON adapter (`adaptResumeData`):** The existing `generated` JSON field may contain `{ resume_text: "..." }` (V1 plain text), `{ resume_structured: {...} }` (V2 structured), or a raw structured object. The adapter normalises all three shapes into the `{ name, summary, experience[], education[], skills, projects[] }` dict that the Jinja2 templates expect.
+
+**ATS constraints enforced in all templates:**
+- Single-column layout; no `<table>` elements
+- Contact info in `<body>`, not `<header>` or ARIA landmark
+- Standard section headings ("Experience", "Education", "Skills")
+- Web-safe fonts only: Calibri, Garamond, Helvetica, Arial
+- Margins 0.45"–0.6"; `page-break-inside: avoid` on entries
+
+**System deps (Docker only):** `libpangoft2-1.0-0 libgdk-pixbuf2.0-0 libffi-dev shared-mime-info` added to `worker/Dockerfile` apt-get stage.
+
+---
+
 ### CareerOps autoapply pipeline (`app/api/cron/run-campaigns/`, `worker/worker/autoapply/careerops.py`)
 
 End-to-end automated job application system.  Triggered every 2 hours by GitHub Actions (`.github/workflows/run-campaigns.yml`) via `POST /api/cron/run-campaigns`.

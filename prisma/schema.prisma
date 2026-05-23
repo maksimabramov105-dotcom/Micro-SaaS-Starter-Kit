@@ -372,6 +372,7 @@ model Resume {
   pdfUrl      String?                 // optional S3/disk URL
   language    String   @default("en")
   isDefault   Boolean  @default(false)
+  templateId  String   @default("modern_minimalist")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

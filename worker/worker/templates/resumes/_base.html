@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    {% include '_common.css' %}
+    {% block extra_css %}{% endblock %}
+  </style>
+</head>
+<body>
+<div class="resume">
+
+  {# Contact info — always in first 3 lines of body, never in <header> #}
+  <div class="contact-block">
+    <h1>{{ resume.name | default('') }}</h1>
+    <div class="contact-line">
+      {%- set parts = [] -%}
+      {%- if resume.email -%}{%- set _ = parts.append(resume.email) -%}{%- endif -%}
+      {%- if resume.phone -%}{%- set _ = parts.append(resume.phone) -%}{%- endif -%}
+      {%- if resume.location -%}{%- set _ = parts.append(resume.location) -%}{%- endif -%}
+      {%- if resume.linkedin -%}{%- set _ = parts.append(resume.linkedin) -%}{%- endif -%}
+      {{ parts | join(' | ') }}
+    </div>
+  </div>
+
+  {% block body %}{% endblock %}
+
+</div>
+</body>
+</html>

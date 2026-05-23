@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+{% include '_common.css' %}
+
+/* Creative Accent — Calibri, single accent colour, still single-column/ATS-safe */
+body { font-family: Calibri, Arial, Helvetica, sans-serif; }
+
+.contact-block {
+    border-left: 3pt solid #2563eb;
+    padding-left: 8pt;
+    margin-bottom: 10pt;
+}
+
+.contact-block h1 { color: #1e40af; font-size: 17pt; }
+
+.section-heading {
+    color: #1e40af;
+    border-bottom: 1.5pt solid #2563eb;
+    font-size: 10.5pt;
+}
+
+.exp-title { color: #1e40af; }
+
+.summary-text { font-size: 10.5pt; line-height: 1.45; }
+</style>
+</head>
+<body>
+<div class="resume">
+
+  <div class="contact-block">
+    <h1>{{ resume.name | default('') }}</h1>
+    <div class="contact-line">
+      {%- set parts = [] -%}
+      {%- if resume.email -%}{%- set _ = parts.append(resume.email) -%}{%- endif -%}
+      {%- if resume.phone -%}{%- set _ = parts.append(resume.phone) -%}{%- endif -%}
+      {%- if resume.location -%}{%- set _ = parts.append(resume.location) -%}{%- endif -%}
+      {%- if resume.linkedin -%}{%- set _ = parts.append(resume.linkedin) -%}{%- endif -%}
+      {{ parts | join(' | ') }}
+    </div>
+  </div>
+
+  {% if resume.summary %}
+  <div class="section-heading">Summary</div>
+  <p class="summary-text">{{ resume.summary }}</p>
+  {% endif %}
+
+  {% if resume.experience %}
+  <div class="section-heading">Experience</div>
+  {% for exp in resume.experience %}
+  <div class="exp-entry">
+    <div class="exp-header">
+      <span class="exp-title">{{ exp.title | default('') }}</span>
+      <span class="exp-dates">{{ exp.years | default('') }}</span>
+    </div>
+    <div class="exp-company">{{ exp.company | default('') }}</div>
+    {% if exp.bullets %}
+    <ul class="bullets">
+      {% for bullet in exp.bullets %}<li>{{ bullet }}</li>{% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  {% if resume.education %}
+  <div class="section-heading">Education</div>
+  {% for edu in resume.education %}
+  <div class="edu-entry">
+    <div class="edu-degree">{{ edu.degree | default('') }}</div>
+    <div class="edu-school">{{ edu.school | default('') }}{% if edu.year %} · {{ edu.year }}{% endif %}</div>
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  {% if resume.skills %}
+  <div class="section-heading">Skills</div>
+  <div class="skills-block">
+    {% if resume.skills is string %}
+      {{ resume.skills }}
+    {% elif resume.skills is mapping %}
+      {% for cat, items in resume.skills.items() %}
+        <span class="skill-category">{{ cat }}:</span> {{ items | join(', ') }}<br>
+      {% endfor %}
+    {% else %}
+      {{ resume.skills | join(', ') }}
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if resume.projects %}
+  <div class="section-heading">Projects</div>
+  {% for proj in resume.projects %}
+  <div class="proj-entry">
+    <span class="proj-name">{{ proj.name | default('') }}</span>
+    {% if proj.description %} — {{ proj.description }}{% endif %}
+  </div>
+  {% endfor %}
+  {% endif %}
+
+</div>
+</body>
+</html>

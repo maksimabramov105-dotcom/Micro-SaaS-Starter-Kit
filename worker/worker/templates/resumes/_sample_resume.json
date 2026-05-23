@@ -1,0 +1,56 @@
+{
+  "name": "Alex Rivera",
+  "email": "alex.rivera@example.com",
+  "phone": "+1 (415) 555-0192",
+  "location": "San Francisco, CA",
+  "linkedin": "linkedin.com/in/alexrivera-dev",
+  "summary": "Backend engineer with 5 years building distributed systems and payment infrastructure at scale. Led migration of monolith to microservices serving 50M+ daily requests. Passionate about Kubernetes, observability, and mentoring junior engineers.",
+  "experience": [
+    {
+      "title": "Senior Software Engineer",
+      "company": "Stripe",
+      "years": "2022 – Present",
+      "bullets": [
+        "Reduced payment API latency by 38% by migrating synchronous DB calls to async event-driven pipeline serving 12M transactions/day.",
+        "Led a team of 4 to re-architect fraud detection service, cutting false-positive rate from 3.2% to 0.9% and saving $2.1M annually.",
+        "Designed and shipped Kubernetes-based autoscaling for webhook delivery, achieving 99.97% uptime across 6 regions.",
+        "Mentored 3 junior engineers through onboarding, reducing time-to-first-PR from 3 weeks to 5 days."
+      ]
+    },
+    {
+      "title": "Software Engineer",
+      "company": "Cloudflare",
+      "years": "2020 – 2022",
+      "bullets": [
+        "Built real-time DDoS mitigation pipeline in Go, processing 8Tbps peak traffic with sub-10ms classification latency.",
+        "Shipped CI/CD pipeline using GitHub Actions + Helm, cutting release cycle from 2 weeks to 2 days.",
+        "Increased test coverage from 41% to 87% across the edge routing service, eliminating 12 production incidents/quarter."
+      ]
+    },
+    {
+      "title": "Junior Backend Engineer",
+      "company": "Segment",
+      "years": "2019 – 2020",
+      "bullets": [
+        "Delivered customer data pipeline ingesting 200GB/day to Redshift; reduced ingestion lag from 45 minutes to under 3 minutes.",
+        "Automated weekly manual reporting scripts, saving 6 engineering-hours per week."
+      ]
+    }
+  ],
+  "education": [
+    {
+      "degree": "BSc Computer Science",
+      "school": "UC Berkeley",
+      "year": "2019",
+      "gpa": "3.8"
+    }
+  ],
+  "skills": ["Python", "Go", "Kubernetes", "PostgreSQL", "Redis", "Kafka", "AWS", "Terraform", "FastAPI", "gRPC", "CI/CD", "Distributed Systems"],
+  "projects": [
+    {
+      "name": "OpenTrace",
+      "description": "Open-source distributed tracing library with 1.2k GitHub stars; adopted by 3 Fortune 500 companies.",
+      "tech": ["Go", "gRPC", "Prometheus"]
+    }
+  ]
+}
