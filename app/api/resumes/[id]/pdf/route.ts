@@ -15,6 +15,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { adaptResumeData, renderResumePdf } from '@/lib/worker-client'
+import { isPdfTemplatesV1 } from '@/lib/flags'
 
 interface RouteContext {
   params: Promise<{ id: string }>
@@ -39,7 +40,7 @@ export async function GET(_req: Request, { params }: RouteContext) {
     .slice(0, 60) || 'resume'
 
   // ── V1 template path (WeasyPrint) ─────────────────────────────────────────
-  const useTemplates = process.env.PDF_TEMPLATES_V1 === 'true'
+  const useTemplates = await isPdfTemplatesV1(session.user.id)
   if (useTemplates) {
     try {
       const templateId = (resume as Record<string, unknown>).templateId as string | undefined

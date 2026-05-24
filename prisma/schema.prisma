@@ -579,3 +579,40 @@ model StripeEvent {
 
   @@index([processedAt])
 }
+
+// ---------------------------------------------------------------------------
+// Feature Flags + A/B Experiments (Prompt 08)
+// Stage 1 — in-house, zero external deps. Migrate to PostHog at $5K MRR.
+// ---------------------------------------------------------------------------
+
+model FeatureFlag {
+  key         String   @id
+  enabled     Boolean  @default(false)
+  rolloutPct  Int      @default(0)   // 0–100; gradual rollout per stable userId hash
+  description String?
+  updatedAt   DateTime @updatedAt
+}
+
+model Experiment {
+  key         String    @id
+  active      Boolean   @default(true)
+  variants    String[]  // e.g. ["control", "treatment"]
+  weights     Int[]     // e.g. [50, 50] — must sum to 100
+  startedAt   DateTime  @default(now())
+  endedAt     DateTime?
+  description String?
+}
+
+model ExperimentAssignment {
+  id            String   @id @default(cuid())
+  experimentKey String
+  userId        String?  // set for logged-in users
+  anonId        String?  // cookie rai_anon — for pre-signup visitors
+  variant       String
+  assignedAt    DateTime @default(now())
+
+  @@unique([experimentKey, userId])
+  @@unique([experimentKey, anonId])
+  @@index([experimentKey, variant])
+  @@index([experimentKey, assignedAt])
+}

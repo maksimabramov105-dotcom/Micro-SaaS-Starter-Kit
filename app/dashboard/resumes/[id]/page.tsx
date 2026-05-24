@@ -26,7 +26,7 @@ export default async function ResumeDetailPage({ params }: PageProps) {
 
   // generated is a Json field — cast to a loose object for rendering
   const generated = resume.generated as Record<string, unknown>
-  const showTemplatePicker = isPdfTemplatesV1()
+  const showTemplatePicker = await isPdfTemplatesV1(session.user.id)
   const templateId = ((resume as Record<string, unknown>).templateId as TemplateId | undefined)
     ?? 'modern_minimalist'
 
