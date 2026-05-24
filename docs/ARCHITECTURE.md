@@ -57,6 +57,45 @@ Key DB fields on `User`: `stripeCustomerId`, `stripeSubscriptionId`, `stripePric
 
 ---
 
+### Feature Flags + A/B Experiments (`lib/flags.ts`, `lib/experiments.ts`, `middleware.ts`)
+
+Stage 1 in-house implementation (zero external deps). Migrate to PostHog free tier at $5K MRR.
+
+| File | Responsibility |
+|---|---|
+| `lib/flags.ts` | DB-backed flag evaluation; 5-min in-memory cache; `isFlagEnabled(key, userId)` |
+| `lib/experiments.ts` | Variant assignment (DB-sticky, deterministic SHA-256 bucket); `getOrAssignVariant(key, userId)` |
+| `middleware.ts` | Edge middleware: seeds `rai_anon` cookie for anonymous visitors |
+| `prisma/seed-experiments.ts` | Idempotent upsert of initial flags + 3 starter experiments |
+| `scripts/experiment_results.ts` | CLI: per-variant conversion counts + two-proportion Z-test p-value |
+| `app/dashboard/admin/flags/page.tsx` | Admin UI: flag toggles, rollout % sliders, experiment assignment counts |
+
+**Prisma models:** `FeatureFlag`, `Experiment`, `ExperimentAssignment`
+
+**Experiments seeded:**
+
+| Key | Variants | Description |
+|---|---|---|
+| `pricing_headline_v1` | control / guarantee | Pricing page headline copy |
+| `free_tier_cap_v1` | three_per_day / five_per_day | Free tier daily app limit |
+| `pro_price_v1` | p1999 / p2499 | Pro monthly price point |
+
+**Flags seeded (all OFF by default):** `resume_quality_v2`, `pdf_templates_v1`, `annual_plans_v1`, `referral_program_v1`
+
+**Anonymous tracking:** `rai_anon` cookie (httpOnly, 1yr, seeded by Edge middleware before SSR). When a user signs up, their future `ExperimentAssignment` rows use `userId`; the `anonId` rows are retained for historical accuracy.
+
+**Conversion tracking convention:**
+```ts
+await trackEvent({ event: 'checkout_started', userId, properties: { experiment_key, variant } })
+```
+
+**Results analysis:**
+```bash
+npx tsx scripts/experiment_results.ts pricing_headline_v1 checkout_started
+```
+
+---
+
 ### PMF (Product–Market Fit) tracking (`lib/pmf/`)
 
 | File | Responsibility |

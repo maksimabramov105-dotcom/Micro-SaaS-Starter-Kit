@@ -30,6 +30,7 @@ import { prisma } from '@/lib/prisma'
 import { canSendApplication, consumeQuota } from '@/lib/quota'
 import { trackEvent } from '@/lib/analytics-advanced'
 import { publishEvent } from '@/lib/redis'
+import { isResumeQualityV2 } from '@/lib/flags'
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -665,7 +666,7 @@ export async function POST(req: Request) {
         }).catch(() => {})
 
         // Track resume generation event for quality-v2 A/B analysis
-        const usedV2 = process.env.RESUME_QUALITY_V2 === 'true'
+        const usedV2 = await isResumeQualityV2(user.id)
         trackEvent({
           event: 'resume_generated',
           userId: user.id,

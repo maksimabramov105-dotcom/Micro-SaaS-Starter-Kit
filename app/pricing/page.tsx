@@ -1,3 +1,6 @@
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { getOrAssignVariant } from '@/lib/experiments'
 import { Navbar } from '@/components/navbar'
 import { PricingCards } from '@/components/pricing-cards'
 
@@ -6,7 +9,23 @@ export const metadata = {
   description: 'Simple, transparent pricing with a 30-day money-back guarantee. No risk.',
 }
 
-export default function PricingPage() {
+// Headline copy for each pricing_headline_v1 variant
+const HEADLINE = {
+  control: {
+    h1: 'Simple, Transparent Pricing',
+    sub: 'Start free. Upgrade when you need more applications.',
+  },
+  guarantee: {
+    h1: 'Land your next job in 30 days — or your money back.',
+    sub: 'Try Pro or Unlimited risk-free. If you don\'t get interviews, we refund you in full.',
+  },
+}
+
+export default async function PricingPage() {
+  const session = await getServerSession(authOptions)
+  const variant = await getOrAssignVariant('pricing_headline_v1', session?.user?.id)
+  const copy = HEADLINE[variant as keyof typeof HEADLINE] ?? HEADLINE.control
+
   return (
     <div className="flex min-h-screen flex-col">
       <Navbar />
@@ -15,10 +34,10 @@ export default function PricingPage() {
           <div className="container px-4 md:px-6">
             <div className="mb-12 text-center">
               <h1 className="mb-4 text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-6xl">
-                Simple, Transparent Pricing
+                {copy.h1}
               </h1>
               <p className="mx-auto max-w-[700px] text-gray-500 md:text-xl dark:text-gray-400">
-                Start free. Upgrade when you need more applications.
+                {copy.sub}
               </p>
             </div>
 
