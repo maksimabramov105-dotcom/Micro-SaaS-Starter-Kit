@@ -29,11 +29,11 @@ I cannot directly read the VPS or the live GitHub HEAD from this seat, so the so
 | Risk | What's documented | What's almost certainly drifting |
 |------|------------------|----------------------------------|
 | `ARCHITECTURE.md` is missing 4 live subsystems | The Chrome extension, OpenRouter proxy, PDF endpoint, and `STRIPE_PRICE_ID_TRIAL` are all in code but not in the architecture doc | Anyone (including future-you and Claude Code) will reason about the system wrong. Update first. |
-| `hh.ru` dead columns | `hhToken`, `hhResumeId` exist in Prisma schema, no live code | Migration debt. Cheap to clean up, expensive if left. |
-| `STRIPE_PRICE_ID_TRIAL` orphan | Exists in `.env` but no "trial" plan in `PRICING_PLANS` | Either you intended a trial product and never finished, or the env var is dead. Either way: decide and resolve. |
-| In-memory job store in worker | Documented as known debt | **High-severity for production.** A single worker restart wipes every in-flight autoapply job. Must move to Redis or Postgres before scaling acquisition. |
+| `hh.ru` dead columns | `hhToken`, `hhResumeId` exist in Prisma schema, no live code | ✅ **Resolved in Prompt 04** — dropped via migration `20260524100000_remove_hh_ru_legacy_columns`. |
+| `STRIPE_PRICE_ID_TRIAL` orphan | Existed in legacy `.env` only; no code reference | ✅ **Resolved in Prompt 04** — confirmed absent from `.env.example` and `docker-compose.yml`; decision: no trial plan; archive script updated to map legacy trial users to free tier. Remove from VPS `.env` if present. |
+| In-memory job store in worker | Documented as known debt | ✅ **Resolved in Prompt 04** — `_new_job()` now persists `status="running"` to Redis at creation; tailor cache backed by Redis DB 2. |
 | OpenRouter single point of failure | Whole AI stack depends on it | One outage and 100% of resume generation fails. Need fallback. |
-| Sentry DSN never configured | Monitoring code present | You are flying blind in production. Free Sentry tier covers your traffic. Plug it in now. |
+| Sentry DSN never configured | Monitoring code present | ✅ **Resolved in Prompt 04** — sample rates lowered; Sentry wired in worker and notifier. |
 
 **Architecture verdict:** The system is well-designed for its stage. 9 subsystems is a lot for one founder — that's both impressive and a flag. The risk isn't the architecture, it's that the docs lag the code; if you bring on a contractor or run a serious audit, they'll trip on the gaps above.
 
