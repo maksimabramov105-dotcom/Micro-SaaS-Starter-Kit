@@ -33,14 +33,25 @@ Session fields are declared in `types/next-auth.d.ts` and sourced from the `User
 
 | File | Responsibility |
 |---|---|
-| `app/api/stripe/checkout/route.ts` | Create Stripe Checkout session |
+| `app/api/stripe/create-checkout-session/route.ts` | Create Stripe Checkout session — accepts `{ planId, interval }` (never raw price IDs from client) |
 | `app/api/stripe/cancel/route.ts` | Cancel subscription + capture exit reason |
 | `app/api/billing/refund/route.ts` | 30-day money-back refund (one per customer) |
-| `app/api/webhooks/stripe/route.ts` | Receive Stripe events; update DB state |
+| `app/api/webhooks/stripe/route.ts` | Receive Stripe events; update DB state (interval-agnostic via `getPlanByPriceId`) |
 | `lib/billing/refund.ts` | Pure eligibility checker (`checkRefundEligibility`) |
 | `lib/billing/email-refund-confirmation.ts` | Refund confirmation email helper |
+| `lib/pricing.ts` | Single source of truth for all plan definitions (monthly + annual) |
 
-Webhook events handled: `checkout.session.completed`, `customer.subscription.deleted`, `charge.refunded`.
+**Plans** (defined in `lib/pricing.ts`):
+
+| ID | Price | Interval | Stripe env var |
+|---|---|---|---|
+| `free` | $0 | — | — |
+| `pro` | $19.99/mo | monthly | `STRIPE_PRICE_ID_PRO` |
+| `pro_yearly` | $199/yr | annual | `STRIPE_PRICE_ID_PRO_YEARLY` |
+| `unlimited` | $29.99/mo | monthly | `STRIPE_PRICE_ID_UNLIMITED` |
+| `unlimited_yearly` | $299/yr | annual | `STRIPE_PRICE_ID_UNLIMITED_YEARLY` |
+
+Webhook events handled: `checkout.session.completed`, `invoice.payment_succeeded`, `customer.subscription.updated`, `customer.subscription.deleted`, `charge.refunded`. The webhook is **interval-agnostic** — `getPlanByPriceId` resolves both monthly and yearly price IDs automatically.
 
 Key DB fields on `User`: `stripeCustomerId`, `stripeSubscriptionId`, `stripePriceId`, `stripeCurrentPeriodEnd`, `firstPaidAt`, `cancelledAt`, `refundedAt`.
 
