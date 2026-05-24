@@ -66,6 +66,14 @@ export function PricingCards() {
     // Map yearly plan IDs back to their family for the checkout endpoint
     const familyId = planId.replace('_yearly', '')
 
+    // Tolt affiliate attribution: pass the visitor referral token if the
+    // Tolt script has loaded (window.tolt is set by cdn.tolt.io/tolt.js).
+    const w = typeof window !== 'undefined' ? (window as unknown as Record<string, unknown>) : null
+    const toltObj = w && typeof w.tolt === 'object' && w.tolt !== null
+      ? (w.tolt as { getReferral?: () => string })
+      : null
+    const toltReferral: string | undefined = toltObj?.getReferral?.() ?? undefined
+
     setIsLoading(planId)
     setErrorMsg(null)
 
@@ -73,7 +81,7 @@ export function PricingCards() {
       const response = await fetch('/api/stripe/create-checkout-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planId: familyId, interval }),
+        body: JSON.stringify({ planId: familyId, interval, ...(toltReferral ? { toltReferral } : {}) }),
       })
 
       if (!response.ok) {
