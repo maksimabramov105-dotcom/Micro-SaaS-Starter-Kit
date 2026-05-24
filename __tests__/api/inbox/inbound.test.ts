@@ -22,19 +22,47 @@ import {
 import { isAutoResponder } from '@/lib/inbox/classify'
 
 const DOMAIN = 'inbox.resumeai-bot.ru'
-const SECRET = 'test-webhook-secret'
+
+// Svix uses a whsec_<base64> secret.
+// 'dGVzdC1zZWNyZXQ=' is base64('test-secret').
+const SECRET = 'whsec_dGVzdC1zZWNyZXQ='
 
 // ── verifyResendSignature ──────────────────────────────────────────────────
 
 describe('verifyResendSignature', () => {
-  function sign(body: string): string {
-    const hex = createHmac('sha256', SECRET).update(body).digest('hex')
-    return `v1=${hex}`
+  /**
+   * Replicate Svix signing: HMAC-SHA256(base64Decoded(secret), message)
+   * where message = "{id}.{timestamp}.{body}" or just "{body}".
+   * Header format: "v1,{base64_hmac}" (space-separated for multi-sig).
+   */
+  function sign(body: string, msgId?: string, msgTimestamp?: string): string {
+    const secretBytes = Buffer.from(SECRET.replace(/^whsec_/, ''), 'base64')
+    const message =
+      msgId && msgTimestamp ? `${msgId}.${msgTimestamp}.${body}` : body
+    const b64 = createHmac('sha256', secretBytes).update(message).digest('base64')
+    return `v1,${b64}`
   }
 
-  it('returns true for a valid v1= signature', () => {
+  it('returns true for a valid Svix v1, signature (body-only)', () => {
     const body = '{"from":"a@b.com","to":["x@inbox.resumeai-bot.ru"]}'
     expect(verifyResendSignature(body, sign(body), SECRET)).toBe(true)
+  })
+
+  it('returns true when msgId + msgTimestamp are included in the signed message', () => {
+    const body = '{"event":"email.received"}'
+    const msgId = 'msg_2gfYEyVXSxHT3VFN'
+    const msgTimestamp = '1716557654'
+    expect(
+      verifyResendSignature(body, sign(body, msgId, msgTimestamp), SECRET, msgId, msgTimestamp),
+    ).toBe(true)
+  })
+
+  it('returns false when body-only signature is checked against id+timestamp message', () => {
+    const body = '{"event":"email.received"}'
+    const msgId = 'msg_abc'
+    const msgTimestamp = '1716557654'
+    // sig was made without id+timestamp — verifier uses them → mismatch
+    expect(verifyResendSignature(body, sign(body), SECRET, msgId, msgTimestamp)).toBe(false)
   })
 
   it('returns false for a tampered body', () => {
@@ -43,8 +71,26 @@ describe('verifyResendSignature', () => {
     expect(verifyResendSignature('{"from":"evil@b.com"}', sig, SECRET)).toBe(false)
   })
 
-  it('returns false for a bad hex signature', () => {
-    expect(verifyResendSignature('body', 'v1=zzznotvalidhex', SECRET)).toBe(false)
+  it('accepts a bare base64 signature without v1, prefix', () => {
+    // Svix may send multiple candidates; bare base64 is also accepted as fallback
+    const body = 'hello'
+    const secretBytes = Buffer.from(SECRET.replace(/^whsec_/, ''), 'base64')
+    const b64 = createHmac('sha256', secretBytes).update(body).digest('base64')
+    expect(verifyResendSignature(body, b64, SECRET)).toBe(true)
+  })
+
+  it('accepts space-separated multi-sig where second entry is valid', () => {
+    const body = 'payload'
+    const validSig = sign(body)
+    const multiSig = `v1,AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= ${validSig}`
+    expect(verifyResendSignature(body, multiSig, SECRET)).toBe(true)
+  })
+
+  it('returns false for a signature with wrong value', () => {
+    // Correctly formatted but wrong HMAC value
+    expect(
+      verifyResendSignature('body', 'v1,AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=', SECRET),
+    ).toBe(false)
   })
 
   it('returns false for a null header', () => {
@@ -52,19 +98,12 @@ describe('verifyResendSignature', () => {
   })
 
   it('returns false for wrong-length signature', () => {
-    expect(verifyResendSignature('body', 'v1=aabb', SECRET)).toBe(false)
+    expect(verifyResendSignature('body', 'v1,aabb', SECRET)).toBe(false)
   })
 
-  it('accepts signatures without the v1= prefix (raw hex)', () => {
-    const body = 'hello'
-    const rawHex = createHmac('sha256', SECRET).update(body).digest('hex')
-    expect(verifyResendSignature(body, rawHex, SECRET)).toBe(true)
-  })
-
-  it('is timing-safe: same result for equal signatures regardless of iteration', () => {
+  it('is timing-safe: same result for equal signatures across iterations', () => {
     const body = 'test-body'
     const sig = sign(body)
-    // Run multiple times to ensure no timing shortcut
     for (let i = 0; i < 10; i++) {
       expect(verifyResendSignature(body, sig, SECRET)).toBe(true)
     }
