@@ -3,6 +3,8 @@ import { headers } from 'next/headers'
 import Stripe from 'stripe'
 import { stripe } from '@/lib/stripe'
 import { prisma } from '@/lib/prisma'
+// getPlanByPriceId handles both monthly AND yearly price IDs automatically —
+// no changes needed here when adding annual plans (Prompt 05).
 import { getPlanByPriceId } from '@/lib/pricing'
 
 export async function POST(req: Request) {
