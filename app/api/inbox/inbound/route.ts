@@ -37,12 +37,14 @@ export async function POST(req: Request) {
   const rawBody = await req.text()
 
   // ── 1. Signature verification ───────────────────────────────────────────
+  // Resend inbound uses Svix for webhook delivery. Svix signs the message
+  // as "{svix-id}.{svix-timestamp}.{body}" with the base64-decoded whsec_ secret.
   const webhookSecret = process.env.RESEND_WEBHOOK_SECRET
   if (webhookSecret) {
-    const sig =
-      req.headers.get('resend-signature') ??
-      req.headers.get('svix-signature')   // fallback: Resend uses svix infra
-    if (!verifyResendSignature(rawBody, sig, webhookSecret)) {
+    const sig = req.headers.get('svix-signature') ?? req.headers.get('resend-signature')
+    const msgId        = req.headers.get('svix-id')
+    const msgTimestamp = req.headers.get('svix-timestamp')
+    if (!verifyResendSignature(rawBody, sig, webhookSecret, msgId, msgTimestamp)) {
       console.warn('[inbox/inbound] signature verification failed')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }

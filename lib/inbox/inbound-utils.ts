@@ -11,29 +11,63 @@ import { createHmac, timingSafeEqual } from 'crypto'
 // ── Signature verification ─────────────────────────────────────────────────
 
 /**
- * Verify a Resend inbound webhook signature.
- * Expected header format: "v1=<hex-hmac-sha256>"
+ * Verify a Resend inbound webhook signature using Svix's algorithm.
+ *
+ * Resend uses Svix for webhook delivery. Svix signs the concatenated
+ * message: `"{svix-id}.{svix-timestamp}.{rawBody}"` with the base64-decoded
+ * `whsec_` secret, producing a base64 HMAC-SHA256 digest.
+ *
+ * The `svix-signature` header contains one or more space-separated values
+ * in the format `v1,{base64_hmac}`.
+ *
+ * @param rawBody       Raw request body string
+ * @param sigHeader     Value of the `svix-signature` header
+ * @param msgId         Value of the `svix-id` header
+ * @param msgTimestamp  Value of the `svix-timestamp` header
+ * @param secret        RESEND_WEBHOOK_SECRET (starts with "whsec_")
  */
 export function verifyResendSignature(
   rawBody: string,
   sigHeader: string | null,
   secret: string,
+  msgId?: string | null,
+  msgTimestamp?: string | null,
 ): boolean {
   if (!sigHeader) return false
 
-  const prefixedHex = sigHeader.startsWith('v1=') ? sigHeader.slice(3) : sigHeader
+  // Decode the `whsec_` base64 secret
+  const secretBytes = Buffer.from(secret.replace(/^whsec_/, ''), 'base64')
 
-  let receivedBuf: Buffer
-  try {
-    receivedBuf = Buffer.from(prefixedHex, 'hex')
-  } catch {
-    return false
+  // Build the Svix signed message: "{id}.{timestamp}.{body}"
+  // Fall back to signing rawBody alone if headers are absent (legacy/non-Svix path)
+  const message =
+    msgId && msgTimestamp
+      ? `${msgId}.${msgTimestamp}.${rawBody}`
+      : rawBody
+
+  const expectedB64 = createHmac('sha256', secretBytes)
+    .update(message)
+    .digest('base64')
+
+  // svix-signature may contain multiple space-separated "v1,{b64}" values
+  const sigs = sigHeader.split(' ')
+  for (const entry of sigs) {
+    const b64 = entry.startsWith('v1,') ? entry.slice(3) : entry
+    try {
+      const receivedBuf = Buffer.from(b64, 'base64')
+      const expectedBuf = Buffer.from(expectedB64, 'base64')
+      if (
+        receivedBuf.length === expectedBuf.length &&
+        timingSafeEqual(receivedBuf, expectedBuf)
+      ) {
+        return true
+      }
+    } catch {
+      // malformed base64 — skip this entry
+    }
   }
 
-  const expected = createHmac('sha256', secret).update(rawBody).digest()
-  if (expected.length !== receivedBuf.length) return false
-
-  return timingSafeEqual(expected, receivedBuf)
+  return false
 }
 
 // ── Address parsers ────────────────────────────────────────────────────────
