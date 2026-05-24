@@ -18,9 +18,9 @@ const faqs = [
       'We accept all major credit cards through Stripe, including Visa, Mastercard, American Express, and Discover.',
   },
   {
-    question: 'Is there a free trial?',
+    question: 'Is there a free tier?',
     answer:
-      'Yes, all paid plans include a 14-day free trial. You can cancel at any time during the trial period without being charged.',
+      'Yes! The Free plan lets you send up to 3 applications per day at no cost, with no credit card required. You can upgrade to Pro at any time for more applications and features.',
   },
   {
     question: 'How do I cancel my subscription?',
@@ -45,12 +45,12 @@ const faqs = [
   {
     question: 'Can I use the API?',
     answer:
-      'Yes! All paid plans include API access. You can generate API keys from your dashboard to integrate with our platform programmatically.',
+      'API access is available on Pro and Unlimited plans. You can generate API keys from your dashboard settings to integrate with our platform programmatically.',
   },
   {
     question: 'Do you offer support?',
     answer:
-      'Yes, we offer email support for all users. Pro and Enterprise plans include priority support with faster response times.',
+      'Yes, we offer email support for all users. Pro plan subscribers receive priority support with faster response times.',
   },
 ]
 
