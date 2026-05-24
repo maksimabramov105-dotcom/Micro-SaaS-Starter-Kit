@@ -58,16 +58,23 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  // Resend inbound payload shape:
-  //   { from, to (string | string[]), subject, text, html, headers }
-  const rawTo: string = Array.isArray(payload.to)
-    ? String(payload.to[0] ?? '')
-    : String(payload.to ?? '')
+  // Resend inbound payload is a Svix event:
+  //   { type: "email.received", data: { from, to, subject, text, html, ... } }
+  // Fall back to the flat root for older/alternative formats.
+  const data = (
+    payload.data && typeof payload.data === 'object'
+      ? payload.data
+      : payload
+  ) as Record<string, unknown>
 
-  const rawFrom: string = String(payload.from ?? '')
-  const subject: string = String(payload.subject ?? '(no subject)')
-  const bodyText: string = String(payload.text ?? payload.plain_text ?? '')
-  const bodyHtml: string | null = payload.html ? String(payload.html) : null
+  const rawTo: string = Array.isArray(data.to)
+    ? String(data.to[0] ?? '')
+    : String(data.to ?? '')
+
+  const rawFrom: string = String(data.from ?? '')
+  const subject: string = String(data.subject ?? '(no subject)')
+  const bodyText: string = String(data.text ?? data.plain_text ?? '')
+  const bodyHtml: string | null = data.html ? String(data.html) : null
 
   // ── 3. Extract handle + applicationId ──────────────────────────────────
   const parsed = parseToAddress(rawTo, INBOX_DOMAIN)
