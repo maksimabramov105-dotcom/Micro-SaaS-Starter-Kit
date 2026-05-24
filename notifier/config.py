@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     # Rate-limit: max notifications per user per hour
     rate_limit_per_hour: int = 30
 
+    # Sentry — optional; leave empty to disable.
+    sentry_dsn: str = ""
+    environment: str = "production"
+
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
 
 

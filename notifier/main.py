@@ -18,12 +18,23 @@ import sys
 
 import httpx
 import redis.asyncio as aioredis
+import sentry_sdk
 import structlog
 
 import templates
 from config import settings
 from database import get_pool, get_telegram_chat
 from rate_limiter import is_allowed
+
+# ── Sentry — init before the event loop starts ────────────────────────────────
+if settings.sentry_dsn:
+    sentry_sdk.init(
+        dsn=settings.sentry_dsn,
+        environment=settings.environment,
+        traces_sample_rate=0.1,
+        sample_rate=1.0,
+        send_default_pii=False,
+    )
 
 log = structlog.get_logger(__name__)
 
