@@ -60,7 +60,7 @@ export default async function FlagsPage() {
         <div>
           <h1 className="text-2xl font-bold">Feature Flags & Experiments</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Changes take effect within 5 min (TTL cache). Use "Bust cache" for instant effect.
+            Changes take effect within 5 min (TTL cache). Use &ldquo;Bust cache&rdquo; for instant effect.
           </p>
         </div>
         <form action={bustCache}>
