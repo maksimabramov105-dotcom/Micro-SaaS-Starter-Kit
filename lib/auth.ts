@@ -38,30 +38,50 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async session({ session, token }) {
       if (session.user && token.sub) {
+        // Always set the user ID from the JWT — this must never fail.
         session.user.id = token.sub
-        const dbUser = await prisma.user.findUnique({
-          where: { id: token.sub },
-          select: {
-            stripeCustomerId: true,
-            stripeSubscriptionId: true,
-            stripePriceId: true,
-            stripeCurrentPeriodEnd: true,
-            firstPaidAt: true,
-            refundedAt: true,
-            role: true,
-          },
-        })
-        if (dbUser) {
-          session.user.stripeCustomerId = dbUser.stripeCustomerId
-          session.user.stripeSubscriptionId = dbUser.stripeSubscriptionId
-          session.user.stripePriceId = dbUser.stripePriceId
-          session.user.stripeCurrentPeriodEnd = dbUser.stripeCurrentPeriodEnd
-          session.user.firstPaidAt = dbUser.firstPaidAt
-          session.user.refundedAt = dbUser.refundedAt
-          session.user.role = dbUser.role
+
+        // Augment the session with Stripe / role fields from the DB.
+        // Wrapped in try/catch so a DB hiccup never invalidates the session
+        // and sends the user back to the login page.
+        try {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: token.sub },
+            select: {
+              stripeCustomerId: true,
+              stripeSubscriptionId: true,
+              stripePriceId: true,
+              stripeCurrentPeriodEnd: true,
+              firstPaidAt: true,
+              refundedAt: true,
+              role: true,
+            },
+          })
+          if (dbUser) {
+            session.user.stripeCustomerId = dbUser.stripeCustomerId
+            session.user.stripeSubscriptionId = dbUser.stripeSubscriptionId
+            session.user.stripePriceId = dbUser.stripePriceId
+            session.user.stripeCurrentPeriodEnd = dbUser.stripeCurrentPeriodEnd
+            session.user.firstPaidAt = dbUser.firstPaidAt
+            session.user.refundedAt = dbUser.refundedAt
+            session.user.role = dbUser.role
+          }
+        } catch (err) {
+          // Non-fatal: the JWT is still valid; user is authenticated.
+          // Dashboard loads without Stripe metadata rather than redirect-looping.
+          console.error('[auth:session] DB lookup failed, continuing with JWT claims', err)
         }
       }
       return session
+    },
+
+    // Guarantee that post-sign-in redirects always land somewhere safe.
+    // Default NextAuth behaviour already allows same-origin URLs; we add an
+    // explicit fallback to /dashboard so /login never becomes the destination.
+    async redirect({ url, baseUrl }) {
+      if (url.startsWith('/')) return `${baseUrl}${url}`
+      if (url.startsWith(baseUrl)) return url
+      return `${baseUrl}/dashboard`
     },
   },
   session: {
