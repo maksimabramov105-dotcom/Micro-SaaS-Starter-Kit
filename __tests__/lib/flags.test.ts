@@ -15,7 +15,6 @@ jest.mock('@/lib/prisma', () => ({
   },
 }))
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const { prisma } = require('@/lib/prisma')
 
 function mockFlags(rows: { key: string; enabled: boolean; rolloutPct: number }[]) {
