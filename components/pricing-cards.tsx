@@ -66,13 +66,12 @@ export function PricingCards() {
     // Map yearly plan IDs back to their family for the checkout endpoint
     const familyId = planId.replace('_yearly', '')
 
-    // Tolt affiliate attribution: pass the visitor referral token if the
-    // Tolt script has loaded (window.tolt is set by cdn.tolt.io/tolt.js).
+    // Tolt affiliate attribution: window.tolt_referral is set by files.tlt-cdn.com/tlt.js
+    // when a visitor arrives via an affiliate link. Send it to the server so Stripe
+    // checkout metadata includes tolt_referral for conversion attribution.
     const w = typeof window !== 'undefined' ? (window as unknown as Record<string, unknown>) : null
-    const toltObj = w && typeof w.tolt === 'object' && w.tolt !== null
-      ? (w.tolt as { getReferral?: () => string })
-      : null
-    const toltReferral: string | undefined = toltObj?.getReferral?.() ?? undefined
+    const toltReferral: string | undefined =
+      typeof w?.tolt_referral === 'string' ? (w.tolt_referral as string) : undefined
 
     setIsLoading(planId)
     setErrorMsg(null)

@@ -36,7 +36,7 @@ export default function RootLayout({
         {/* Tolt affiliate tracking — only injected when NEXT_PUBLIC_TOLT_REFERRAL_ID is set */}
         {process.env.NEXT_PUBLIC_TOLT_REFERRAL_ID && (
           <Script
-            src="https://cdn.tolt.io/tolt.js"
+            src="https://files.tlt-cdn.com/tlt.js"
             data-tolt={process.env.NEXT_PUBLIC_TOLT_REFERRAL_ID}
             strategy="afterInteractive"
           />
