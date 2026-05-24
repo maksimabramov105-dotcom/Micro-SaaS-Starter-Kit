@@ -1,7 +1,7 @@
 import { Navbar } from '@/components/navbar'
 
 // Bump this date on any meaningful policy edit.
-const LAST_UPDATED = new Date('2026-05-24')
+const LAST_UPDATED = new Date('2026-05-25')
 
 export default function TermsPage() {
   return (
@@ -71,6 +71,35 @@ export default function TermsPage() {
               <p>
                 All subscriptions are billed automatically on a recurring basis. You can cancel your
                 subscription at any time through your account settings or by contacting support.
+              </p>
+            </section>
+
+            <section className="mt-8">
+              <h2 className="text-2xl font-semibold mb-4">7. Referral Program</h2>
+              <p>
+                We operate a double-sided referral program. When you refer a new user who subscribes
+                to a paid plan, both you and the referred user receive a $20 account credit applied
+                to future invoices. Credits are non-transferable and have no cash value.
+              </p>
+              <p className="mt-3">
+                Referral rewards are capped at 10 successful referrals per account ($200 total
+                credit). We reserve the right to withhold or reverse credits in cases of suspected
+                abuse, self-referral, or fraud. Credits are clawed back if the referred user
+                requests a refund within 30 days of their first payment.
+              </p>
+            </section>
+
+            <section className="mt-8">
+              <h2 className="text-2xl font-semibold mb-4">8. Affiliate Program</h2>
+              <p>
+                We run an affiliate program via Tolt. Third-party content creators and affiliates
+                may earn recurring commissions on paid subscriptions they refer. Affiliate
+                commissions are paid by us and do not affect the price you pay as a subscriber.
+              </p>
+              <p className="mt-3">
+                If you arrived via an affiliate link, a cookie may be set to attribute your
+                subscription to the affiliate. This is solely for commission tracking purposes and
+                does not affect your account, your data, or your subscription terms.
               </p>
             </section>
           </div>

@@ -25,7 +25,8 @@
     "stripe:listen": "stripe listen --forward-to localhost:3000/api/webhooks/stripe",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "db:backfill-referrals": "tsx scripts/backfill_referral_codes.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

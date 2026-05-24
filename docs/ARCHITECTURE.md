@@ -400,3 +400,60 @@ User clicks "Confirm refund" on /dashboard/billing
         prisma.user.update({ refundedAt, cancelledAt, stripe fields → null })
         sendRefundConfirmationEmail()
 ```
+
+## Referral + Affiliate system (Prompt 07)
+
+### Referral (in-house)
+
+Double-sided $20 credit: referrer earns when the referred user pays; referee gets $20 off their first subscription.
+
+| Model | Key fields |
+|---|---|
+| `Referral` | `referrerId`, `refereeId`, `status` (pending → qualified → rewarded / abused / clawback), `stripeCouponReferrerId/RefereeId` |
+| `User` | `referralCode` (unique slug), `referralCount`, `referralEarned`, `referredById` |
+
+**Code flow:**
+```
+User visits /r/{code}  (app/r/[code]/route.ts)
+  └─► sets referral_code cookie (30-day, sameSite=lax, httpOnly=false)
+  └─► redirects to /login?ref={code}
+
+New user signs up
+  └─► NextAuth createUser event (lib/auth.ts)
+        └─► reads referral_code cookie via next/headers cookies()
+        └─► captureReferral(userId, code)  ← lib/referral/index.ts
+              ├─ validates code (not self-referral, not already referred)
+              ├─ creates Referral { status: 'pending' }
+              ├─ sets User.referredById
+              └─ sends referral-received email
+
+Stripe checkout.session.completed (first payment)
+  └─► app/api/webhooks/stripe/route.ts
+        └─► qualifyReferral(userId, stripeCustomerId)  ← lib/referral/index.ts
+              ├─ checks MAX_REFERRALS cap (10)
+              ├─ creates $20 Stripe coupon for referrer (idempotency key: referral-{id}-referrer)
+              ├─ creates $20 Stripe coupon for referee  (idempotency key: referral-{id}-referee)
+              ├─ applies both coupons via stripe.customers.update
+              ├─ marks Referral { status: 'rewarded' }
+              ├─ increments User.referralCount, User.referralEarned
+              └─ sends referral-qualified email to referrer
+
+charge.refunded within 30 days
+  └─► clawbackReferral(stripeCustomerId)  ← lib/referral/index.ts
+        ├─ marks Referral { status: 'clawback' }
+        ├─ decrements referralCount / referralEarned
+        └─ deletes referrer's Stripe coupon (if unused)
+```
+
+**Anti-abuse:** Self-referral blocked at `captureReferral`. Cap at 10 (`MAX_REFERRALS`). Manual `status='abused'` flag suppresses reward. 30-day clawback on refund.
+
+Dashboard: `/dashboard/referrals` — share link, copy button, one-click Twitter/LinkedIn/email, stats cards, cap progress bar, recent referrals table.
+
+### Affiliate (Tolt)
+
+Third-party affiliate channel managed externally by [Tolt](https://tolt.io) ($29/mo).
+
+- **Script**: `https://cdn.tolt.io/tolt.js` injected in `app/layout.tsx` when `NEXT_PUBLIC_TOLT_REFERRAL_ID` is set (strategy: afterInteractive)
+- **Attribution bridge**: On checkout, the client reads `window.tolt?.getReferral()` and passes it as `toltReferral` in the POST body. The checkout route stores it in `subscription_data.metadata.tolt_referral` so Tolt's Stripe webhook can attribute the conversion.
+- **Payouts**: Handled by Tolt (30% recurring commission, PayPal/Wise). No payout logic in this codebase.
+- **Disclosure**: `/terms` §8 — Affiliate Program.
