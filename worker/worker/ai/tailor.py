@@ -25,6 +25,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+import redis.asyncio as aioredis
 import structlog
 
 from worker.ai.resume import _call_openai
@@ -58,9 +59,28 @@ _COVER_TEMPLATE_V2: str = (
     (_PROMPTS_DIR / "tailor_cover_letter_v2.txt").read_text(encoding="utf-8").strip()
 )
 
-# ── In-process dedup cache ─────────────────────────────────────────────────────
-_CACHE: dict[str, tuple[Any, float]] = {}
-_CACHE_TTL = 7 * 24 * 3600  # 7 days in seconds
+# ── Tailor result cache (Redis DB 2 + local fast-path) ────────────────────────
+# Redis key prefix: "tailor:{sha256_key}"
+# Redis DB 2 is dedicated to tailor results, separate from the job store (DB 0).
+# TTL: 7 days — same as the old in-memory TTL.
+# Local dict is a fast-path for same-restart, same-process hits (avoids a round-
+# trip to Redis for the common case where the worker hasn't restarted).
+
+_CACHE: dict[str, tuple[Any, float]] = {}  # fast-path: {key: (value, timestamp)}
+_CACHE_TTL = 7 * 24 * 3600                 # 7 days in seconds
+_LOCAL_TTL = 3600                           # 1 hour — local fast-path eviction
+
+
+def _tailor_redis_url() -> str:
+    """Return a Redis DB 2 URL derived from settings.redis_url, or empty string."""
+    url = settings.redis_url
+    if not url:
+        return ""
+    # Strip existing /db suffix if present (e.g. redis://host:6379/1 → /2)
+    parts = url.rstrip("/").rsplit("/", 1)
+    if len(parts) == 2 and parts[1].isdigit():
+        return f"{parts[0]}/2"
+    return f"{url}/2"
 
 
 def _cache_key(base_resume: dict, job_id: str, suffix: str) -> str:
@@ -69,19 +89,44 @@ def _cache_key(base_resume: dict, job_id: str, suffix: str) -> str:
     return hashlib.sha256(data.encode()).hexdigest()
 
 
-def _get_cached(key: str) -> Any | None:
+async def _get_cached(key: str) -> Any | None:
+    """Check local fast-path first, then Redis. Returns None on miss."""
+    # 1. Local fast-path (no I/O)
     entry = _CACHE.get(key)
-    if entry is None:
+    if entry is not None:
+        value, ts = entry
+        if time.time() - ts < _LOCAL_TTL:
+            return value
+        del _CACHE[key]
+
+    # 2. Redis fallback (survives restarts)
+    redis_url = _tailor_redis_url()
+    if not redis_url:
         return None
-    value, ts = entry
-    if time.time() - ts < _CACHE_TTL:
-        return value
-    del _CACHE[key]
+    try:
+        async with aioredis.from_url(redis_url, decode_responses=True) as r:
+            data = await r.get(f"tailor:{key}")
+        if data:
+            value = json.loads(data)
+            _CACHE[key] = (value, time.time())  # warm local fast-path
+            return value
+    except Exception as exc:
+        logger.warning("tailor_cache.redis_read_failed", key=key[:16], error=str(exc))
     return None
 
 
-def _set_cached(key: str, value: Any) -> None:
+async def _set_cached(key: str, value: Any) -> None:
+    """Write to local fast-path and Redis DB 2 (fire-and-forget on Redis error)."""
     _CACHE[key] = (value, time.time())
+
+    redis_url = _tailor_redis_url()
+    if not redis_url:
+        return
+    try:
+        async with aioredis.from_url(redis_url, decode_responses=True) as r:
+            await r.setex(f"tailor:{key}", _CACHE_TTL, json.dumps(value))
+    except Exception as exc:
+        logger.warning("tailor_cache.redis_write_failed", key=key[:16], error=str(exc))
 
 
 # ── Plan-tier gating ───────────────────────────────────────────────────────────
@@ -217,13 +262,13 @@ async def tailor_resume(
     # V2 pipeline — STAR/CAR + ATS keywords + self-critique
     if settings.resume_quality_v2:
         key_v2 = _cache_key(base_resume, job_id, "resume_v2")
-        cached_v2 = _get_cached(key_v2)
+        cached_v2 = await _get_cached(key_v2)
         if cached_v2 is not None:
             logger.info("tailor_resume.cache_hit_v2", job_id=job_id)
             return cached_v2
         try:
             result_v2 = await _tailor_resume_v2(base_resume, job, api_key, job_id)
-            _set_cached(key_v2, result_v2)
+            await _set_cached(key_v2, result_v2)
             return result_v2
         except json.JSONDecodeError as exc:
             logger.warning("tailor_resume_v2.json_error", job_id=job_id, error=str(exc))
@@ -235,7 +280,7 @@ async def tailor_resume(
         logger.warning("tailor_resume_v2.fallback_to_v1", job_id=job_id)
 
     key = _cache_key(base_resume, job_id, "resume")
-    cached = _get_cached(key)
+    cached = await _get_cached(key)
     if cached is not None:
         logger.info("tailor_resume.cache_hit", job_id=job_id)
         return cached
@@ -277,7 +322,7 @@ async def tailor_resume(
         # Approximate token usage: ~0.75 tokens per word
         tokens = max(1, int(len(raw.split()) * 0.75))
         result: tuple[dict, int, str] = (tailored, tokens, TAILOR_MODEL)
-        _set_cached(key, result)
+        await _set_cached(key, result)
         logger.info("tailor_resume.done", job_id=job_id, tokens=tokens)
         return result
 
@@ -314,7 +359,7 @@ async def tailor_cover_letter(
     # V2 pipeline — ATS-keyword-enriched cover letter
     if settings.resume_quality_v2:
         key_v2 = _cache_key(base_resume, job_id, "cover_v2")
-        cached_v2 = _get_cached(key_v2)
+        cached_v2 = await _get_cached(key_v2)
         if cached_v2 is not None:
             logger.info("tailor_cover_letter.cache_hit_v2", job_id=job_id)
             return cached_v2
@@ -346,7 +391,7 @@ async def tailor_cover_letter(
             text_v2 = text_v2.strip()
             tokens_v2 = max(1, int(len(text_v2.split()) * 0.75))
             result_v2: tuple[str, int, str] = (text_v2, tokens_v2, TAILOR_MODEL)
-            _set_cached(key_v2, result_v2)
+            await _set_cached(key_v2, result_v2)
             logger.info("tailor_cover_letter_v2.done", job_id=job_id, length=len(text_v2))
             return result_v2
         except asyncio.TimeoutError:
@@ -357,7 +402,7 @@ async def tailor_cover_letter(
         logger.warning("tailor_cover_letter_v2.fallback_to_v1", job_id=job_id)
 
     key = _cache_key(base_resume, job_id, "cover")
-    cached = _get_cached(key)
+    cached = await _get_cached(key)
     if cached is not None:
         logger.info("tailor_cover_letter.cache_hit", job_id=job_id)
         return cached
@@ -392,7 +437,7 @@ async def tailor_cover_letter(
         text = text.strip()
         tokens = max(1, int(len(text.split()) * 0.75))
         result: tuple[str, int, str] = (text, tokens, TAILOR_MODEL)
-        _set_cached(key, result)
+        await _set_cached(key, result)
         logger.info("tailor_cover_letter.done", job_id=job_id, length=len(text))
         return result
 

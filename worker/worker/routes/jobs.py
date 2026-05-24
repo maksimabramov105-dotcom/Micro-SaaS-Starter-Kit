@@ -80,13 +80,17 @@ async def _redis_load(job_id: str) -> "JobRecord | None":
     return None
 
 
-def _new_job() -> JobRecord:
+async def _new_job() -> JobRecord:
+    """Create a new job, register it in the local cache, and immediately persist
+    to Redis so it's visible to GET /jobs/{job_id} even if the worker crashes
+    before the work completes."""
     job = JobRecord(
         job_id=str(uuid.uuid4()),
         status="running",
         created_at=datetime.now(timezone.utc),
     )
     _jobs[job.job_id] = job
+    await _redis_save(job)  # persist "running" state at creation
     return job
 
 
@@ -169,7 +173,7 @@ class ResumePdfRequest(BaseModel):
 @router.post("/resume/generate", dependencies=[Depends(verify_bearer)])
 async def resume_generate(body: ResumeGenerateRequest) -> dict:
     """Generate a tailored resume using OpenAI."""
-    job = _new_job()
+    job = await _new_job()
     logger.info("job.resume_generate.started", job_id=job.job_id, user_id=body.user_id)
     try:
         text = await generate_tailored_resume(
@@ -272,7 +276,7 @@ async def resume_pdf(body: ResumePdfRequest) -> FastAPIResponse:
 @router.post("/cover-letter", dependencies=[Depends(verify_bearer)])
 async def cover_letter(body: CoverLetterRequest) -> dict:
     """Generate a tailored cover letter using OpenAI."""
-    job = _new_job()
+    job = await _new_job()
     logger.info("job.cover_letter.started", job_id=job.job_id, user_id=body.user_id)
     try:
         text = await generate_cover_letter(
@@ -303,7 +307,7 @@ async def autoapply_prepare(body: TailorRequest) -> dict:
 
     Cost guardrail: gpt-4o-mini only; plan_tier gates Free/Trial users.
     """
-    job = _new_job()
+    job = await _new_job()
     logger.info(
         "job.autoapply_prepare.started",
         job_id=job.job_id,
@@ -338,7 +342,7 @@ async def autoapply_linkedin(body: LinkedInApplyRequest) -> dict:
     """Run a LinkedIn Easy Apply campaign session."""
     from worker.crypto import decrypt
 
-    job = _new_job()
+    job = await _new_job()
     logger.info(
         "job.linkedin.started",
         job_id=job.job_id,
@@ -367,7 +371,7 @@ async def autoapply_linkedin(body: LinkedInApplyRequest) -> dict:
 @router.post("/autoapply/careerops", dependencies=[Depends(verify_bearer)])
 async def autoapply_careerops(body: CareerOpsApplyRequest) -> dict:
     """Submit a job application via the CareerOps ATS filler."""
-    job = _new_job()
+    job = await _new_job()
     logger.info(
         "job.careerops.started",
         job_id=job.job_id,
@@ -408,7 +412,7 @@ async def scrape_board(board: str, body: ScrapeRequest) -> dict:
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Unknown board '{board}'. Valid: {list(_SCRAPER_MAP)}",
         )
-    job = _new_job()
+    job = await _new_job()
     logger.info("job.scrape.started", job_id=job.job_id, board=board, keywords=body.keywords)
     try:
         results = await _SCRAPER_MAP[board](
