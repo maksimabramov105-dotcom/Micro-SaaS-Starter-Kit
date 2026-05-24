@@ -67,6 +67,7 @@ services:
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://resumeai-bot.ru}
       NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+      SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
       SENTRY_ORG: ${SENTRY_ORG:-}
       SENTRY_PROJECT: ${SENTRY_PROJECT:-}
       REDIS_URL: redis://redis:6379
@@ -123,6 +124,8 @@ services:
       RESUME_QUALITY_V2: ${RESUME_QUALITY_V2:-false}
       # PDF Templates v1 — WeasyPrint-based 5-template picker UI. Set to true to enable.
       PDF_TEMPLATES_V1: ${PDF_TEMPLATES_V1:-false}
+      # Sentry — optional; leave unset to disable error reporting.
+      SENTRY_DSN: ${SENTRY_DSN_WORKER:-}
     deploy:
       resources:
         limits:
@@ -158,6 +161,8 @@ services:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-}
       APP_URL: ${NEXT_PUBLIC_APP_URL:-https://resumeai-bot.ru}
+      # Sentry — optional; leave unset to disable error reporting.
+      SENTRY_DSN: ${SENTRY_DSN_NOTIFIER:-}
     depends_on:
       postgres:
         condition: service_healthy

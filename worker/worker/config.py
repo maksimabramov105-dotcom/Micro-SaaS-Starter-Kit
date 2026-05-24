@@ -44,6 +44,11 @@ class Settings(BaseSettings):
     # Set PDF_TEMPLATES_V1=true to enable. Default OFF (legacy reportlab path used).
     pdf_templates_v1: bool = False
 
+    # Sentry — optional; leave empty to disable error reporting.
+    # Set SENTRY_DSN_WORKER in environment (separate DSN from the web project).
+    sentry_dsn: str = ""
+    environment: str = "production"
+
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
 
 

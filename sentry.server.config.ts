@@ -2,6 +2,7 @@ import * as Sentry from '@sentry/nextjs'
 
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
-  tracesSampleRate: 1.0,
+  // 10% of transactions sampled — free-tier friendly.
+  tracesSampleRate: 0.1,
   debug: false,
 })

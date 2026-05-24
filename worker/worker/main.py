@@ -12,6 +12,7 @@ import time
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
+import sentry_sdk
 import structlog
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,6 +21,19 @@ from worker.config import settings
 from worker.db import close_pool, init_pool
 from worker.routes.health import router as health_router
 from worker.routes.jobs import router as jobs_router
+
+# ── Sentry — init before any request handling ─────────────────────────────────
+# sentry_dsn is optional; empty string disables the SDK silently.
+if settings.sentry_dsn:
+    sentry_sdk.init(
+        dsn=settings.sentry_dsn,
+        environment=settings.environment,
+        # 10% of transactions — free-tier friendly.
+        traces_sample_rate=0.1,
+        # Capture 100% of errors regardless of trace sampling.
+        sample_rate=1.0,
+        send_default_pii=False,
+    )
 
 # ── structlog configuration ─────────────────────────────────────────────────
 
