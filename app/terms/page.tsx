@@ -1,5 +1,8 @@
 import { Navbar } from '@/components/navbar'
 
+// Bump this date on any meaningful policy edit.
+const LAST_UPDATED = new Date('2026-05-24')
+
 export default function TermsPage() {
   return (
     <div className="flex min-h-screen flex-col">
@@ -9,7 +12,14 @@ export default function TermsPage() {
           <h1 className="mb-8 text-4xl font-bold">Terms of Service</h1>
 
           <div className="prose prose-gray max-w-none">
-            <p className="text-lg text-gray-600">Last updated: May 2026</p>
+            <p className="text-lg text-gray-600">
+              Last updated:{' '}
+              {LAST_UPDATED.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+              })}
+            </p>
 
             <section className="mt-8">
               <h2 className="text-2xl font-semibold mb-4">1. Acceptance of Terms</h2>
