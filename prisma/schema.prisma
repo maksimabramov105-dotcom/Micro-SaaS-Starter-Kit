@@ -103,12 +103,23 @@ model User {
   // Telegram notification (Prompt 18)
   telegramChat  TelegramChat?
 
+  // Referral program (Prompt 07)
+  referralCode   String?   @unique  // e.g. "adam-7g9k23" — shareable link token
+  referralCount  Int       @default(0)   // successful referrals this calendar year
+  referralEarned Float     @default(0)   // total $ credit earned lifetime
+  referredById   String?               // the user who referred this user (set on signup)
+  referredBy     User?     @relation("UserReferredBy", fields: [referredById], references: [id])
+  referredUsers  User[]    @relation("UserReferredBy")
+  referralsAsReferrer Referral[] @relation("ReferrerRelation")
+  referralsAsReferee  Referral[] @relation("RefereeRelation")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([email])
   @@index([firstPaidAt])
   @@index([cancelledAt])
+  @@index([referralCode])
 }
 
 model VerificationToken {
@@ -578,6 +589,29 @@ model StripeEvent {
   processedAt DateTime @default(now())
 
   @@index([processedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Referral program (Prompt 07)
+// Double-sided $20 credit: referrer earns when friend pays; referee gets credit on signup.
+// Anti-abuse: max 10 rewarded referrals per user, self-referral blocked.
+// ---------------------------------------------------------------------------
+
+model Referral {
+  id              String    @id @default(cuid())
+  referrerId      String
+  referrer        User      @relation("ReferrerRelation", fields: [referrerId], references: [id], onDelete: Cascade)
+  refereeId       String    @unique  // one referee can only belong to one referral
+  referee         User      @relation("RefereeRelation", fields: [refereeId], references: [id], onDelete: Cascade)
+  status          String    @default("pending")  // pending | qualified | rewarded | abused | clawback
+  stripeCouponReferrerId  String?   // Stripe coupon ID issued to referrer
+  stripeCouponRefereeId   String?   // Stripe coupon ID issued to referee
+  qualifiedAt     DateTime?
+  rewardedAt      DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([referrerId])
+  @@index([status])
 }
 
 // ---------------------------------------------------------------------------

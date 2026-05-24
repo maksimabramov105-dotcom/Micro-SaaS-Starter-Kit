@@ -51,10 +51,15 @@ export async function POST(req: Request) {
       select: { stripeCustomerId: true },
     })
 
+    // Tolt affiliate attribution: the client passes window.tolt?.getReferral()
+    // We store it in session metadata so Tolt's Stripe webhook can attribute the conversion.
+    const toltReferral = typeof body.toltReferral === 'string' ? body.toltReferral : undefined
+
     const checkoutSession = await getStripeSession({
       priceId,
       customerId: user?.stripeCustomerId || undefined,
       userId: session.user.id,
+      toltReferral,
     })
 
     // ── Analytics: checkout_started ─────────────────────────────────────────

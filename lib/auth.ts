@@ -3,8 +3,10 @@ import GoogleProvider from 'next-auth/providers/google'
 import GitHubProvider from 'next-auth/providers/github'
 import EmailProvider from 'next-auth/providers/email'
 import { PrismaAdapter } from '@next-auth/prisma-adapter'
+import { cookies } from 'next/headers'
 import { prisma } from './prisma'
 import { mintInboxHandle } from './auth/handle-mint'
+import { captureReferral, REFERRAL_COOKIE } from './referral'
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -79,6 +81,19 @@ export const authOptions: NextAuthOptions = {
         } catch (err) {
           // Non-fatal — user can still sign in; handle can be minted later
           console.error('[auth] failed to mint inboxHandle for', user.id, err)
+        }
+
+        // Capture referral: read the referral_code cookie set by /r/[code]
+        // cookies() works here because createUser fires inside a Route Handler context
+        try {
+          const cookieStore = await cookies()
+          const refCode = cookieStore.get(REFERRAL_COOKIE)?.value
+          if (refCode) {
+            await captureReferral(user.id, refCode)
+          }
+        } catch (err) {
+          // Non-fatal — user is still created; referral can be captured manually
+          console.error('[auth] referral capture failed for', user.id, err)
         }
       }
     },

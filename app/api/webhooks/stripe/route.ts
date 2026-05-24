@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 // getPlanByPriceId handles both monthly AND yearly price IDs automatically —
 // no changes needed here when adding annual plans (Prompt 05).
 import { getPlanByPriceId } from '@/lib/pricing'
+import { qualifyReferral, clawbackReferral } from '@/lib/referral'
 
 export async function POST(req: Request) {
   const body = await req.text()
@@ -58,6 +59,8 @@ export async function POST(req: Request) {
           select: { firstPaidAt: true },
         })
 
+        const isFirstPayment = existingUser?.firstPaidAt == null
+
         await prisma.user.update({
           where: { id: userId },
           data: {
@@ -67,9 +70,19 @@ export async function POST(req: Request) {
             stripeCurrentPeriodEnd: new Date(stripeSubscription.current_period_end * 1000),
             dailyApplicationLimit: plan.dailyLimit,
             // Record first paid date for PMF cohort retention tracking
-            ...(existingUser?.firstPaidAt == null ? { firstPaidAt: new Date() } : {}),
+            ...(isFirstPayment ? { firstPaidAt: new Date() } : {}),
           },
         })
+
+        // Qualify any pending referral on the referee's first payment
+        if (isFirstPayment && customerId) {
+          try {
+            await qualifyReferral(userId, customerId)
+          } catch (err) {
+            // Non-fatal — referral can be manually rewarded if this fails
+            console.error('[webhook] referral qualification failed for user', userId, err)
+          }
+        }
       }
       break
     }
@@ -141,6 +154,13 @@ export async function POST(req: Request) {
             where: { id: user.id },
             data: { refundedAt: new Date() },
           })
+        }
+
+        // Clawback referral reward if the refund is within 30 days of first payment
+        try {
+          await clawbackReferral(customerId)
+        } catch (err) {
+          console.error('[webhook] referral clawback failed for customer', customerId, err)
         }
       }
       break

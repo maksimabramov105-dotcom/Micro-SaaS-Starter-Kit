@@ -12,10 +12,13 @@ export const getStripeSession = async ({
   priceId,
   customerId,
   userId,
+  toltReferral,
 }: {
   priceId: string
   customerId?: string
   userId: string
+  /** Tolt affiliate visitor ID from window.tolt.getReferral() — stored in metadata for attribution */
+  toltReferral?: string
 }) => {
   const session = await stripe.checkout.sessions.create({
     customer: customerId,
@@ -33,6 +36,8 @@ export const getStripeSession = async ({
     subscription_data: {
       metadata: {
         userId,
+        // Tolt uses this to attribute the conversion to the correct affiliate
+        ...(toltReferral ? { tolt_referral: toltReferral } : {}),
       },
     },
     success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?success=true`,
