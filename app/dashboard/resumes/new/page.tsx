@@ -29,7 +29,11 @@ const educationItemSchema = z.object({
 })
 
 const formSchema = z.object({
-  // Step 1
+  // Step 1 — contact info + target
+  fullName: z.string().min(1, 'Required'),
+  email: z.string().email('Valid email required'),
+  phone: z.string().optional(),
+  linkedin: z.string().optional(),
   targetRole: z.string().min(1, 'Required'),
   yearsExp: z.coerce.number().min(0),
   location: z.string().min(1, 'Required'),
@@ -48,6 +52,10 @@ type FormValues = z.infer<typeof formSchema>
 const TOTAL_STEPS = 4
 
 const defaultValues: FormValues = {
+  fullName: '',
+  email: '',
+  phone: '',
+  linkedin: '',
   targetRole: '',
   yearsExp: 0,
   location: '',
@@ -150,26 +158,48 @@ export default function NewResumePage() {
           {step === 1 && (
             <Card>
               <CardHeader>
-                <CardTitle>Basic info</CardTitle>
+                <CardTitle>Contact &amp; target role</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="targetRole">Target role *</Label>
-                  <Input id="targetRole" placeholder="e.g. Senior Backend Engineer" {...register('targetRole')} />
-                  {errors.targetRole && <p className="mt-1 text-xs text-red-500">{errors.targetRole.message}</p>}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="col-span-2">
+                    <Label htmlFor="fullName">Full name *</Label>
+                    <Input id="fullName" placeholder="e.g. Jane Smith" {...register('fullName')} />
+                    {errors.fullName && <p className="mt-1 text-xs text-red-500">{errors.fullName.message}</p>}
+                  </div>
+                  <div>
+                    <Label htmlFor="email">Email *</Label>
+                    <Input id="email" type="email" placeholder="jane@example.com" {...register('email')} />
+                    {errors.email && <p className="mt-1 text-xs text-red-500">{errors.email.message}</p>}
+                  </div>
+                  <div>
+                    <Label htmlFor="phone">Phone</Label>
+                    <Input id="phone" placeholder="+1 555 000 0000" {...register('phone')} />
+                  </div>
+                  <div className="col-span-2">
+                    <Label htmlFor="linkedin">LinkedIn URL</Label>
+                    <Input id="linkedin" placeholder="linkedin.com/in/janesmith" {...register('linkedin')} />
+                  </div>
                 </div>
-                <div>
-                  <Label htmlFor="yearsExp">Years of experience</Label>
-                  <Input id="yearsExp" type="number" min={0} {...register('yearsExp')} />
-                </div>
-                <div>
-                  <Label htmlFor="location">Location *</Label>
-                  <Input id="location" placeholder="e.g. Berlin, Germany" {...register('location')} />
-                  {errors.location && <p className="mt-1 text-xs text-red-500">{errors.location.message}</p>}
-                </div>
-                <div className="flex items-center gap-2">
-                  <input id="remote" type="checkbox" className="h-4 w-4" {...register('remote')} />
-                  <Label htmlFor="remote">Open to remote</Label>
+                <div className="border-t pt-4 space-y-4">
+                  <div>
+                    <Label htmlFor="targetRole">Target role *</Label>
+                    <Input id="targetRole" placeholder="e.g. Senior Backend Engineer" {...register('targetRole')} />
+                    {errors.targetRole && <p className="mt-1 text-xs text-red-500">{errors.targetRole.message}</p>}
+                  </div>
+                  <div>
+                    <Label htmlFor="yearsExp">Years of experience</Label>
+                    <Input id="yearsExp" type="number" min={0} {...register('yearsExp')} />
+                  </div>
+                  <div>
+                    <Label htmlFor="location">Location *</Label>
+                    <Input id="location" placeholder="e.g. Berlin, Germany" {...register('location')} />
+                    {errors.location && <p className="mt-1 text-xs text-red-500">{errors.location.message}</p>}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input id="remote" type="checkbox" className="h-4 w-4" {...register('remote')} />
+                    <Label htmlFor="remote">Open to remote</Label>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -323,6 +353,8 @@ export default function NewResumePage() {
 
                 {/* Review summary */}
                 <div className="rounded-lg bg-slate-50 p-4 space-y-2 text-sm text-slate-700">
+                  <p><span className="font-medium">Name:</span> {formValues.fullName || '—'}</p>
+                  <p><span className="font-medium">Email:</span> {formValues.email || '—'}</p>
                   <p><span className="font-medium">Role:</span> {formValues.targetRole || '—'}</p>
                   <p><span className="font-medium">Experience:</span> {formValues.yearsExp} years</p>
                   <p><span className="font-medium">Location:</span> {formValues.location || '—'} {formValues.remote && '· Remote'}</p>

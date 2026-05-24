@@ -31,6 +31,10 @@ export async function POST(req: Request) {
   type EducationItem   = { school?: string; degree?: string; year?: string }
 
   const {
+    fullName,
+    email,
+    phone,
+    linkedin,
     targetRole,
     yearsExp,
     location,
@@ -67,14 +71,19 @@ export async function POST(req: Request) {
     : String(skills ?? '')
 
   // Build a plain-text user profile from form fields to send to the worker.
+  // Contact info is passed first so the AI can include it in the resume header.
   const profileParts: string[] = []
-  if (workHistoryText) profileParts.push(`Work History:\n${workHistoryText}`)
-  if (educationText)   profileParts.push(`Education:\n${educationText}`)
-  if (skillsText)      profileParts.push(`Skills:\n${skillsText}`)
-  if (yearsExp)        profileParts.push(`Years of experience: ${yearsExp}`)
-  if (location)        profileParts.push(`Preferred location: ${location}`)
-  if (remote)          profileParts.push('Open to remote work.')
-  if (tone)            profileParts.push(`Preferred tone: ${tone}`)
+  if (fullName)         profileParts.push(`Candidate name: ${fullName}`)
+  if (email)            profileParts.push(`Email: ${email}`)
+  if (phone)            profileParts.push(`Phone: ${phone}`)
+  if (linkedin)         profileParts.push(`LinkedIn: ${linkedin}`)
+  if (location)         profileParts.push(`Location: ${location}`)
+  if (remote)           profileParts.push('Open to remote work.')
+  if (yearsExp)         profileParts.push(`Years of experience: ${yearsExp}`)
+  if (workHistoryText)  profileParts.push(`Work History:\n${workHistoryText}`)
+  if (educationText)    profileParts.push(`Education:\n${educationText}`)
+  if (skillsText)       profileParts.push(`Skills:\n${skillsText}`)
+  if (tone)             profileParts.push(`Preferred tone: ${tone}`)
   const resumeInput = profileParts.join('\n\n') || String(targetRole)
 
   let generated: unknown = {}

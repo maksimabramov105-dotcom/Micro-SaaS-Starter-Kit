@@ -233,21 +233,39 @@ async def resume_pdf(body: ResumePdfRequest) -> FastAPIResponse:
             alignment=TA_LEFT,
         )
 
+        import re as _re
+
+        def _clean_line(text: str) -> str:
+            """Strip markdown formatting that the AI sometimes emits despite being told not to."""
+            # Remove horizontal rules (---, ===, ___)
+            if _re.match(r"^[-=_]{2,}\s*$", text):
+                return ""
+            # Remove leading # heading markers → keep text, will be uppercased below
+            text = _re.sub(r"^#{1,6}\s+", "", text)
+            # Remove bold/italic markers (**text**, *text*, __text__, _text_)
+            text = _re.sub(r"\*{1,3}(.*?)\*{1,3}", r"\1", text)
+            text = _re.sub(r"_{1,2}(.*?)_{1,2}", r"\1", text)
+            # Remove trailing [End of Resume] commentary
+            text = _re.sub(r"\[End of Resume\].*", "", text, flags=_re.IGNORECASE)
+            # Remove any remaining [placeholder] patterns
+            text = _re.sub(r"\[.*?\]", "", text)
+            return text.strip()
+
         elements = []
         for line in body.resume_text.split("\n"):
-            stripped = line.strip()
-            if not stripped:
+            cleaned = _clean_line(line.strip())
+            if not cleaned:
                 elements.append(Spacer(1, 4))
                 continue
             # Escape XML special chars for reportlab's Paragraph
             safe = (
-                stripped
+                cleaned
                 .replace("&", "&amp;")
                 .replace("<", "&lt;")
                 .replace(">", "&gt;")
             )
             # Heuristic: ALL-CAPS short lines are section headers
-            if stripped.isupper() and len(stripped) < 50:
+            if cleaned.isupper() and len(cleaned) < 60:
                 elements.append(Paragraph(safe, heading_style))
             else:
                 elements.append(Paragraph(safe, body_style))

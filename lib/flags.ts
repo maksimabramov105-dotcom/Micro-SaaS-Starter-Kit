@@ -88,12 +88,16 @@ export async function setFlag(key: string, enabled: boolean, rolloutPct: number)
 // These originally read env vars. They now delegate to the DB so the admin UI
 // controls them without a redeploy. Pass userId for gradual rollouts.
 
-/** WeasyPrint + Jinja2 template picker (Prompt 03). */
+/** WeasyPrint + Jinja2 template picker (Prompt 03).
+ *  Env var PDF_TEMPLATES_V1=true acts as a global override (no DB lookup needed). */
 export async function isPdfTemplatesV1(userId?: string): Promise<boolean> {
+  if (process.env.PDF_TEMPLATES_V1 === 'true') return true
   return isFlagEnabled('pdf_templates_v1', userId)
 }
 
-/** STAR/CAR + ATS keyword + self-critique resume pipeline (Prompt 02). */
+/** STAR/CAR + ATS keyword + self-critique resume pipeline (Prompt 02).
+ *  Env var RESUME_QUALITY_V2=true acts as a global override. */
 export async function isResumeQualityV2(userId?: string): Promise<boolean> {
+  if (process.env.RESUME_QUALITY_V2 === 'true') return true
   return isFlagEnabled('resume_quality_v2', userId)
 }
