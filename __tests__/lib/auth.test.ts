@@ -51,12 +51,10 @@ const mockPrisma = prisma as unknown as {
 async function callSessionCallback(
   session: Session,
   token: Partial<JWT>,
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<Session> {
   const cb = authOptions.callbacks?.session
   if (!cb) throw new Error('session callback not configured')
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const result = await (cb as any)({
+  const result = await (cb as unknown as (...args: unknown[]) => Promise<unknown>)({
     session,
     token: token as JWT,
     user: {} as never,
