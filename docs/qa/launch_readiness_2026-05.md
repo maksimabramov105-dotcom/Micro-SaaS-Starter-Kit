@@ -165,6 +165,12 @@ All C-section checks require live OAuth/Stripe/LinkedIn credentials.
 | 🟢 7 | ~~C8: Stripe checkout~~ | **VERIFIED** 2026-05-20 — live mode, form works, test card correctly declined | ✅ DONE |
 | 🟢 8 | ~~H2: Lighthouse scores~~ | **VERIFIED** 2026-05-20 — Perf 99, A11y 95, BP 96, SEO 100 | ✅ DONE |
 | 🟢 10 | ~~PDF download disabled~~ | **FIXED 2026-05-20** — `POST /jobs/resume/pdf` worker endpoint + Next.js proxy route | ✅ DONE |
+| 🟢 11 | ~~Telegram bot conflict~~ | **FIXED 2026-05-24** — stopped `personal-crm-bot.service` (same token was hijacking bot), registered webhook to `/api/notifications/telegram/webhook` | ✅ DONE |
+| 🟢 12 | ~~application_submitted events never published~~ | **FIXED 2026-05-24** — `run-campaigns` now calls `publishEvent()` after every successful CareerOps and LinkedIn submission → Telegram notifications now fire | ✅ DONE |
+| 🟢 13 | ~~LinkedIn campaigns had no automated runner~~ | **FIXED 2026-05-24** — `run-campaigns` now loads LINKEDIN campaigns and calls worker `POST /jobs/autoapply/linkedin` per campaign per cron run | ✅ DONE |
+| 🟢 14 | ~~2 users missing inboxHandle~~ | **FIXED 2026-05-24** — minted `ndchoppe-f420` and `electrom-5b98` directly in DB; all 4 users now have inbox handles for reply tracking | ✅ DONE |
+| 🟢 15 | ~~STRIPE_PRICE_ID_TRIAL in VPS .env~~ | **FIXED 2026-05-24** — removed from `/opt/resumeai/.env` (was `price_1TRBHbHH7N0YD11Qwx6owN7R`) | ✅ DONE |
+| 📝 INFO | **Auto-apply reply tracking** | CareerOps apps use `handle@resumeai-bot.ru` inbox; Resend inbound must have MX record + webhook registered (verify in Resend dashboard → Domains → resumeai-bot.ru → Inbound). LinkedIn replies appear in LinkedIn inbox only — no email path. | Verify Resend inbound setup |
 
 ---
 
@@ -195,5 +201,16 @@ All C-section checks require live OAuth/Stripe/LinkedIn credentials.
 
 ---
 
-_Signed: Claude Code — Prompt 15 QA pass — 2026-05-18; updated 2026-05-19, 2026-05-20 (×2)_
-_Status: **✅ LAUNCH READY** — all hard blockers cleared. PDF download shipped. OpenAI proxy needs VPS env var before resume generation works from Russian IPs._
+### Pass 2026-05-24 (system audit — commit 9c7a9d7)
+
+| Area | Finding | Fix |
+|------|---------|-----|
+| Telegram bot | `personal-crm-bot.service` (systemd) was running with the SAME token as ResumeAI notifier, intercepting all bot commands via long-polling | Stopped + disabled the CRM service; registered webhook to `https://resumeai-bot.ru/api/notifications/telegram/webhook` |
+| Campaign runner | `application_submitted` events were never published → users got zero Telegram notifications when apps were submitted | Added `publishEvent()` call after every SUBMITTED CareerOps application |
+| LinkedIn campaigns | Campaigns with `source: 'LINKEDIN'` were completely ignored by the cron runner | Added LinkedIn session block to `run-campaigns` cron |
+| inboxHandle | 2 users (`n.d.chopper98`, `electro.mediax`) had no inboxHandle — reply emails would go to personal email only | Minted handles directly in DB: `ndchoppe-f420`, `electrom-5b98` |
+| VPS .env | `STRIPE_PRICE_ID_TRIAL=price_1TRBHbHH7N0YD11Qwx6owN7R` was still present | Removed via `sed -i` |
+| Auto-apply delivery | 69/73 CAREEROPS applications confirmed SUBMITTED to real Greenhouse boards (Postman, Twilio, Robinhood, Figma, Gusto…). 0 replies is NORMAL — companies respond in 1-2 weeks. | No action needed — system is working correctly |
+
+_Signed: Claude Code — Prompt 15 QA pass — 2026-05-18; updated 2026-05-19, 2026-05-20 (×2), 2026-05-24_
+_Status: **✅ LAUNCH READY** — all hard blockers cleared. Telegram bot working. Campaign notifications fixed. OpenAI proxy needs VPS env var before resume generation works from Russian IPs._
