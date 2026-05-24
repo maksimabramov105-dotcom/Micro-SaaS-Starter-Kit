@@ -32,7 +32,8 @@ RUN pip install uv && uv pip install --system \
       "reportlab>=4.2" \
       "redis[hiredis]>=5.0" \
       "weasyprint>=62.0" \
-      "jinja2>=3.1.4"
+      "jinja2>=3.1.4" \
+      "sentry-sdk[fastapi]>=2.0.0"
 
 # Download Chromium browser to a fixed, world-readable path.
 # PLAYWRIGHT_BROWSERS_PATH overrides the default ~/.cache/ms-playwright so the
