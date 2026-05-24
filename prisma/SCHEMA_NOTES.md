@@ -34,12 +34,9 @@ Storing credentials on `User` would enforce a one-to-one constraint that the pro
 does not impose.  Storing them on the campaign keeps each set of credentials scoped to
 its purpose and means revoking one campaign never affects another.
 
-The same logic applies to `hhToken` / `hhResumeId` (HeadHunter OAuth) — a user may have
-two hh.ru accounts (personal + corporate).
-
-**Encryption:** both `linkedinPasswordEnc` and `hhToken` are Fernet-encrypted at the
-application layer using `ENCRYPTION_KEY` before write, and decrypted on read inside the
-worker.  The DB stores only ciphertext — a DB dump alone cannot recover credentials.
+**Encryption:** `linkedinPasswordEnc` is Fernet-encrypted at the application layer using
+`ENCRYPTION_KEY` before write, and decrypted on read inside the worker.  The DB stores
+only ciphertext — a DB dump alone cannot recover credentials.
 
 ---
 
@@ -79,8 +76,8 @@ truth.
 | `responses_received` | — | Derived from `ApplicationEvent` of type `interview_requested` |
 | `linkedin_email` | `AutoApplyCampaign.linkedinEmail` | Per-campaign |
 | `linkedin_password_enc` | `AutoApplyCampaign.linkedinPasswordEnc` | Per-campaign, Fernet |
-| `hh_token` | `AutoApplyCampaign.hhToken` | Per-campaign |
-| `hh_resume_id` | `AutoApplyCampaign.hhResumeId` | Per-campaign |
+| `hh_token` | — | hh.ru integration was cut; `AutoApplyCampaign.hhToken` dropped in migration `20260524100000_remove_hh_ru_legacy_columns` |
+| `hh_resume_id` | — | Same — `AutoApplyCampaign.hhResumeId` dropped in same migration |
 | `resume_text` | `Resume.generated` | Imported as `{ legacy: true, text: "..." }` |
 | `is_verified` | `emailVerified` on User | |
 | `consent_at` | `Consent` row | Written as type=`tos`, version=`legacy` |

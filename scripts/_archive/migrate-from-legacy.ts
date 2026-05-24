@@ -245,8 +245,6 @@ interface AutoapplyUser {
   applications_total: number | null
   linkedin_email: string | null
   linkedin_password_enc: string | null
-  hh_token: string | null
-  hh_resume_id: string | null
   resume_text: string | null
   is_verified: number | null
   consent_at: string | null
@@ -497,8 +495,6 @@ async function migrate() {
             // Copy encrypted password VERBATIM — same Fernet key on both sides
             linkedinEmail: aaUser.linkedin_email ?? null,
             linkedinPasswordEnc: aaUser.linkedin_password_enc ?? null,
-            hhToken: aaUser.hh_token ?? null,
-            hhResumeId: aaUser.hh_resume_id ?? null,
             createdAt: c.created_at ? new Date(c.created_at) : new Date(),
             updatedAt: new Date(),
           },
