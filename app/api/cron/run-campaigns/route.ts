@@ -1,7 +1,7 @@
 /**
  * POST /api/cron/run-campaigns
  *
- * Campaign runner — the missing piece that makes autoapply actually work.
+ * Campaign runner — runs all active autoapply campaigns.
  *
  * For each active CAREEROPS campaign it:
  *   1. Scrapes fresh job listings from Adzuna / RemoteOK / Arbeitnow
@@ -9,9 +9,15 @@
  *   3. Skips listings the user has already applied to
  *   4. Calls the CareerOps ATS filler worker for each new listing
  *   5. Records a JobApplication row (SUBMITTED or FAILED)
- *   6. Stamps quota via consumeQuota() and fires Redis notification
+ *   6. Stamps quota via consumeQuota() and publishes application_submitted event
  *   7. Respects user.dailyApplicationLimit and campaign.dailyLimit
  *   8. Updates campaign.lastRunAt and campaign.totalSent when done
+ *
+ * For each active LINKEDIN campaign it:
+ *   1. Calls the LinkedIn Easy Apply worker (1 session per campaign per run)
+ *   2. Records JobApplication rows for submitted jobs
+ *   3. Publishes application_submitted events for Telegram notifications
+ *   4. Note: LinkedIn replies appear in LinkedIn inbox only — not email-trackable
  *
  * Auth: Authorization: Bearer <CRON_SECRET>
  * Called every 2 hours by GitHub Actions (.github/workflows/run-campaigns.yml)
@@ -23,6 +29,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { canSendApplication, consumeQuota } from '@/lib/quota'
 import { trackEvent } from '@/lib/analytics-advanced'
+import { publishEvent } from '@/lib/redis'
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -193,9 +200,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'WORKER_SECRET not configured' }, { status: 500 })
   }
 
-  // ── Load active CAREEROPS campaigns with user + resume ────────────────────
+  // ── Load active campaigns with user + resume ─────────────────────────────
   const campaigns = await prisma.autoApplyCampaign.findMany({
-    where: { isActive: true, source: 'CAREEROPS' },
+    where: { isActive: true, source: { in: ['CAREEROPS', 'LINKEDIN'] } },
     include: {
       user: {
         select: { id: true, name: true, email: true, dailyApplicationLimit: true, inboxHandle: true },
@@ -212,6 +219,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ message: 'No active campaigns', applied: 0 })
   }
 
+  const careerOpsCampaigns = campaigns.filter((c) => c.source === 'CAREEROPS')
+  const linkedInCampaigns = campaigns.filter((c) => c.source === 'LINKEDIN')
+
   const summary: Array<{
     campaignId: string
     campaignName: string
@@ -221,8 +231,135 @@ export async function POST(req: Request) {
     error?: string
   }> = []
 
-  // ── Process each campaign ─────────────────────────────────────────────────
-  for (const campaign of campaigns) {
+  // ── Process LinkedIn campaigns ────────────────────────────────────────────
+  // LinkedIn Easy Apply: 1 session per campaign per cron run (max 30 apps/session,
+  // 2-3 min between apps). GitHub Actions timeout is 600s — cap at 1 session total.
+  for (const campaign of linkedInCampaigns) {
+    const { user, resume } = campaign
+
+    const linkedinEmail = campaign.linkedinEmail
+    const linkedinPasswordEnc = (campaign as any).linkedinPasswordEnc as string | null
+    if (!linkedinEmail || !linkedinPasswordEnc) {
+      console.warn('[run-campaigns] LinkedIn campaign missing credentials, skipping', campaign.id)
+      summary.push({
+        campaignId: campaign.id,
+        campaignName: campaign.name,
+        applied: 0, failed: 0, skipped: 0,
+        error: 'No LinkedIn credentials on campaign',
+      })
+      continue
+    }
+
+    const keyword = campaign.keywords[0] ?? 'software engineer'
+    const location = campaign.locations[0] ?? ''
+
+    console.log('[run-campaigns] linkedin campaign', { id: campaign.id, keyword, location })
+
+    try {
+      const res = await fetch(`${workerUrl}/jobs/autoapply/linkedin`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${workerSecret}`,
+        },
+        body: JSON.stringify({
+          user_id: 0,
+          campaign_id: 0,
+          email: linkedinEmail,
+          password_encrypted: linkedinPasswordEnc,
+          job_title: keyword,
+          location,
+        }),
+        signal: AbortSignal.timeout(300_000), // 5 min max (LinkedIn sessions are slow)
+      })
+
+      if (!res.ok) {
+        const body = await res.text().catch(() => '')
+        console.warn('[run-campaigns] linkedin worker returned', res.status, body)
+        summary.push({
+          campaignId: campaign.id,
+          campaignName: campaign.name,
+          applied: 0, failed: 0, skipped: 0,
+          error: `Worker HTTP ${res.status}`,
+        })
+        continue
+      }
+
+      const data = (await res.json()) as {
+        status: string
+        result?: { applied_count: number; results: Array<{ success: boolean; job_url: string; job_title?: string; company?: string; error?: string }> }
+      }
+
+      const result = data.result
+      let liApplied = 0
+      let liFailed = 0
+
+      if (result?.results) {
+        for (const r of result.results) {
+          const hasQuota = await canSendApplication(user.id)
+          if (!hasQuota) break
+
+          if (r.success) {
+            // Create application record
+            const application = await prisma.jobApplication.create({
+              data: {
+                userId: user.id,
+                resumeId: resume.id,
+                campaignId: campaign.id,
+                source: 'LINKEDIN',
+                jobTitle: r.job_title ?? keyword,
+                company: r.company ?? '',
+                location,
+                jobUrl: r.job_url,
+                vacancyId: r.job_url, // use URL as unique ID for LinkedIn jobs
+                status: 'SUBMITTED',
+                appliedAt: new Date(),
+              },
+            })
+            await consumeQuota(user.id, application.id)
+            liApplied++
+
+            // Publish Telegram notification
+            publishEvent('application_events', {
+              type: 'application_submitted',
+              userId: user.id,
+              applicationId: application.id,
+              jobTitle: r.job_title ?? keyword,
+              company: r.company ?? '',
+              timestamp: new Date().toISOString(),
+            }).catch(() => {})
+          } else {
+            liFailed++
+          }
+        }
+      }
+
+      await prisma.autoApplyCampaign.update({
+        where: { id: campaign.id },
+        data: { lastRunAt: new Date(), totalSent: { increment: liApplied } },
+      })
+
+      summary.push({
+        campaignId: campaign.id,
+        campaignName: campaign.name,
+        applied: liApplied, failed: liFailed, skipped: 0,
+      })
+      console.log('[run-campaigns] linkedin done', { campaign: campaign.id, liApplied, liFailed })
+
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.warn('[run-campaigns] linkedin error', { campaign: campaign.id, msg })
+      summary.push({
+        campaignId: campaign.id,
+        campaignName: campaign.name,
+        applied: 0, failed: 0, skipped: 0,
+        error: msg,
+      })
+    }
+  }
+
+  // ── Process each CAREEROPS campaign ──────────────────────────────────────
+  for (const campaign of careerOpsCampaigns) {
     const { user, resume } = campaign
     const campaignLog: {
       campaignId: string
@@ -511,11 +648,21 @@ export async function POST(req: Request) {
         // Success — mark SUBMITTED and stamp quota
         await prisma.jobApplication.update({
           where: { id: application.id },
-          data: { status: 'SUBMITTED' },
+          data: { status: 'SUBMITTED', appliedAt: new Date() },
         })
         await consumeQuota(user.id, application.id)
         campaignLog.applied++
         appliedThisCampaign++
+
+        // Publish Telegram notification
+        publishEvent('application_events', {
+          type: 'application_submitted',
+          userId: user.id,
+          applicationId: application.id,
+          jobTitle: job.title,
+          company: job.company,
+          timestamp: new Date().toISOString(),
+        }).catch(() => {})
 
         // Track resume generation event for quality-v2 A/B analysis
         const usedV2 = process.env.RESUME_QUALITY_V2 === 'true'
