@@ -140,7 +140,9 @@ function mapPlanToStripePriceId(legacyPlan: string | null): string | null {
   switch ((legacyPlan ?? '').toLowerCase()) {
     case 'trial':
     case 'pro_trial':
-      return process.env.STRIPE_PRICE_ID_TRIAL ?? null
+      // No trial plan was ever shipped — legacy trial users migrate to free tier.
+      // STRIPE_PRICE_ID_TRIAL was removed in Prompt 04 (chore/remove-stripe-trial-env).
+      return null
     case 'pro':
     case 'pro_monthly':
       return process.env.STRIPE_PRICE_ID_PRO ?? null

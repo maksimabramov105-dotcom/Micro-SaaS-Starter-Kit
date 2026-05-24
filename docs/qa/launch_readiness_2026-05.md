@@ -24,7 +24,7 @@
 | A3. `npm test:ci` | ✅ | 96/96 pass — verified 2026-05-20 |
 | A4. `pytest` (worker) | ✅ | 56/56 pass locally (incl. playwright tests); playwright pkg required for local run |
 | A5. Cyrillic in source | ✅ | Zero files in `app/ components/ lib/ prisma/ worker/` |
-| A6. Legacy artifacts | ⚠️ | `hh.ru` in `prisma/schema.prisma` comment and `SCHEMA_NOTES.md` only — schema columns (`hhToken`, `hhResumeId`) are inert dead columns, no live code paths. Non-blocking. |
+| A6. Legacy artifacts | ✅ | **Prompt 04** dropped `hhToken`/`hhResumeId` via migration `20260524100000_remove_hh_ru_legacy_columns`. `STRIPE_PRICE_ID_TRIAL` confirmed absent from `.env.example` and `docker-compose.yml`; remove from VPS `.env` manually if present. |
 | A7. `bandit -r worker/` | ✅ | 0 HIGH, 0 MEDIUM, 33 LOW (all subprocess/assert patterns — expected) |
 | A8. `npm audit --audit-level=high` | ✅ | 0 high/critical; 5 moderate in `next`/`next-auth` transitive deps |
 
