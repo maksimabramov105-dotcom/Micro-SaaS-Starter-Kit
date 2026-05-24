@@ -463,10 +463,6 @@ model AutoApplyCampaign {
   linkedinEmail       String?          // legacy: autoapply.db.autoapply_users.linkedin_email
   linkedinPasswordEnc String?          // legacy: autoapply.db.autoapply_users.linkedin_password_enc
 
-  // HeadHunter (hh.ru) OAuth — Russia/CIS job market
-  hhToken    String?                  // legacy: autoapply.db.autoapply_users.hh_token
-  hhResumeId String?                  // legacy: autoapply.db.autoapply_users.hh_resume_id
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
