@@ -27,6 +27,9 @@ export async function POST(req: Request) {
     return new NextResponse('Invalid JSON', { status: 400 })
   }
 
+  type WorkHistoryItem = { company?: string; role?: string; startDate?: string; endDate?: string; bullets?: string[] }
+  type EducationItem   = { school?: string; degree?: string; year?: string }
+
   const {
     targetRole,
     yearsExp,
@@ -40,15 +43,38 @@ export async function POST(req: Request) {
 
   if (!targetRole) return new NextResponse('targetRole is required', { status: 400 })
 
+  // Serialize structured form arrays into readable plain text for the AI.
+  const workHistoryText = Array.isArray(workHistory)
+    ? (workHistory as WorkHistoryItem[])
+        .filter(j => j.company || j.role)
+        .map(j => {
+          const period = [j.startDate, j.endDate || 'Present'].filter(Boolean).join(' – ')
+          const bullets = (j.bullets ?? []).filter(Boolean).map(b => `  • ${b}`).join('\n')
+          return `${j.role ?? ''}${j.company ? ` at ${j.company}` : ''}${period ? ` (${period})` : ''}${bullets ? '\n' + bullets : ''}`
+        })
+        .join('\n\n')
+    : String(workHistory ?? '')
+
+  const educationText = Array.isArray(education)
+    ? (education as EducationItem[])
+        .filter(e => e.school || e.degree)
+        .map(e => `${e.degree ?? ''}${e.school ? ` — ${e.school}` : ''}${e.year ? ` (${e.year})` : ''}`)
+        .join('\n')
+    : String(education ?? '')
+
+  const skillsText = Array.isArray(skills)
+    ? (skills as string[]).filter(Boolean).join(', ')
+    : String(skills ?? '')
+
   // Build a plain-text user profile from form fields to send to the worker.
   const profileParts: string[] = []
-  if (workHistory)  profileParts.push(`Work History:\n${workHistory}`)
-  if (education)    profileParts.push(`Education:\n${education}`)
-  if (skills)       profileParts.push(`Skills:\n${skills}`)
-  if (yearsExp)     profileParts.push(`Years of experience: ${yearsExp}`)
-  if (location)     profileParts.push(`Preferred location: ${location}`)
-  if (remote)       profileParts.push('Open to remote work.')
-  if (tone)         profileParts.push(`Preferred tone: ${tone}`)
+  if (workHistoryText) profileParts.push(`Work History:\n${workHistoryText}`)
+  if (educationText)   profileParts.push(`Education:\n${educationText}`)
+  if (skillsText)      profileParts.push(`Skills:\n${skillsText}`)
+  if (yearsExp)        profileParts.push(`Years of experience: ${yearsExp}`)
+  if (location)        profileParts.push(`Preferred location: ${location}`)
+  if (remote)          profileParts.push('Open to remote work.')
+  if (tone)            profileParts.push(`Preferred tone: ${tone}`)
   const resumeInput = profileParts.join('\n\n') || String(targetRole)
 
   let generated: unknown = {}
