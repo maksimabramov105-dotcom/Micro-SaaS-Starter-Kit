@@ -14,10 +14,17 @@ export const authOptions: NextAuthOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      // Allow sign-in even when this Google account isn't the one that was
+      // originally used to create the DB user — e.g. user signed up via GitHub,
+      // then tries Google with the same email.  Without this flag NextAuth throws
+      // OAuthAccountNotLinked and the user can never sign in.
+      allowDangerousEmailAccountLinking: true,
     }),
     GitHubProvider({
       clientId: process.env.GITHUB_ID!,
       clientSecret: process.env.GITHUB_SECRET!,
+      // Same as above — permit GitHub sign-in to link to an existing email.
+      allowDangerousEmailAccountLinking: true,
     }),
     EmailProvider({
       server: {
