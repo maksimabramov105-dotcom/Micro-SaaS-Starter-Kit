@@ -70,6 +70,35 @@ export async function sendSubscriptionConfirmation(to: string, planName: string)
   return sendEmail({ to, subject, html })
 }
 
+export async function sendPaymentFailedEmail(to: string, attemptCount: number) {
+  const subject = 'Action required: your payment failed'
+  const isRetry = attemptCount > 1
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h1 style="color: #e53e3e;">Payment Failed</h1>
+      <p>Hi there,</p>
+      <p>
+        ${isRetry
+          ? `We tried to renew your subscription again but the payment failed (attempt ${attemptCount}).`
+          : 'We were unable to process your subscription renewal payment.'}
+      </p>
+      <p>
+        Please update your payment method to keep access to all premium features.
+        Stripe will automatically retry the charge — but updating your card now
+        prevents any interruption to your service.
+      </p>
+      <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard/billing"
+         style="display: inline-block; padding: 12px 24px; background-color: #e53e3e; color: #fff; text-decoration: none; border-radius: 5px; margin: 20px 0;">
+        Update Payment Method
+      </a>
+      <p>If you need help, reply to this email and we'll sort it out.</p>
+      <p>Best regards,<br>The ${process.env.NEXT_PUBLIC_APP_NAME} Team</p>
+    </div>
+  `
+
+  return sendEmail({ to, subject, html })
+}
+
 export async function sendSubscriptionCancellation(to: string) {
   const subject = 'Subscription Cancelled'
   const html = `

@@ -7,17 +7,59 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import Link from 'next/link'
 
+// Human-readable descriptions for NextAuth error codes that land on this page
+// via pages.error: '/login' in authOptions.
+const AUTH_ERRORS: Record<string, string> = {
+  OAuthSignin: 'Could not start the sign-in process. Please try again.',
+  OAuthCallback: 'Something went wrong during sign-in. Please try again.',
+  OAuthCreateAccount: 'Could not create your account. Please try again.',
+  EmailCreateAccount: 'Could not create your account. Please try again.',
+  Callback: 'Sign-in callback error. Please try again.',
+  OAuthAccountNotLinked:
+    'This email is already registered with a different sign-in method. Try the other provider.',
+  EmailSignin: 'Failed to send the sign-in email. Please try again.',
+  CredentialsSignin: 'Invalid credentials. Please check and try again.',
+  SessionRequired: 'You must be signed in to access that page.',
+  Default: 'An error occurred during sign-in. Please try again.',
+}
+
 // Reads ?callbackUrl= from the URL so users coming from a protected deep-link
 // (e.g. /dashboard/resumes/123 → redirected here by proxy.ts) land back where
 // they started after sign-in instead of always going to /dashboard.
 function LoginButtons() {
   const searchParams = useSearchParams()
-  // Only accept same-origin relative URLs to prevent open-redirect attacks.
+
+  // Accept relative paths OR absolute same-origin URLs (proxy.ts sends the full
+  // public URL, e.g. https://resumeai-bot.ru/dashboard).  Strip the origin so
+  // NextAuth's redirect callback always sees a relative path it can validate.
   const raw = searchParams.get('callbackUrl') ?? '/dashboard'
-  const callbackUrl = raw.startsWith('/') ? raw : '/dashboard'
+  let callbackUrl = '/dashboard'
+  if (raw.startsWith('/')) {
+    callbackUrl = raw
+  } else {
+    try {
+      const parsed = new URL(raw)
+      // Allow same-origin absolute URLs; convert to relative path
+      if (typeof window !== 'undefined' && parsed.origin === window.location.origin) {
+        callbackUrl = parsed.pathname + parsed.search + parsed.hash
+      }
+    } catch {
+      // Malformed URL — fall back to /dashboard
+    }
+  }
+
+  const errorCode = searchParams.get('error')
+  const errorMessage = errorCode
+    ? (AUTH_ERRORS[errorCode] ?? AUTH_ERRORS['Default'])
+    : null
 
   return (
     <div className="space-y-3">
+      {errorMessage && (
+        <div className="rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+          {errorMessage}
+        </div>
+      )}
       <Button
         variant="outline"
         className="w-full"

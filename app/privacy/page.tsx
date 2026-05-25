@@ -1,7 +1,7 @@
 import { Navbar } from '@/components/navbar'
 
 // Bump this date on any meaningful policy edit.
-const LAST_UPDATED = new Date('2026-05-24')
+const LAST_UPDATED = new Date('2026-05-25')
 
 export default function PrivacyPage() {
   return (
@@ -93,6 +93,19 @@ export default function PrivacyPage() {
               <p>
                 If you have any questions about this privacy policy, please contact us through your
                 account settings or by email.
+              </p>
+            </section>
+
+            <section className="mt-8">
+              <h2 className="text-2xl font-semibold mb-4">9. AI-Powered Features</h2>
+              <p>
+                When you use AI-powered features (such as resume analysis, cover-letter generation,
+                or job-match scoring), your resume content and related inputs are sent to
+                OpenAI&apos;s API for processing via OpenRouter. We do not instruct OpenAI to store
+                your data beyond the processing window, and your data is not used to train OpenAI
+                models under our API agreement. LinkedIn credentials entered in the app are
+                encrypted at rest and are only used to perform the automations you explicitly
+                request.
               </p>
             </section>
           </div>

@@ -22,8 +22,11 @@ export default async function proxy(req: NextRequest) {
   if (pathname.startsWith('/dashboard')) {
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
     if (!token) {
-      const signIn = new URL('/login', req.url)
-      signIn.searchParams.set('callbackUrl', req.url)
+      // Use req.nextUrl.href (the public URL seen by the browser) rather than
+      // req.url, which inside Docker resolves to the internal address
+      // (https://0.0.0.0:3000/...) and leaks into the callbackUrl query param.
+      const signIn = new URL('/login', req.nextUrl.href)
+      signIn.searchParams.set('callbackUrl', req.nextUrl.href)
       return NextResponse.redirect(signIn)
     }
   }

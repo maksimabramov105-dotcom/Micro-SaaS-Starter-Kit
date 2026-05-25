@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma'
 // no changes needed here when adding annual plans (Prompt 05).
 import { getPlanByPriceId } from '@/lib/pricing'
 import { qualifyReferral, clawbackReferral } from '@/lib/referral'
+import { sendPaymentFailedEmail } from '@/lib/email'
 
 export async function POST(req: Request) {
   const body = await req.text()
@@ -132,6 +133,40 @@ export async function POST(req: Request) {
           cancelledAt: new Date(),
         },
       })
+      break
+    }
+
+    case 'invoice.payment_failed': {
+      // A renewal charge failed.  Log it and nudge the user to update their card.
+      // Stripe will retry automatically (up to 4 attempts over ~1 week by default).
+      const failedInvoice = event.data.object as Stripe.Invoice
+      const failedCustomerId = typeof failedInvoice.customer === 'string'
+        ? failedInvoice.customer
+        : (failedInvoice.customer as Stripe.Customer | null)?.id
+
+      console.error('[webhook] invoice.payment_failed', {
+        invoiceId: failedInvoice.id,
+        customerId: failedCustomerId,
+        subscriptionId: failedInvoice.subscription,
+        attemptCount: failedInvoice.attempt_count,
+        amountDue: failedInvoice.amount_due,
+        nextPaymentAttempt: failedInvoice.next_payment_attempt,
+      })
+
+      if (failedCustomerId) {
+        try {
+          const user = await prisma.user.findFirst({
+            where: { stripeCustomerId: failedCustomerId },
+            select: { email: true },
+          })
+          if (user?.email) {
+            await sendPaymentFailedEmail(user.email, failedInvoice.attempt_count ?? 1)
+          }
+        } catch (err) {
+          // Non-fatal — payment failed email is best-effort
+          console.error('[webhook] failed to send payment_failed email for customer', failedCustomerId, err)
+        }
+      }
       break
     }
 
