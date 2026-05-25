@@ -417,6 +417,7 @@ export async function POST(req: Request) {
       failed: number
       skipped: number
       error?: string
+      _debug?: { keyword: string; totalScraped: number; greenhouseMatched: number }
     } = {
       campaignId: campaign.id,
       campaignName: campaign.name,
@@ -588,7 +589,9 @@ export async function POST(req: Request) {
       }
     }
 
-    console.log('[run-campaigns] scraped', { campaign: campaign.id, total: scrapedJobs.length })
+    const greenhouseMatched = runGreenhouseCache.filter((j) => keywordMatches(j.title, keyword)).length
+    campaignLog._debug = { keyword, totalScraped: scrapedJobs.length, greenhouseMatched }
+    console.log('[run-campaigns] scraped', { campaign: campaign.id, total: scrapedJobs.length, keyword, greenhouseMatched })
 
     // Apply to each new job up to the remaining limit.
     //
