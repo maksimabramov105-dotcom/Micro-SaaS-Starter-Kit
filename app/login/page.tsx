@@ -29,24 +29,10 @@ const AUTH_ERRORS: Record<string, string> = {
 function LoginButtons() {
   const searchParams = useSearchParams()
 
-  // Accept relative paths OR absolute same-origin URLs (proxy.ts sends the full
-  // public URL, e.g. https://resumeai-bot.ru/dashboard).  Strip the origin so
-  // NextAuth's redirect callback always sees a relative path it can validate.
+  // proxy.ts always sends a relative path as callbackUrl (e.g. /dashboard/resumes/123).
+  // Only accept relative paths to prevent open-redirect attacks.
   const raw = searchParams.get('callbackUrl') ?? '/dashboard'
-  let callbackUrl = '/dashboard'
-  if (raw.startsWith('/')) {
-    callbackUrl = raw
-  } else {
-    try {
-      const parsed = new URL(raw)
-      // Allow same-origin absolute URLs; convert to relative path
-      if (typeof window !== 'undefined' && parsed.origin === window.location.origin) {
-        callbackUrl = parsed.pathname + parsed.search + parsed.hash
-      }
-    } catch {
-      // Malformed URL — fall back to /dashboard
-    }
-  }
+  const callbackUrl = raw.startsWith('/') ? raw : '/dashboard'
 
   const errorCode = searchParams.get('error')
   const errorMessage = errorCode

@@ -22,11 +22,18 @@ export default async function proxy(req: NextRequest) {
   if (pathname.startsWith('/dashboard')) {
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
     if (!token) {
-      // Use req.nextUrl.href (the public URL seen by the browser) rather than
-      // req.url, which inside Docker resolves to the internal address
-      // (https://0.0.0.0:3000/...) and leaks into the callbackUrl query param.
-      const signIn = new URL('/login', req.nextUrl.href)
-      signIn.searchParams.set('callbackUrl', req.nextUrl.href)
+      // Build the redirect using NEXTAUTH_URL so the Location header always
+      // carries the correct public hostname.  Both req.url and req.nextUrl.href
+      // resolve to the internal Docker address (https://0.0.0.0:3000/...) when
+      // the container is behind Caddy — Caddy rewrites the top-level hostname in
+      // the 307 Location header but cannot rewrite hostname-containing query
+      // parameters, so callbackUrl would still expose 0.0.0.0:3000.
+      //
+      // Fix: derive the login URL from NEXTAUTH_URL (always the public origin)
+      // and pass only the pathname+search as callbackUrl (no host involved at all).
+      const appOrigin = (process.env.NEXTAUTH_URL ?? '').replace(/\/$/, '')
+      const signIn = new URL(`${appOrigin}/login`)
+      signIn.searchParams.set('callbackUrl', req.nextUrl.pathname + req.nextUrl.search)
       return NextResponse.redirect(signIn)
     }
   }
