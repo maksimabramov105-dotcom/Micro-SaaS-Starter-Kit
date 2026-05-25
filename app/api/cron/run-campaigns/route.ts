@@ -684,14 +684,6 @@ export async function POST(req: Request) {
     let appliedThisCampaign = 0
     let attemptsThisCampaign = 0
 
-    console.log('[run-campaigns] entering job loop', {
-      campaign: campaign.id,
-      jobs: scrapedJobs.length,
-      campaignRemaining,
-      appliedUrlsCount: appliedUrls.size,
-      elapsed: Date.now() - runStart,
-    })
-
     // Job boards whose "apply_url" is their own listing page, not a direct ATS URL.
     // CareerOps fills ATS forms (Greenhouse, Lever, Workable, etc.) and cannot work on
     // these aggregator pages — skip them to avoid spending Playwright budget on timeouts.
