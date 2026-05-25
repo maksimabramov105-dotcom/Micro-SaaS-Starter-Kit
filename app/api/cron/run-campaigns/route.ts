@@ -469,6 +469,7 @@ export async function POST(req: Request) {
     const campaignLog: {
       campaignId: string
       campaignName: string
+      userId: string
       applied: number
       failed: number
       skipped: number
@@ -477,6 +478,7 @@ export async function POST(req: Request) {
     } = {
       campaignId: campaign.id,
       campaignName: campaign.name,
+      userId: user.id,
       applied: 0,
       failed: 0,
       skipped: 0,
