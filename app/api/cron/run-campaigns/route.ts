@@ -150,7 +150,8 @@ async function scrapeBoard(
   workerSecret: string,
   board: string,
   keywords: string,
-  location: string
+  location: string,
+  timeoutMs = 12_000,
 ): Promise<ScrapedJob[]> {
   try {
     const res = await fetch(`${workerUrl}/jobs/scrape/${board}`, {
@@ -160,7 +161,7 @@ async function scrapeBoard(
         Authorization: `Bearer ${workerSecret}`,
       },
       body: JSON.stringify({ keywords, location }),
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(timeoutMs),
     })
     if (!res.ok) {
       console.warn(`[run-campaigns] scrape/${board} returned ${res.status}`)
@@ -275,7 +276,9 @@ export async function POST(req: Request) {
   // Only bother if there is at least one CAREEROPS campaign that needs jobs.
   let runGreenhouseCache: (ScrapedJob & { board: string })[] = []
   if (careerOpsCampaigns.length > 0) {
-    const rawGreenhouse = await scrapeBoard(workerUrl, workerSecret, 'greenhouse', '', '')
+    // 20 s timeout — the Greenhouse pre-scrape queries 20 companies in parallel
+    // and needs slightly more headroom than the per-campaign board scrapers.
+    const rawGreenhouse = await scrapeBoard(workerUrl, workerSecret, 'greenhouse', '', '', 20_000)
     runGreenhouseCache = rawGreenhouse.map((j) => ({ ...j, board: 'greenhouse' }))
     console.log('[run-campaigns] greenhouse pre-scrape', { total: runGreenhouseCache.length })
   }
@@ -488,6 +491,7 @@ export async function POST(req: Request) {
     const campaignRemaining = campaign.dailyLimit - sentToday
     if (campaignRemaining <= 0) {
       console.log('[run-campaigns] campaign daily limit reached', campaign.id)
+      campaignLog.error = 'daily limit reached'
       summary.push(campaignLog)
       continue
     }
@@ -631,7 +635,9 @@ export async function POST(req: Request) {
       // Global wall-clock guard: stop launching new attempts if we are near the
       // Cloudflare proxy timeout — let the endpoint return cleanly instead of 524.
       if (Date.now() - runStart >= RUN_BUDGET_MS) {
-        console.log('[run-campaigns] time budget reached, stopping', { elapsed: Date.now() - runStart })
+        const elapsed = Date.now() - runStart
+        console.log('[run-campaigns] time budget reached, stopping', { elapsed, campaign: campaign.id })
+        if (!campaignLog.error) campaignLog.error = `time budget (${elapsed}ms)`
         break
       }
 
