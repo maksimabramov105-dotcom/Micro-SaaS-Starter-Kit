@@ -183,7 +183,8 @@ async function careeropsApply(
   workerUrl: string,
   workerSecret: string,
   applyUrl: string,
-  userData: Record<string, string>
+  userData: Record<string, string>,
+  timeoutMs = 50_000,  // caller passes remaining budget; hard default 50 s
 ): Promise<WorkerJobResult['result']> {
   try {
     const res = await fetch(`${workerUrl}/jobs/autoapply/careerops`, {
@@ -198,7 +199,7 @@ async function careeropsApply(
         apply_url: applyUrl,
         user_data: userData,
       }),
-      signal: AbortSignal.timeout(120_000), // Playwright can take up to 2 min
+      signal: AbortSignal.timeout(timeoutMs),
     })
     if (!res.ok) {
       const body = await res.text().catch(() => '')
@@ -696,14 +697,28 @@ export async function POST(req: Request) {
       if (appliedThisCampaign >= campaignRemaining) break
       // Per-campaign OOM cap: stop if this campaign has used its Playwright budget
       if (attemptsThisCampaign >= MAX_APPLIES_PER_CAMPAIGN) break
-      // Global wall-clock guard: stop launching new attempts if we are near the
-      // Cloudflare proxy timeout — let the endpoint return cleanly instead of 524.
-      if (Date.now() - runStart >= RUN_BUDGET_MS) {
-        const elapsed = Date.now() - runStart
-        console.log('[run-campaigns] time budget reached, stopping', { elapsed, campaign: campaign.id })
-        if (!campaignLog.error) campaignLog.error = `time budget (${elapsed}ms)`
+      // Dynamic wall-clock guard — prevents Cloudflare 524 timeout.
+      //
+      // Two-part check:
+      //   1. Minimum remaining budget (15 s) — only start a Playwright call if
+      //      there's at least 15 s left (fast attempt ~7 s + DB writes + buffer).
+      //   2. Dynamic Playwright timeout — caps the fetch to (remaining - 5 s),
+      //      max 50 s.  This replaces the old hardcoded 120 s limit which could
+      //      let a slow call run past Cloudflare's ~100 s proxy timeout even
+      //      when the budget check had already passed.
+      //
+      // Why 50 s max: normal Playwright attempts take 7–20 s; 50 s is 2.5×
+      // the observed worst case and still fits safely under 100 s with overhead.
+      const PLAYWRIGHT_MIN_BUDGET = 15_000
+      const PLAYWRIGHT_MAX_TIMEOUT = 50_000
+      const elapsedNow = Date.now() - runStart
+      const remainingBudget = RUN_BUDGET_MS - elapsedNow
+      if (remainingBudget < PLAYWRIGHT_MIN_BUDGET) {
+        console.log('[run-campaigns] time budget reached, stopping', { elapsed: elapsedNow, campaign: campaign.id })
+        if (!campaignLog.error) campaignLog.error = `time budget (${elapsedNow}ms)`
         break
       }
+      const playwrightTimeout = Math.min(PLAYWRIGHT_MAX_TIMEOUT, remainingBudget - 5_000)
 
       const applyUrl = job.apply_url || job.url
       if (!applyUrl) {
@@ -782,8 +797,8 @@ export async function POST(req: Request) {
       // Mark URL as applied to prevent duplicates in this run
       appliedUrls.add(applyUrl)
 
-      // Call the CareerOps worker
-      const result = await careeropsApply(workerUrl, workerSecret, applyUrl, userData)
+      // Call the CareerOps worker (timeout dynamically capped to remaining budget)
+      const result = await careeropsApply(workerUrl, workerSecret, applyUrl, userData, playwrightTimeout)
       attemptsThisCampaign++ // Always count every Playwright call for OOM cap
 
       if (result?.status === 'submitted') {
