@@ -419,6 +419,50 @@ export async function POST(req: Request) {
     }
   }
 
+  // ── Per-user quota distribution across CAREEROPS campaigns ──────────────
+  //
+  // Problem: if a user has multiple CAREEROPS campaigns, Campaign 1 runs first
+  // and can exhaust the entire daily user quota before Campaign 2 gets a turn.
+  //
+  // Fix: for each user with >1 active campaign, divide their remaining daily
+  // quota evenly across campaigns (ceil to avoid rounding to zero).  The
+  // result is a Map<userId, number> of per-run per-campaign quota caps.
+  //
+  // Example: user with dailyApplicationLimit=15, 2 campaigns, 12 used today:
+  //   remaining = 15 - 12 = 3 → cap per campaign = ceil(3/2) = 2.
+  {
+    const userCampaignCounts = new Map<string, number>()
+    for (const c of careerOpsCampaigns) {
+      userCampaignCounts.set(c.user.id, (userCampaignCounts.get(c.user.id) ?? 0) + 1)
+    }
+    // Only need to cap users with >1 campaign.
+    for (const [userId, count] of userCampaignCounts.entries()) {
+      if (count <= 1) continue
+      const userRec = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { dailyApplicationLimit: true },
+      })
+      if (!userRec) continue
+      const today2 = new Date(); today2.setHours(0, 0, 0, 0)
+      const usedToday = await prisma.jobApplication.count({
+        where: {
+          userId,
+          appliedAt: { gte: today2 },
+          status: { in: ['SUBMITTED', 'INTERVIEW', 'OFFER'] },
+        },
+      })
+      const remaining = Math.max(0, userRec.dailyApplicationLimit - usedToday)
+      const capPerCampaign = Math.ceil(remaining / count)
+      console.log('[run-campaigns] quota distribution', { userId, remaining, count, capPerCampaign })
+      // Store cap on each campaign object (transient — not persisted)
+      for (const c of careerOpsCampaigns) {
+        if (c.user.id === userId) {
+          (c as any)._runQuotaCap = capPerCampaign
+        }
+      }
+    }
+  }
+
   // ── Process each CAREEROPS campaign ──────────────────────────────────────
   for (const campaign of careerOpsCampaigns) {
     const { user, resume } = campaign
@@ -430,7 +474,6 @@ export async function POST(req: Request) {
       skipped: number
       error?: string
       scraped?: number
-      quotaRemaining?: number
     } = {
       campaignId: campaign.id,
       campaignName: campaign.name,
@@ -490,7 +533,13 @@ export async function POST(req: Request) {
         status: { in: ['SUBMITTED', 'INTERVIEW', 'OFFER'] },
       },
     })
-    const campaignRemaining = campaign.dailyLimit - sentToday
+    // _runQuotaCap is set by the quota-distribution block above for users with
+    // >1 active campaign.  It caps this campaign to its fair share of the
+    // remaining daily user quota so Campaign 1 cannot exhaust the entire quota
+    // before Campaign 2 gets a turn.  Falls back to campaign.dailyLimit for
+    // single-campaign users (no change in behaviour).
+    const runQuotaCap = (campaign as any)._runQuotaCap ?? campaign.dailyLimit
+    const campaignRemaining = Math.min(campaign.dailyLimit - sentToday, runQuotaCap)
     if (campaignRemaining <= 0) {
       console.log('[run-campaigns] campaign daily limit reached', campaign.id)
       campaignLog.error = 'daily limit reached'
@@ -611,17 +660,6 @@ export async function POST(req: Request) {
       keyword,
       greenhouseMatched: ghMatched,
     })
-
-    // Compute remaining user-level quota once (for logging; per-job check is inside the loop)
-    {
-      const quotaOk = await canSendApplication(user.id)
-      if (!quotaOk) {
-        campaignLog.error = 'user quota exhausted'
-        campaignLog.quotaRemaining = 0
-        summary.push(campaignLog)
-        continue
-      }
-    }
 
     // Apply to each new job up to the remaining limit.
     //
