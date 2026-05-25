@@ -429,6 +429,8 @@ export async function POST(req: Request) {
       failed: number
       skipped: number
       error?: string
+      scraped?: number
+      quotaRemaining?: number
     } = {
       campaignId: campaign.id,
       campaignName: campaign.name,
@@ -601,12 +603,25 @@ export async function POST(req: Request) {
       }
     }
 
+    const ghMatched = runGreenhouseCache.filter((j) => keywordMatches(j.title, keyword)).length
+    campaignLog.scraped = scrapedJobs.length
     console.log('[run-campaigns] scraped', {
       campaign: campaign.id,
       total: scrapedJobs.length,
       keyword,
-      greenhouseMatched: runGreenhouseCache.filter((j) => keywordMatches(j.title, keyword)).length,
+      greenhouseMatched: ghMatched,
     })
+
+    // Compute remaining user-level quota once (for logging; per-job check is inside the loop)
+    {
+      const quotaOk = await canSendApplication(user.id)
+      if (!quotaOk) {
+        campaignLog.error = 'user quota exhausted'
+        campaignLog.quotaRemaining = 0
+        summary.push(campaignLog)
+        continue
+      }
+    }
 
     // Apply to each new job up to the remaining limit.
     //
