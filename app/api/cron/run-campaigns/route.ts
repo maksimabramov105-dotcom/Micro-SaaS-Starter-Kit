@@ -543,13 +543,17 @@ export async function POST(req: Request) {
     //
     // TWO separate counters:
     //   appliedThisCampaign — successful SUBMITTED apps (used for daily-limit tracking)
-    //   attemptsThisRun     — every Playwright call, success or fail (used for OOM cap)
+    //   attemptsThisCampaign — every Playwright call, success or fail (used for OOM cap)
     //
-    // MAX_APPLIES_PER_RUN MUST check attempts, not successes — otherwise 100 consecutive
-    // Playwright timeouts would all start before the cap fires, crashing the VPS with OOM.
+    // MAX_APPLIES_PER_RUN is a PER-CAMPAIGN cap (not global).  Each campaign gets its
+    // own independent Playwright budget.  Campaigns run sequentially (not in parallel),
+    // so peak concurrency is always 1 browser instance — the OOM concern is a single
+    // campaign burning unlimited attempts, which attemptsThisCampaign guards against.
+    //
+    // Bug fixed: previously globalAttempts (from earlier campaigns in the same run)
+    // was added here, causing the second campaign to hit the cap immediately whenever
+    // the first campaign used all 3 slots — resulting in applied:0 failed:0 skipped:0.
     let appliedThisCampaign = 0
-    const globalApplied = summary.reduce((s, c) => s + c.applied, 0)
-    const globalAttempts = summary.reduce((s, c) => s + c.applied + c.failed, 0)
     let attemptsThisCampaign = 0
 
     // Job boards whose "apply_url" is their own listing page, not a direct ATS URL.
@@ -562,8 +566,8 @@ export async function POST(req: Request) {
 
     for (const job of scrapedJobs) {
       if (appliedThisCampaign >= campaignRemaining) break
-      // Hard OOM cap: count every Playwright attempt (success + failure)
-      if (globalAttempts + attemptsThisCampaign >= MAX_APPLIES_PER_RUN) break
+      // Hard OOM cap (per-campaign): count every Playwright attempt (success + failure)
+      if (attemptsThisCampaign >= MAX_APPLIES_PER_RUN) break
 
       const applyUrl = job.apply_url || job.url
       if (!applyUrl) {
