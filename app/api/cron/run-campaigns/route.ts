@@ -120,6 +120,20 @@ function toJobSource(
   return map[scraperBoard.toLowerCase()] ?? 'CAREEROPS'
 }
 
+// ── Keyword matching (mirrors Python greenhouse._keyword_matches) ─────────────
+//
+// Returns true if ANY word from `keywords` appears in `title`.
+// Used to filter the run-level Greenhouse cache per campaign without re-querying
+// the API — this avoids Greenhouse rate-limiting when multiple campaigns run
+// sequentially in the same cron invocation.
+
+function keywordMatches(title: string, keywords: string): boolean {
+  if (!keywords) return true
+  const words = keywords.toLowerCase().split(/[\s,/\-]+/).filter(Boolean)
+  const titleLower = title.toLowerCase()
+  return words.some((w) => titleLower.includes(w))
+}
+
 // ── Scraper call ──────────────────────────────────────────────────────────────
 
 async function scrapeBoard(
@@ -236,6 +250,26 @@ export async function POST(req: Request) {
 
   const careerOpsCampaigns = campaigns.filter((c) => c.source === 'CAREEROPS')
   const linkedInCampaigns = campaigns.filter((c) => c.source === 'LINKEDIN')
+
+  // ── Pre-scrape Greenhouse ONCE for the entire run ─────────────────────────
+  //
+  // Problem: when two CAREEROPS campaigns run sequentially in the same cron
+  // invocation, both call the Greenhouse API (20 company boards each).
+  // The second batch hits Greenhouse immediately after the first — the API
+  // rate-limits the VPS IP and returns empty/error responses, so Campaign 2
+  // ends up with near-zero jobs.
+  //
+  // Fix: query all 20 Greenhouse boards ONE time per run with no keyword filter
+  // (returns ALL ~200 open roles).  Each campaign then filters this shared
+  // result set client-side using keywordMatches() — no repeated API calls.
+  //
+  // Only bother if there is at least one CAREEROPS campaign that needs jobs.
+  let runGreenhouseCache: (ScrapedJob & { board: string })[] = []
+  if (careerOpsCampaigns.length > 0) {
+    const rawGreenhouse = await scrapeBoard(workerUrl, workerSecret, 'greenhouse', '', '')
+    runGreenhouseCache = rawGreenhouse.map((j) => ({ ...j, board: 'greenhouse' }))
+    console.log('[run-campaigns] greenhouse pre-scrape', { total: runGreenhouseCache.length })
+  }
 
   const summary: Array<{
     campaignId: string
@@ -498,9 +532,12 @@ export async function POST(req: Request) {
     ])).slice(0, 3)
 
     const allScrapes = await Promise.all([
-      // Greenhouse — direct ATS apply URLs (PRIMARY source)
-      scrapeBoard(workerUrl, workerSecret, 'greenhouse', keyword, location)
-        .then((j) => j.map((x) => ({ ...x, board: 'greenhouse' }))),
+      // Greenhouse — use the run-level pre-scraped cache (filtered client-side).
+      // This avoids a second round of 20 concurrent Greenhouse API calls that
+      // would trigger rate-limiting when multiple campaigns run sequentially.
+      Promise.resolve(
+        runGreenhouseCache.filter((j) => keywordMatches(j.title, keyword))
+      ),
       // Adzuna (with keys) — direct company apply URLs when configured
       scrapeBoard(workerUrl, workerSecret, 'adzuna', keyword, location)
         .then((j) => j.map((x) => ({ ...x, board: 'adzuna' }))),
