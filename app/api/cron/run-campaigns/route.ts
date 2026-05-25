@@ -41,8 +41,17 @@ import { isResumeQualityV2 } from '@/lib/flags'
  *
  * OOM guard: attemptsThisCampaign >= MAX_APPLIES_PER_CAMPAIGN breaks the
  * inner loop so a single runaway campaign can never exhaust VPS memory.
+ *
+ * TIMING NOTE (multi-campaign runs):
+ * Overhead per run = pre-scrape (~12 s) + per-campaign setup/scraping (~12 s each).
+ * Each Playwright attempt takes ~16 s on the VPS.
+ * With Cloudflare's ~100 s proxy timeout and RUN_BUDGET_MS = 82 s, the total
+ * Playwright budget is roughly (82 - 12_prescrape - N * 12_setup) / 16_per_attempt.
+ * For 2 campaigns that works out to ≈ 3.6 total attempts.  Capping each campaign
+ * at 2 keeps Campaign 1 to ~56 s elapsed so Campaign 2 can still start
+ * a Playwright attempt (~68 s < 82 s) before the wall-clock guard fires.
  */
-const MAX_APPLIES_PER_CAMPAIGN = 3
+const MAX_APPLIES_PER_CAMPAIGN = 2
 
 /**
  * Global wall-clock budget (ms) for the entire cron run.
@@ -417,7 +426,6 @@ export async function POST(req: Request) {
       failed: number
       skipped: number
       error?: string
-      _debug?: { keyword: string; totalScraped: number; greenhouseMatched: number }
     } = {
       campaignId: campaign.id,
       campaignName: campaign.name,
@@ -589,9 +597,12 @@ export async function POST(req: Request) {
       }
     }
 
-    const greenhouseMatched = runGreenhouseCache.filter((j) => keywordMatches(j.title, keyword)).length
-    campaignLog._debug = { keyword, totalScraped: scrapedJobs.length, greenhouseMatched }
-    console.log('[run-campaigns] scraped', { campaign: campaign.id, total: scrapedJobs.length, keyword, greenhouseMatched })
+    console.log('[run-campaigns] scraped', {
+      campaign: campaign.id,
+      total: scrapedJobs.length,
+      keyword,
+      greenhouseMatched: runGreenhouseCache.filter((j) => keywordMatches(j.title, keyword)).length,
+    })
 
     // Apply to each new job up to the remaining limit.
     //
