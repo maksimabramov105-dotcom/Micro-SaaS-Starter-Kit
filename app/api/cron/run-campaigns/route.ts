@@ -35,12 +35,25 @@ import { isResumeQualityV2 } from '@/lib/flags'
 // ── Config ────────────────────────────────────────────────────────────────────
 
 /**
- * Hard cap on Playwright applications per cron run.
- * Each application can take up to 120s; 3 × 120s = 360s — safely under the
- * 600s GitHub Actions curl timeout.  The 2-hourly cron runs 12× per day,
- * so campaigns can reach up to 36 applications/day across all triggers.
+ * Hard cap on Playwright applications PER CAMPAIGN per cron run.
+ * Each campaign independently gets up to this many attempts (success or fail).
+ * Campaigns run sequentially so peak browser concurrency is always 1.
+ *
+ * OOM guard: attemptsThisCampaign >= MAX_APPLIES_PER_CAMPAIGN breaks the
+ * inner loop so a single runaway campaign can never exhaust VPS memory.
  */
-const MAX_APPLIES_PER_RUN = 3
+const MAX_APPLIES_PER_CAMPAIGN = 3
+
+/**
+ * Global wall-clock budget (ms) for the entire cron run.
+ * Cloudflare's reverse-proxy read timeout is ~100 s; we stop launching new
+ * Playwright attempts at 82 s to guarantee the endpoint returns a JSON body
+ * before Cloudflare drops the connection with a 524 error.
+ *
+ * Any already-running Playwright call is allowed to finish; only new ones
+ * are blocked once the budget expires.
+ */
+const RUN_BUDGET_MS = 82_000
 
 // ── Types from worker API ─────────────────────────────────────────────────────
 
@@ -181,6 +194,7 @@ async function careeropsApply(
 
 export async function POST(req: Request) {
   const runAt = new Date().toISOString()
+  const runStart = Date.now()
   console.log('[run-campaigns] cron fired', { runAt })
 
   // ── Auth ──────────────────────────────────────────────────────────────────
@@ -541,18 +555,13 @@ export async function POST(req: Request) {
 
     // Apply to each new job up to the remaining limit.
     //
-    // TWO separate counters:
-    //   appliedThisCampaign — successful SUBMITTED apps (used for daily-limit tracking)
-    //   attemptsThisCampaign — every Playwright call, success or fail (used for OOM cap)
+    // TWO per-campaign counters:
+    //   appliedThisCampaign  — successful SUBMITTED apps (daily-limit tracking)
+    //   attemptsThisCampaign — every Playwright attempt, success or fail (OOM cap)
     //
-    // MAX_APPLIES_PER_RUN is a PER-CAMPAIGN cap (not global).  Each campaign gets its
-    // own independent Playwright budget.  Campaigns run sequentially (not in parallel),
-    // so peak concurrency is always 1 browser instance — the OOM concern is a single
-    // campaign burning unlimited attempts, which attemptsThisCampaign guards against.
-    //
-    // Bug fixed: previously globalAttempts (from earlier campaigns in the same run)
-    // was added here, causing the second campaign to hit the cap immediately whenever
-    // the first campaign used all 3 slots — resulting in applied:0 failed:0 skipped:0.
+    // The inner loop also checks the global RUN_BUDGET_MS wall-clock guard so the
+    // endpoint always returns within Cloudflare's ~100 s proxy timeout when there
+    // are multiple campaigns in a single run.
     let appliedThisCampaign = 0
     let attemptsThisCampaign = 0
 
@@ -566,8 +575,14 @@ export async function POST(req: Request) {
 
     for (const job of scrapedJobs) {
       if (appliedThisCampaign >= campaignRemaining) break
-      // Hard OOM cap (per-campaign): count every Playwright attempt (success + failure)
-      if (attemptsThisCampaign >= MAX_APPLIES_PER_RUN) break
+      // Per-campaign OOM cap: stop if this campaign has used its Playwright budget
+      if (attemptsThisCampaign >= MAX_APPLIES_PER_CAMPAIGN) break
+      // Global wall-clock guard: stop launching new attempts if we are near the
+      // Cloudflare proxy timeout — let the endpoint return cleanly instead of 524.
+      if (Date.now() - runStart >= RUN_BUDGET_MS) {
+        console.log('[run-campaigns] time budget reached, stopping', { elapsed: Date.now() - runStart })
+        break
+      }
 
       const applyUrl = job.apply_url || job.url
       if (!applyUrl) {
