@@ -91,21 +91,60 @@ async def _fill(page: Page, selector: str, value: str) -> bool:
     return False
 
 
-async def _upload_resume(page: Page, selector: str, resume_text: str) -> bool:
-    """Write resume to a temporary .txt file and upload it via file input."""
+def _render_resume_pdf(resume_text: str) -> str:
+    """
+    Render resume_text to a real PDF and return the temp file path.
+
+    Most ATS (Greenhouse, Lever, Workable…) validate the uploaded file is a
+    real document — a .txt is silently rejected, which was a key reason
+    submissions never completed (P19).  Falls back to .txt only if reportlab
+    is unavailable.
+    """
     try:
+        from reportlab.lib.pagesizes import letter
+        from reportlab.pdfgen import canvas as _canvas
+
+        fd, path = tempfile.mkstemp(suffix=".pdf")
+        os.close(fd)
+        c = _canvas.Canvas(path, pagesize=letter)
+        width, height = letter
+        y = height - 72
+        for raw_line in resume_text.split("\n"):
+            # naive wrap at ~95 chars so long lines don't overflow the page
+            line = raw_line if raw_line else " "
+            while line:
+                chunk, line = line[:95], line[95:]
+                c.drawString(72, y, chunk)
+                y -= 15
+                if y < 72:
+                    c.showPage()
+                    y = height - 72
+        c.save()
+        return path
+    except Exception as exc:  # reportlab missing or render error → .txt fallback
+        logger.warning("careerops.pdf_render_failed", error=str(exc))
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".txt", delete=False, encoding="utf-8"
         ) as f:
             f.write(resume_text)
-            tmp_path = f.name
+            return f.name
+
+
+async def _upload_resume(page: Page, selector: str, resume_text: str) -> bool:
+    """Render the resume to a PDF and upload it via the file input."""
+    tmp_path = _render_resume_pdf(resume_text)
+    try:
         await page.set_input_files(selector, tmp_path)
-        os.unlink(tmp_path)
-        await page.wait_for_timeout(1000)
+        await page.wait_for_timeout(1200)
         return True
     except Exception as exc:
         logger.warning("careerops.resume_upload_failed", selector=selector, error=str(exc))
         return False
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
 
 
 async def _click_apply_button(page: Page) -> bool:
@@ -132,6 +171,250 @@ async def _fill_standard_fields(page: Page, user_data: dict, field_map: dict) ->
     for sel, val in field_map.items():
         if val:
             await _fill(page, sel, val)
+
+
+# Confirmation phrases ATS platforms show after a *successful* submission.
+_SUCCESS_MARKERS = [
+    "thank you for applying",
+    "thank you for your application",
+    "thank you for your interest",
+    "application has been submitted",
+    "your application was submitted",
+    "your application has been received",
+    "we have received your application",
+    "application received",
+    "successfully submitted",
+    "thanks for applying",
+    "submission received",
+    "you have already applied",  # treat as already-submitted (still success-ish)
+]
+
+# Validation-error phrases that mean the submit was REJECTED (still on the form).
+_ERROR_MARKERS = [
+    "is required",
+    "this field is required",
+    "please complete",
+    "please enter",
+    "please select",
+    "cannot be blank",
+    "fix the errors",
+    "required field",
+]
+
+
+async def _verify_submitted(page: Page) -> bool:
+    """
+    Return True only when the page shows real evidence the application was
+    accepted — a confirmation message, a confirmation URL, or the application
+    form having disappeared.  This replaces the old "clicked submit == success"
+    assumption that produced false SUBMITTED records (P19, 2026-05-30).
+
+    Conservative by design: when in doubt it returns False so the application
+    is recorded as failed rather than a phantom success.
+    """
+    try:
+        await page.wait_for_timeout(1200)
+        body = (await page.inner_text("body")).lower()
+    except Exception:
+        body = ""
+
+    # 1. Explicit confirmation text anywhere on the page.
+    if any(m in body for m in _SUCCESS_MARKERS):
+        return True
+
+    # 2. Confirmation-style URL (Greenhouse/Lever redirect to a thanks page).
+    try:
+        if re.search(r"(thank|confirm|success|submitted|/thanks)", page.url, re.I):
+            return True
+    except Exception:
+        pass
+
+    # 3. Visible validation errors => definitely NOT submitted.
+    if any(m in body for m in _ERROR_MARKERS):
+        return False
+
+    # 4. Heuristic: the application form's submit button is gone AND no
+    #    required fields remain visible — strong signal the form was accepted.
+    try:
+        remaining = await page.evaluate("""() => {
+            const submit = document.querySelector('input[type=submit], button[type=submit]');
+            const reqEmpty = Array.from(document.querySelectorAll('input,select,textarea'))
+                .filter(e => (e.required || e.getAttribute('aria-required')==='true')
+                    && e.type !== 'hidden' && e.offsetParent !== null
+                    && (!e.value || e.value.trim()===''));
+            return { hasSubmit: !!submit, reqEmpty: reqEmpty.length };
+        }""")
+        if not remaining.get("hasSubmit") and remaining.get("reqEmpty", 1) == 0:
+            return True
+    except Exception:
+        pass
+
+    return False
+
+
+def _pick_answer(label: str, options: list[str]) -> Optional[str]:
+    """
+    Choose the best option text for a screening/EEO question, given its label.
+    Conservative, compliance-safe defaults (decline to self-identify; authorized
+    to work = yes; visa sponsorship = no).  Returns None when no option fits.
+    """
+    L = label.lower()
+
+    def find(*subs: str) -> Optional[str]:
+        for s in subs:
+            for o in options:
+                if s in o.lower():
+                    return o
+        return None
+
+    decline = find(
+        "decline", "prefer not", "don't wish", "do not wish",
+        "not to disclose", "not to answer", "not to identify", "not to specify",
+    )
+    if any(k in L for k in ["authoriz", "eligible to work", "legally authorized", "right to work"]):
+        return find("yes") or (options[1] if len(options) > 1 else None)
+    if any(k in L for k in ["sponsor", "visa", "immigration support"]):
+        return find("no, i do not", "no, i will not", "no") or (options[1] if len(options) > 1 else None)
+    if "hear about" in L or "how did you find" in L:
+        return find("linkedin", "job board", "company website", "online", "other") or (options[1] if len(options) > 1 else None)
+    if any(k in L for k in ["acknowledge", "hybrid", "onsite", "on-site", "relocat", "commute", "comfortable", "willing", "intend to work", "able to work"]):
+        return find("yes", "i acknowledge", "i agree", "i understand", "remote") or (options[1] if len(options) > 1 else None)
+    if any(k in L for k in ["former employer", "non-compete", "subject to any agreement", "restrictive covenant"]):
+        return find("no") or (options[1] if len(options) > 1 else None)
+    if any(k in L for k in ["years", "minimum of", "do you have", "experience with", "proficient"]):
+        # Affirmative for "do you have X experience" screeners.
+        return find("yes") or (options[1] if len(options) > 1 else None)
+    if any(k in L for k in ["gender", "race", "ethnic", "sexual orientation", "veteran",
+                            "disability", "identify", "lgbt", "transgender", "pronoun",
+                            "first-generation", "hispanic", "latino"]):
+        return decline or find("i am not", "no") or (options[-1] if options else None)
+    return decline or (options[1] if len(options) > 1 else (options[0] if options else None))
+
+
+async def _answer_react_selects(page: Page) -> int:
+    """
+    Answer every required react-select (Greenhouse/modern ATS) combobox by
+    opening it, reading the rendered options, and clicking the best match.
+    Returns the number of selects answered.
+    """
+    containers = page.locator(".select__container")
+    answered = 0
+    try:
+        n = await containers.count()
+    except Exception:
+        return 0
+    for i in range(n):
+        cont = containers.nth(i)
+        try:
+            inp = cont.locator('input[role="combobox"]').first
+            if await inp.count() == 0:
+                continue
+            # Skip Country / Location autocompletes — handled separately by typing.
+            field_id = (await inp.get_attribute("id")) or ""
+            if field_id in ("country", "candidate-location"):
+                continue
+            label = ""
+            lab = cont.locator("label").first
+            if await lab.count() > 0:
+                label = (await lab.inner_text()).strip()
+            control = cont.locator(".select__control").first
+            await control.click()
+            await page.wait_for_timeout(450)
+            opts = page.locator(".select__option")
+            oc = await opts.count()
+            texts = []
+            for k in range(min(oc, 30)):
+                try:
+                    texts.append((await opts.nth(k).inner_text()).strip())
+                except Exception:
+                    pass
+            choice = _pick_answer(label, texts)
+            clicked = False
+            if choice:
+                target = page.locator(f'.select__option:has-text("{choice[:30]}")').first
+                if await target.count() > 0:
+                    await target.click()
+                    answered += 1
+                    clicked = True
+            if not clicked:
+                await page.keyboard.press("Escape")
+            await page.wait_for_timeout(200)
+        except Exception:
+            try:
+                await page.keyboard.press("Escape")
+            except Exception:
+                pass
+    return answered
+
+
+async def _fill_autocomplete(page: Page, field_id: str, value: str) -> bool:
+    """Fill a Greenhouse autocomplete combobox (Country / Location) by typing
+    then selecting the first suggested option."""
+    try:
+        inp = page.locator(f'#{field_id}').first
+        if await inp.count() == 0 or not value:
+            return False
+        await inp.click()
+        await inp.fill(value)
+        await page.wait_for_timeout(1000)
+        opt = page.locator('.select__option').first
+        if await opt.count() > 0:
+            await opt.click()
+            return True
+        # fall back to keyboard select
+        await page.keyboard.press("Enter")
+        return True
+    except Exception:
+        return False
+
+
+async def _fill_questions_by_label(page: Page, mapping: list[tuple[list[str], str]]) -> None:
+    """
+    Fill per-job `question_*` text inputs by matching their label text.
+    `mapping` is a list of (keywords, value).  First keyword match wins.
+    """
+    try:
+        handles = await page.evaluate("""() => {
+            const out = [];
+            document.querySelectorAll('input[id^="question_"], textarea[id^="question_"]').forEach(e => {
+                if (e.offsetParent === null) return;
+                if (e.getAttribute('role') === 'combobox') return;  // react-select handled elsewhere
+                let lab = '';
+                if (e.labels && e.labels[0]) lab = e.labels[0].innerText;
+                if (!lab && e.getAttribute('aria-labelledby')) {
+                    const l = document.getElementById(e.getAttribute('aria-labelledby'));
+                    if (l) lab = l.innerText;
+                }
+                out.push({ id: e.id, label: (lab||'').toLowerCase() });
+            });
+            return out;
+        }""")
+    except Exception:
+        return
+    for h in handles:
+        for keywords, value in mapping:
+            if value and any(k in h["label"] for k in keywords):
+                try:
+                    await page.locator(f'#{h["id"]}').first.fill(value)
+                except Exception:
+                    pass
+                break
+
+
+async def _check_required_boxes(page: Page) -> None:
+    """Tick any unchecked checkboxes (consent / acknowledgement gates)."""
+    boxes = page.locator('input[type="checkbox"]')
+    try:
+        n = await boxes.count()
+    except Exception:
+        return
+    for i in range(n):
+        b = boxes.nth(i)
+        try:
+            if not await b.is_checked():
+                await b.check(timeout=1500)
+        except Exception:
+            pass
 
 
 class CareerOpsApplicator:
@@ -194,23 +477,57 @@ class CareerOpsApplicator:
     # ── Greenhouse ───────────────────────────────────────────────────────────
 
     async def apply_greenhouse(self, job_url: str, user_data: dict) -> dict:
-        """Greenhouse: boards.greenhouse.io/*/jobs/* — standard id-keyed form."""
+        """
+        Greenhouse — both classic (boards.greenhouse.io) and the modern React
+        embedded form (job-boards.greenhouse.io).
+
+        Modern forms require: standard fields by id, Country/Location
+        autocomplete comboboxes, per-job `question_*` text inputs (matched by
+        label), react-select screening/EEO questions, consent checkboxes, and a
+        real PDF resume.  We fill all of these, then only report `submitted`
+        when _verify_submitted confirms acceptance (P19).
+        """
         page = await self.context.new_page()
         try:
-            await page.goto(job_url, timeout=30000)
-            await page.wait_for_load_state("networkidle", timeout=15000)
-            await page.wait_for_timeout(random.randint(1000, 2000))
+            # domcontentloaded (not "load") — the modern SPA form often never
+            # fires a full load event; then give React time to render.
+            await page.goto(job_url, timeout=45000, wait_until="domcontentloaded")
+            try:
+                await page.wait_for_load_state("networkidle", timeout=8000)
+            except Exception:
+                pass
+            await page.wait_for_timeout(random.randint(2000, 3000))
 
-            await _fill(page, "#first_name", user_data.get("first_name", ""))
-            await _fill(page, "#last_name", user_data.get("last_name", ""))
-            await _fill(page, "#email", user_data.get("email", ""))
+            first = user_data.get("first_name", "")
+            last = user_data.get("last_name", "")
+            # Standard fields by id, with autocomplete-attribute fallback.
+            if not await _fill(page, "#first_name", first):
+                await _fill(page, 'input[autocomplete="given-name"]', first)
+            if not await _fill(page, "#last_name", last):
+                await _fill(page, 'input[autocomplete="family-name"]', last)
+            if not await _fill(page, "#email", user_data.get("email", "")):
+                await _fill(page, 'input[autocomplete="email"]', user_data.get("email", ""))
             await _fill(page, "#phone", user_data.get("phone", ""))
 
-            linkedin = user_data.get("linkedin_url", "")
-            for sel in ['input[name*="linkedin"]', 'input[id*="linkedin"]']:
-                if linkedin and await _fill(page, sel, linkedin):
-                    break
+            # Country / Location autocomplete comboboxes.
+            await _fill_autocomplete(page, "country", user_data.get("country", "") or "United States")
+            await _fill_autocomplete(
+                page, "candidate-location",
+                user_data.get("location", "") or "Remote",
+            )
 
+            # Per-job question_* text inputs, matched by label.
+            full_name = f"{first} {last}".strip()
+            await _fill_questions_by_label(page, [
+                (["linkedin"], user_data.get("linkedin_url", "")),
+                (["preferred first name", "preferred name"], first),
+                (["website", "portfolio"], user_data.get("portfolio_url", "")),
+                (["where do you intend to work", "where will you work", "location"], user_data.get("location", "") or "Remote"),
+                (["zip", "postal"], "94103"),
+                (["full name", "your name"], full_name),
+            ])
+
+            # Resume (real PDF).
             resume_text = user_data.get("resume_text", "")
             if resume_text:
                 for sel in [
@@ -222,18 +539,30 @@ class CareerOpsApplicator:
                         await _upload_resume(page, sel, resume_text)
                         break
 
+            # Cover letter (text field if present).
             cover_letter = user_data.get("cover_letter", "")
             for sel in ['textarea[name*="cover"]', 'textarea[id*="cover"]', '#cover_letter']:
                 if cover_letter and await _fill(page, sel, cover_letter[:2000]):
                     break
 
+            # Screening / EEO react-select questions + consent checkboxes.
+            answered = await _answer_react_selects(page)
+            await _check_required_boxes(page)
+            logger.info("careerops.greenhouse.filled", url=job_url, selects_answered=answered)
+
             submit = page.locator('input[type="submit"], button[type="submit"]').first
             if await submit.count() > 0:
                 await submit.click()
-                await page.wait_for_load_state("networkidle", timeout=15000)
-                await page.wait_for_timeout(2000)
-                logger.info("careerops.greenhouse.submitted", url=job_url)
-                return {"status": "submitted", "url": job_url, "ats": "greenhouse"}
+                try:
+                    await page.wait_for_load_state("networkidle", timeout=12000)
+                except Exception:
+                    pass
+                if await _verify_submitted(page):
+                    logger.info("careerops.greenhouse.submitted", url=job_url)
+                    return {"status": "submitted", "url": job_url, "ats": "greenhouse"}
+                logger.warning("careerops.greenhouse.submit_unconfirmed", url=job_url)
+                return {"status": "error", "url": job_url, "ats": "greenhouse",
+                        "error": "submission not confirmed (required fields likely incomplete)"}
 
             return {"status": "form_not_found", "url": job_url, "ats": "greenhouse"}
         finally:
@@ -291,9 +620,12 @@ class CareerOpsApplicator:
                 if await btn.count() > 0:
                     await btn.click()
                     await page.wait_for_load_state("networkidle", timeout=15000)
-                    await page.wait_for_timeout(2000)
-                    logger.info("careerops.lever.submitted", url=job_url)
-                    return {"status": "submitted", "url": job_url, "ats": "lever"}
+                    if await _verify_submitted(page):
+                        logger.info("careerops.lever.submitted", url=job_url)
+                        return {"status": "submitted", "url": job_url, "ats": "lever"}
+                    logger.warning("careerops.lever.submit_unconfirmed", url=job_url)
+                    return {"status": "error", "url": job_url, "ats": "lever",
+                            "error": "submission not confirmed"}
 
             return {"status": "form_not_found", "url": job_url, "ats": "lever"}
         finally:
@@ -357,13 +689,16 @@ class CareerOpsApplicator:
                     if await btn.count() > 0:
                         await btn.click()
                         await page.wait_for_load_state("networkidle", timeout=10000)
-                        await page.wait_for_timeout(1500)
-                        logger.info("careerops.workable.submitted", url=job_url)
-                        return {
-                            "status": "submitted",
-                            "url": job_url,
-                            "ats": "workable",
-                        }
+                        if await _verify_submitted(page):
+                            logger.info("careerops.workable.submitted", url=job_url)
+                            return {
+                                "status": "submitted",
+                                "url": job_url,
+                                "ats": "workable",
+                            }
+                        logger.warning("careerops.workable.submit_unconfirmed", url=job_url)
+                        return {"status": "error", "url": job_url, "ats": "workable",
+                                "error": "submission not confirmed"}
 
                 # Then try Next / Continue
                 advanced = False
@@ -418,9 +753,12 @@ class CareerOpsApplicator:
             if await submit.count() > 0:
                 await submit.click()
                 await page.wait_for_load_state("networkidle", timeout=15000)
-                await page.wait_for_timeout(2000)
-                logger.info("careerops.smartrecruiters.submitted", url=job_url)
-                return {"status": "submitted", "url": job_url, "ats": "smartrecruiters"}
+                if await _verify_submitted(page):
+                    logger.info("careerops.smartrecruiters.submitted", url=job_url)
+                    return {"status": "submitted", "url": job_url, "ats": "smartrecruiters"}
+                logger.warning("careerops.smartrecruiters.submit_unconfirmed", url=job_url)
+                return {"status": "error", "url": job_url, "ats": "smartrecruiters",
+                        "error": "submission not confirmed"}
 
             return {"status": "form_not_found", "url": job_url, "ats": "smartrecruiters"}
         finally:
@@ -482,9 +820,12 @@ class CareerOpsApplicator:
                     if await btn.count() > 0:
                         await btn.click()
                         await page.wait_for_load_state("networkidle", timeout=15000)
-                        await page.wait_for_timeout(2000)
-                        logger.info("careerops.jobvite.submitted", url=job_url)
-                        return {"status": "submitted", "url": job_url, "ats": "jobvite"}
+                        if await _verify_submitted(page):
+                            logger.info("careerops.jobvite.submitted", url=job_url)
+                            return {"status": "submitted", "url": job_url, "ats": "jobvite"}
+                        logger.warning("careerops.jobvite.submit_unconfirmed", url=job_url)
+                        return {"status": "error", "url": job_url, "ats": "jobvite",
+                                "error": "submission not confirmed"}
 
                 # Try next page
                 advanced = False
@@ -561,9 +902,12 @@ class CareerOpsApplicator:
             if await submit.count() > 0:
                 await submit.click()
                 await page.wait_for_load_state("networkidle", timeout=15000)
-                await page.wait_for_timeout(2000)
-                logger.info("careerops.ashby.submitted", url=job_url)
-                return {"status": "submitted", "url": job_url, "ats": "ashby"}
+                if await _verify_submitted(page):
+                    logger.info("careerops.ashby.submitted", url=job_url)
+                    return {"status": "submitted", "url": job_url, "ats": "ashby"}
+                logger.warning("careerops.ashby.submit_unconfirmed", url=job_url)
+                return {"status": "error", "url": job_url, "ats": "ashby",
+                        "error": "submission not confirmed"}
 
             return {"status": "form_not_found", "url": job_url, "ats": "ashby"}
         finally:
@@ -679,31 +1023,36 @@ class CareerOpsApplicator:
                 if await btn.count() > 0:
                     await btn.click()
                     await page.wait_for_load_state("networkidle", timeout=15000)
-                    await page.wait_for_timeout(2000)
-                    logger.info(
-                        "careerops.generic.submitted",
-                        url=job_url,
-                        fields_filled=filled,
-                    )
-                    return {
-                        "status": "submitted",
-                        "url": job_url,
-                        "ats": "generic",
-                        "fields_filled": filled,
-                    }
+                    if await _verify_submitted(page):
+                        logger.info(
+                            "careerops.generic.submitted",
+                            url=job_url,
+                            fields_filled=filled,
+                        )
+                        return {
+                            "status": "submitted",
+                            "url": job_url,
+                            "ats": "generic",
+                            "fields_filled": filled,
+                        }
+                    logger.warning("careerops.generic.submit_unconfirmed", url=job_url)
+                    return {"status": "error", "url": job_url, "ats": "generic",
+                            "error": "submission not confirmed", "fields_filled": filled}
 
             # Last resort: any submit button
             fallback = page.locator('button[type="submit"], input[type="submit"]').first
             if await fallback.count() > 0:
                 await fallback.click()
                 await page.wait_for_load_state("networkidle", timeout=15000)
-                await page.wait_for_timeout(2000)
-                return {
-                    "status": "submitted",
-                    "url": job_url,
-                    "ats": "generic",
-                    "fields_filled": filled,
-                }
+                if await _verify_submitted(page):
+                    return {
+                        "status": "submitted",
+                        "url": job_url,
+                        "ats": "generic",
+                        "fields_filled": filled,
+                    }
+                return {"status": "error", "url": job_url, "ats": "generic",
+                        "error": "submission not confirmed", "fields_filled": filled}
 
             return {"status": "form_not_found", "url": job_url, "ats": "generic"}
         finally:
