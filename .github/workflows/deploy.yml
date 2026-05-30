@@ -141,6 +141,12 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key:      ${{ secrets.VPS_SSH_KEY }}
           envs: GITHUB_SHA,GHCR_TOKEN
+          # appleboy/ssh-action defaults command_timeout to 10m. On this VPS the
+          # web image pull (~927 MB) over a slow link + near-full disk routinely
+          # takes 8-10 min on its own, tripping the default and aborting the
+          # deploy mid-pull. Raise to 30m so the full pull+migrate+smoke sequence
+          # always completes. (See deploy failures 2026-05-30.)
+          command_timeout: 30m
           script: |
             export IMAGE_TAG="${GITHUB_SHA}"
             export OWNER="${{ env.OWNER }}"
