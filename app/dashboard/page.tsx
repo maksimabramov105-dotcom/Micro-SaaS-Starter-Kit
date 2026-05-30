@@ -1,4 +1,5 @@
 import { getServerSession } from 'next-auth'
+import { revalidatePath } from 'next/cache'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getPlanByPriceId } from '@/lib/pricing'
@@ -6,6 +7,34 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
+
+// Pause/resume an autoapply campaign.
+//
+// Runs as a Server Action invoked directly from the form (see CampaignToggleForm).
+// The previous implementation fetched /api/campaigns/[id]/toggle from inside a
+// server action — but a server-to-self fetch carries no session cookie, so the
+// route's getServerSession() returned null and the toggle silently 401'd.
+// Mutating the DB directly here keeps the user's session in scope and lets us
+// revalidate the dashboard so the button label flips immediately.
+async function toggleCampaign(id: string) {
+  'use server'
+  const session = await getServerSession(authOptions)
+  if (!session?.user) return
+
+  // Scope by userId so a user can only toggle their own campaigns.
+  const campaign = await prisma.autoApplyCampaign.findFirst({
+    where: { id, userId: session.user.id },
+    select: { id: true, isActive: true },
+  })
+  if (!campaign) return
+
+  await prisma.autoApplyCampaign.update({
+    where: { id: campaign.id },
+    data: { isActive: !campaign.isActive },
+  })
+
+  revalidatePath('/dashboard')
+}
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions)
@@ -254,15 +283,7 @@ function StatusBadge({ status }: { status: string }) {
 
 function CampaignToggleForm({ id, isActive }: { id: string; isActive: boolean }) {
   return (
-    <form
-      action={async () => {
-        'use server'
-        await fetch(
-          `${process.env.NEXT_PUBLIC_APP_URL}/api/campaigns/${id}/toggle`,
-          { method: 'POST' },
-        )
-      }}
-    >
+    <form action={toggleCampaign.bind(null, id)}>
       <Button type="submit" variant={isActive ? 'default' : 'outline'} size="sm">
         {isActive ? 'Pause' : 'Resume'}
       </Button>

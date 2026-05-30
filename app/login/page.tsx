@@ -16,7 +16,7 @@ const AUTH_ERRORS: Record<string, string> = {
   EmailCreateAccount: 'Could not create your account. Please try again.',
   Callback: 'Sign-in callback error. Please try again.',
   OAuthAccountNotLinked:
-    'This email is already registered with a different sign-in method. Try the other provider.',
+    'We had trouble linking that account. Please click your provider again — your accounts will be connected automatically.',
   EmailSignin: 'Failed to send the sign-in email. Please try again.',
   CredentialsSignin: 'Invalid credentials. Please check and try again.',
   SessionRequired: 'You must be signed in to access that page.',
