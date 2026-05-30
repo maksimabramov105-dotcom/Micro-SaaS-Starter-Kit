@@ -182,6 +182,31 @@ async def _is_already_applied(page: Any) -> bool:
     return False
 
 
+async def _verify_li_submitted(page: Any) -> bool:
+    """
+    Confirm LinkedIn actually accepted the application.  After a real submit
+    LinkedIn shows an "Application sent" / "Your application was sent to …"
+    confirmation modal.  Without this check the worker reported success the
+    moment the Easy Apply modal merely closed — which could equally mean an
+    error (P19: honest submission verification, matching careerops).
+    """
+    markers = [
+        'h2:has-text("Application sent")',
+        'h3:has-text("Application sent")',
+        ':text("Your application was sent")',
+        ':text("Application submitted")',
+        '.artdeco-modal__content:has-text("Application sent")',
+    ]
+    for sel in markers:
+        try:
+            el = await page.wait_for_selector(sel, timeout=2500)
+            if el:
+                return True
+        except Exception:
+            pass
+    return False
+
+
 async def _fill_contact_info(page: Any, user_profile: dict[str, Any]) -> None:
     """Fill in contact info fields if present on the current form step."""
     parts = user_profile.get("name", "").strip().split()
@@ -546,8 +571,15 @@ async def _apply_to_job_in_context(
             if submit_btn:
                 await submit_btn.click()
                 await asyncio.sleep(random.uniform(2.0, 3.0))
-                logger.info("linkedin.apply_to_job.submitted", url=job_url)
-                return {"success": True, "error": None, "job_url": job_url}
+                if await _verify_li_submitted(page):
+                    logger.info("linkedin.apply_to_job.submitted", url=job_url)
+                    return {"success": True, "error": None, "job_url": job_url}
+                logger.warning("linkedin.apply_to_job.submit_unconfirmed", url=job_url)
+                return {
+                    "success": False,
+                    "error": "submit_not_confirmed",
+                    "job_url": job_url,
+                }
 
             # Check for Next / Continue / Review
             next_btn = None
@@ -569,15 +601,24 @@ async def _apply_to_job_in_context(
                 await next_btn.click()
                 await asyncio.sleep(random.uniform(1.0, 2.0))
             else:
-                # No recognizable button — check if modal was dismissed
+                # No recognizable button — verify whether the application was
+                # actually sent before assuming anything (was previously a
+                # false "modal closed == success").
+                if await _verify_li_submitted(page):
+                    logger.info("linkedin.apply_to_job.submitted_no_button", url=job_url)
+                    return {"success": True, "error": None, "job_url": job_url}
                 try:
                     await page.wait_for_selector(".artdeco-modal", timeout=1500)
                 except PWTimeout:
-                    logger.info(
-                        "linkedin.apply_to_job.modal_closed_assuming_success",
+                    logger.warning(
+                        "linkedin.apply_to_job.closed_without_confirmation",
                         url=job_url,
                     )
-                    return {"success": True, "error": None, "job_url": job_url}
+                    return {
+                        "success": False,
+                        "error": "closed_without_confirmation",
+                        "job_url": job_url,
+                    }
                 break
 
         logger.warning("linkedin.apply_to_job.max_steps_reached", url=job_url)
