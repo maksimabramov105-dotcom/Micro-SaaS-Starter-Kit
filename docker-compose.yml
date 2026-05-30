@@ -112,6 +112,10 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://resumeai:resumeai@postgres:5432/resumeai
       WORKER_SECRET: ${WORKER_SECRET}
+      # Full-access Resend key so the CareerOps applicator can read the
+      # Greenhouse email-verification code from the inbound mailbox and
+      # complete applications (P19 email-code step).
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
       # Set to a proxy URL if the VPS cannot reach api.openai.com directly

@@ -40,12 +40,14 @@ P16 improvements (2026-05-19):
   - Ashby: dedicated handler (was falling through to apply_generic_form).
   - apply(): routes jobvite and ashby to their dedicated handlers.
 """
+import asyncio
 import random
 import re
 import tempfile
 import os
 from typing import Optional
 
+import httpx
 import structlog
 from playwright.async_api import async_playwright, BrowserContext, Page
 
@@ -417,6 +419,120 @@ async def _check_required_boxes(page: Page) -> None:
             pass
 
 
+async def _poll_greenhouse_code(
+    email: str, company: str, resend_key: str, since_iso: str,
+    attempts: int = 6, delay: float = 4.0,
+) -> Optional[str]:
+    """
+    Poll the Resend inbound mailbox for Greenhouse's "Security code for your
+    application to {company}" email and extract the code.
+
+    Greenhouse requires unauthenticated applicants to verify their email by
+    pasting a code, then resubmitting.  The code email arrives at the user's
+    inbox handle within ~5-20 s.  Returns the code string or None.
+    """
+    if not resend_key:
+        return None
+    headers = {"Authorization": f"Bearer {resend_key}"}
+    code_re = re.compile(r"application[:\s]*([A-Za-z0-9]{6,12})", re.I)
+    company_key = company.lower()[:6]
+    async with httpx.AsyncClient(timeout=15, headers=headers) as client:
+        for _ in range(attempts):
+            await asyncio.sleep(delay)
+            try:
+                r = await client.get("https://api.resend.com/emails/inbound")
+                rows = r.json().get("data", []) if r.status_code == 200 else []
+            except Exception:
+                continue
+            for m in rows:
+                to = ",".join(m.get("to") or []).lower()
+                frm = (m.get("from") or "").lower()
+                subj = (m.get("subject") or "").lower()
+                created = m.get("created_at", "")
+                if email.lower() not in to:
+                    continue
+                if "greenhouse" not in frm or "security code" not in subj:
+                    continue
+                if company_key and company_key not in subj:
+                    continue
+                if since_iso and created < since_iso:
+                    continue  # stale (from a previous attempt)
+                try:
+                    rd = await client.get(f"https://api.resend.com/emails/inbound/{m['id']}")
+                    body = rd.json()
+                    html = body.get("html") or body.get("text") or ""
+                except Exception:
+                    continue
+                text = re.sub(r"<[^>]+>", " ", html)
+                match = code_re.search(text)
+                if match:
+                    return match.group(1)
+    return None
+
+
+async def _complete_greenhouse_verification(
+    page: Page, email: str, company: str,
+) -> bool:
+    """
+    Handle Greenhouse's post-submit email-verification step: if a security-code
+    field appeared, fetch the emailed code from the inbox, enter it, resubmit,
+    and verify.  Returns True only on a confirmed submission.
+    """
+    # Greenhouse renders the security code as N single-character boxes
+    # (id="security-input-0" … "security-input-{n-1}", maxlength=1).
+    # Also support a single-field variant just in case.
+    boxes = page.locator('input[id^="security-input-"]')
+    single = None
+    try:
+        n_boxes = await boxes.count()
+    except Exception:
+        n_boxes = 0
+    if n_boxes == 0:
+        for sel in ['input#security_code', 'input[name*="security"]',
+                    'input[aria-label*="ecurity code"]']:
+            loc = page.locator(sel).first
+            try:
+                if await loc.count() > 0 and await loc.is_visible():
+                    single = loc
+                    break
+            except Exception:
+                pass
+        if single is None:
+            return False  # no security-code field present
+
+    resend_key = os.environ.get("RESEND_API_KEY", "")
+    import datetime
+    since_iso = (datetime.datetime.utcnow() - datetime.timedelta(minutes=3)).strftime("%Y-%m-%d %H:%M:%S")
+    code = await _poll_greenhouse_code(email, company, resend_key, since_iso)
+    if not code:
+        logger.warning("careerops.greenhouse.code_not_received", company=company)
+        return False
+
+    try:
+        if n_boxes > 0:
+            # Fill one character per box (focus + type so React registers each).
+            for i in range(min(n_boxes, len(code))):
+                box = page.locator(f'#security-input-{i}')
+                await box.click()
+                await box.fill(code[i])
+                await page.wait_for_timeout(80)
+        else:
+            await single.fill(code)
+        await page.wait_for_timeout(600)
+
+        submit = page.locator('input[type="submit"], button[type="submit"]').first
+        if await submit.count() > 0:
+            await submit.click()
+            try:
+                await page.wait_for_load_state("networkidle", timeout=12000)
+            except Exception:
+                pass
+            return await _verify_submitted(page)
+    except Exception as exc:
+        logger.warning("careerops.greenhouse.code_entry_failed", error=str(exc))
+    return False
+
+
 class CareerOpsApplicator:
     """Playwright-based form filler for major ATS platforms."""
 
@@ -508,6 +624,9 @@ class CareerOpsApplicator:
             if not await _fill(page, "#email", user_data.get("email", "")):
                 await _fill(page, 'input[autocomplete="email"]', user_data.get("email", ""))
             await _fill(page, "#phone", user_data.get("phone", ""))
+            # Preferred First Name is a standard #preferred_name input (not a
+            # question_* id) and is required on many boards — fill it directly.
+            await _fill(page, "#preferred_name", first)
 
             # Country / Location autocomplete comboboxes.
             await _fill_autocomplete(page, "country", user_data.get("country", "") or "United States")
@@ -521,10 +640,12 @@ class CareerOpsApplicator:
             await _fill_questions_by_label(page, [
                 (["linkedin"], user_data.get("linkedin_url", "")),
                 (["preferred first name", "preferred name"], first),
+                (["hear about", "how did you find", "how did you hear", "referred", "referral source"], "LinkedIn"),
                 (["website", "portfolio"], user_data.get("portfolio_url", "")),
-                (["where do you intend to work", "where will you work", "location"], user_data.get("location", "") or "Remote"),
+                (["where do you intend to work", "where will you work", "current location", "location (city"], user_data.get("location", "") or "Remote"),
                 (["zip", "postal"], "94103"),
-                (["full name", "your name"], full_name),
+                (["city"], user_data.get("location", "") or "Remote"),
+                (["full name", "your name", "legal name"], full_name),
             ])
 
             # Resume (real PDF).
@@ -560,9 +681,20 @@ class CareerOpsApplicator:
                 if await _verify_submitted(page):
                     logger.info("careerops.greenhouse.submitted", url=job_url)
                     return {"status": "submitted", "url": job_url, "ats": "greenhouse"}
+
+                # Greenhouse email-verification step: a security-code field
+                # appears and a code is emailed to the applicant. Fetch it from
+                # the inbox, enter it, and resubmit to finalize the application.
+                company = (user_data.get("_company") or "").strip()
+                if await _complete_greenhouse_verification(
+                    page, user_data.get("email", ""), company,
+                ):
+                    logger.info("careerops.greenhouse.submitted_after_code", url=job_url)
+                    return {"status": "submitted", "url": job_url, "ats": "greenhouse"}
+
                 logger.warning("careerops.greenhouse.submit_unconfirmed", url=job_url)
                 return {"status": "error", "url": job_url, "ats": "greenhouse",
-                        "error": "submission not confirmed (required fields likely incomplete)"}
+                        "error": "submission not confirmed (required fields or email code incomplete)"}
 
             return {"status": "form_not_found", "url": job_url, "ats": "greenhouse"}
         finally:

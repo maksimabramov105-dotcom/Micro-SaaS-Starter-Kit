@@ -707,10 +707,16 @@ export async function POST(req: Request) {
       //      let a slow call run past Cloudflare's ~100 s proxy timeout even
       //      when the budget check had already passed.
       //
-      // Why 50 s max: normal Playwright attempts take 7–20 s; 50 s is 2.5×
-      // the observed worst case and still fits safely under 100 s with overhead.
-      const PLAYWRIGHT_MIN_BUDGET = 15_000
-      const PLAYWRIGHT_MAX_TIMEOUT = 50_000
+      // A full Greenhouse application now includes the email-verification step
+      // (submit → fetch the emailed security code from the inbox → enter it →
+      // resubmit), which takes ~40-55 s end-to-end.  We therefore only START an
+      // application when ≥45 s of budget remains, and cap each attempt at 65 s.
+      // With RUN_BUDGET_MS=82 s this completes ~1 real application per run while
+      // staying under Cloudflare's ~100 s proxy timeout.
+      // NOTE: to scale beyond ~1 app/run, move the apply loop off this
+      // Cloudflare-fronted HTTP request onto a background queue/worker.
+      const PLAYWRIGHT_MIN_BUDGET = 45_000
+      const PLAYWRIGHT_MAX_TIMEOUT = 65_000
       const elapsedNow = Date.now() - runStart
       const remainingBudget = RUN_BUDGET_MS - elapsedNow
       if (remainingBudget < PLAYWRIGHT_MIN_BUDGET) {
@@ -797,8 +803,14 @@ export async function POST(req: Request) {
       // Mark URL as applied to prevent duplicates in this run
       appliedUrls.add(applyUrl)
 
-      // Call the CareerOps worker (timeout dynamically capped to remaining budget)
-      const result = await careeropsApply(workerUrl, workerSecret, applyUrl, userData, playwrightTimeout)
+      // Call the CareerOps worker (timeout dynamically capped to remaining budget).
+      // Pass the company so the worker can match Greenhouse's emailed security
+      // code ("Security code for your application to {company}") precisely.
+      const result = await careeropsApply(
+        workerUrl, workerSecret, applyUrl,
+        { ...userData, _company: job.company },
+        playwrightTimeout,
+      )
       attemptsThisCampaign++ // Always count every Playwright call for OOM cap
 
       if (result?.status === 'submitted') {
