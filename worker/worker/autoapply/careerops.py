@@ -145,11 +145,23 @@ def _render_resume_pdf(resume_text: str) -> str:
 
 
 async def _upload_resume(page: Page, selector: str, resume_text: str) -> bool:
-    """Render the resume to a PDF and upload it via the file input."""
+    """
+    Render the resume to a PDF and upload it via the file input, then VERIFY the
+    browser actually registered a file (some forms match a wrong/empty input or
+    re-render the widget, leaving "Resume is required").  Returns True only when
+    the input ends up holding a file.
+    """
     tmp_path = _render_resume_pdf(resume_text)
     try:
-        await page.set_input_files(selector, tmp_path)
-        await page.wait_for_timeout(1200)
+        loc = page.locator(selector).first
+        await loc.set_input_files(tmp_path)
+        await page.wait_for_timeout(1500)
+        try:
+            files = await loc.evaluate("el => (el.files && el.files.length) || 0")
+        except Exception:
+            files = 1  # can't introspect (detached) — assume it took
+        if not files:
+            return False
         return True
     except Exception as exc:
         logger.warning("careerops.resume_upload_failed", selector=selector, error=str(exc))
@@ -367,52 +379,218 @@ _LLM_SYSTEM = (
     "For multiple-choice questions you MUST return EXACTLY one of the provided "
     "options, copied verbatim. For free-text questions return a concise, "
     "professional answer (a number when a number is asked for; 1-2 sentences "
-    "otherwise). Respond with ONLY a JSON object mapping each question id to its "
-    "answer string. No prose, no markdown."
+    "otherwise). "
+    "Work-authorization questions: the candidate IS authorized to work and does "
+    "NOT require visa sponsorship. "
+    "Demographic / EEO / diversity questions (gender, race, ethnicity, veteran "
+    "status, disability, sexual orientation, pronouns): choose the option that "
+    "declines to self-identify (e.g. 'Decline to self-identify', 'I don't wish "
+    "to answer', 'Prefer not to say'). "
+    "For date questions return an ISO date (YYYY-MM-DD); for an availability / "
+    "start-date question a date about two weeks from now is sensible. "
+    "Respond with ONLY a JSON object mapping each question id to its answer "
+    "string. No prose, no markdown."
 )
+
+
+# Keyword groups the deterministic _pick_answer heuristic can resolve in a
+# compliance-safe way.  A field whose label matches one of these is answered
+# WITHOUT an LLM call (cheaper, and deterministic for compliance-sensitive
+# items like EEO/work-authorization); everything else is routed to the LLM.
+_STANDARD_Q_KEYWORDS = (
+    "authoriz", "eligible to work", "legally authorized", "right to work",
+    "sponsor", "visa", "immigration",
+    "hear about", "how did you find", "how did you hear", "referral", "referred",
+    "acknowledge", "i agree", "i understand", "consent",
+    "gender", "race", "ethnic", "sexual orientation", "veteran", "disability",
+    "identify", "lgbt", "transgender", "pronoun", "hispanic", "latino",
+    "first-generation",
+    "former employer", "non-compete", "restrictive covenant", "subject to any agreement",
+    "relocat", "commute", "willing to", "able to work", "hybrid", "onsite", "on-site",
+    "comfortable", "intend to work",
+)
+
+_PLACEHOLDER_OPT_RE = re.compile(r"^\s*(select|choose|please|--|\.\.\.)", re.I)
+
+
+def _is_standard_question(label: str) -> bool:
+    return any(k in (label or "").lower() for k in _STANDARD_Q_KEYWORDS)
+
+
+def _clean_options(options: list[str]) -> list[str]:
+    """Drop placeholder-ish options ('Select…', 'Choose…', '--') from a list."""
+    return [o for o in (options or []) if o and not _PLACEHOLDER_OPT_RE.match(o.strip())]
+
+
+async def _count_required_empty(page: Page) -> int:
+    """
+    Count visible required fields that are STILL empty across every control
+    type (text/select/native-select/react-select/radio/checkbox).  Logged
+    before submit purely to measure fill coverage.  Returns -1 on error.
+    """
+    try:
+        return await page.evaluate(r"""() => {
+            let n = 0;
+            document.querySelectorAll('input, textarea, select').forEach(e => {
+                if (e.offsetParent === null) return;
+                // Skip react-select internal comboboxes — their <input> value is
+                // always '' even when answered (the value lives in
+                // .select__single-value); counted via .select__container below.
+                if (e.getAttribute('role') === 'combobox') return;
+                const t = (e.type || '').toLowerCase();
+                if (['hidden','submit','button','file','image','reset'].includes(t)) return;
+                const req = e.required || e.getAttribute('aria-required') === 'true';
+                if (!req) return;
+                if (t === 'checkbox') { if (!e.checked) n++; return; }
+                if (t === 'radio') return;  // counted via groups below
+                if (e.tagName === 'SELECT') {
+                    const o = e.options[e.selectedIndex];
+                    if (!e.value || (o && o.disabled)) n++;
+                    return;
+                }
+                if (!e.value || !e.value.trim()) n++;
+            });
+            document.querySelectorAll('.select__container').forEach(c => {
+                const inp = c.querySelector('input[role=combobox]');
+                if (!inp || inp.offsetParent === null) return;
+                if (inp.getAttribute('aria-required') !== 'true') return;
+                if (!c.querySelector('.select__single-value, .select__multi-value')) n++;
+            });
+            const seen = {};
+            document.querySelectorAll('input[type=radio]').forEach(r => {
+                if (r.offsetParent === null) return;
+                const rg = r.closest('[role=radiogroup], fieldset');
+                const req = r.required || r.getAttribute('aria-required') === 'true'
+                    || (rg && rg.getAttribute('aria-required') === 'true');
+                if (!req) return;
+                const name = r.name || '';
+                const gk = name || ('__' + n);
+                if (seen[gk]) return; seen[gk] = true;
+                const group = name
+                    ? Array.from(document.querySelectorAll('input[type=radio]')).filter(x => x.name === name)
+                    : [r];
+                if (!group.some(g => g.checked)) n++;
+            });
+            return n;
+        }""")
+    except Exception:
+        return -1
 
 
 async def _collect_unanswered_required(page: Page) -> list[dict]:
     """
-    Gather still-empty required fields after the heuristic pass:
-    react-selects still showing a placeholder, and empty question_* text inputs.
-    For selects we open each once to capture its options.
+    Gather EVERY still-empty required field after the heuristic pass, tagging
+    each interactable element with a stable `data-cops-fid` marker so the answer
+    can be committed later regardless of whether it has an id.
+
+    Field kinds returned:
+      select        — react-select combobox still on placeholder
+      autocomplete  — Greenhouse Country / Location react-select combobox
+      native_select — native <select> still on its placeholder option
+      text          — text/email/tel/url/number/date <input> or <textarea>
+      radio         — radio group (required) with nothing selected
+
+    For react-selects we open each once to capture its options.
     """
-    base = await page.evaluate("""() => {
+    base = await page.evaluate(r"""() => {
         const out = [];
+        let i = 0;
+        const mark = (el) => { const id = 'f' + (i++); try { el.setAttribute('data-cops-fid', id); } catch (e) {} return id; };
+        const lab = (el, container) => {
+            let t = '';
+            if (el.labels && el.labels[0]) t = el.labels[0].innerText;
+            if (!t && el.getAttribute && el.getAttribute('aria-label')) t = el.getAttribute('aria-label');
+            if (!t && el.getAttribute && el.getAttribute('aria-labelledby')) {
+                const ref = document.getElementById(el.getAttribute('aria-labelledby').split(' ')[0]);
+                if (ref) t = ref.innerText;
+            }
+            if (!t && el.placeholder) t = el.placeholder;
+            if (!t && container) { const l = container.querySelector('legend, label'); if (l) t = l.innerText; }
+            return (t || '').replace(/\s+/g, ' ').trim().slice(0, 160);
+        };
+
+        // 1) react-select comboboxes still on placeholder (incl. Country/Location)
         document.querySelectorAll('.select__container').forEach(c => {
             const inp = c.querySelector('input[role=combobox]');
-            if (!inp) return;
-            if (inp.id === 'country' || inp.id === 'candidate-location') return;
+            if (!inp || inp.offsetParent === null) return;
+            const isLoc = inp.id === 'country' || inp.id === 'candidate-location';
             const required = inp.getAttribute('aria-required') === 'true';
             const answered = c.querySelector('.select__single-value, .select__multi-value');
-            if (required && !answered) {
-                let lab = ''; const l = c.querySelector('label'); if (l) lab = l.innerText;
-                out.push({ id: inp.id, kind: 'select', label: (lab||'').trim().slice(0,140) });
+            if ((required || isLoc) && !answered) {
+                const key = mark(inp);
+                out.push({ key, kind: isLoc ? 'autocomplete' : 'select', fieldId: inp.id || '', label: lab(inp, c) });
             }
         });
-        document.querySelectorAll('input[id^=question_], textarea[id^=question_]').forEach(e => {
-            if (e.getAttribute('role') === 'combobox') return;
+
+        // 2) native <select> elements (required, still on placeholder/empty)
+        document.querySelectorAll('select').forEach(s => {
+            if (s.offsetParent === null) return;
+            if (s.getAttribute('role') === 'combobox') return;
+            const required = s.required || s.getAttribute('aria-required') === 'true';
+            if (!required) return;
+            const o = s.options[s.selectedIndex];
+            const ph = !s.value || (o && (o.disabled || /^(\s*|select\b.*|choose\b.*|--.*)$/i.test((o.text || '').trim())));
+            if (!ph) return;
+            const key = mark(s);
+            const options = Array.from(s.options).map(x => (x.text || '').trim()).filter(Boolean);
+            out.push({ key, kind: 'native_select', fieldId: s.id || '', label: lab(s), options });
+        });
+
+        // 3) text-like inputs + textareas (required, empty) — ANY id, not just question_*
+        document.querySelectorAll('input, textarea').forEach(e => {
             if (e.offsetParent === null) return;
+            if (e.getAttribute('role') === 'combobox') return;
+            const t = (e.type || 'text').toLowerCase();
+            if (['hidden','submit','button','file','checkbox','radio','image','reset','range','color'].includes(t)) return;
             const required = e.required || e.getAttribute('aria-required') === 'true';
-            if (required && (!e.value || !e.value.trim())) {
-                let lab = ''; if (e.labels && e.labels[0]) lab = e.labels[0].innerText;
-                out.push({ id: e.id, kind: 'text', label: (lab||'').trim().slice(0,140) });
-            }
+            if (!required) return;
+            if (e.value && e.value.trim()) return;
+            const key = mark(e);
+            out.push({ key, kind: 'text', inputType: t, fieldId: e.id || '', label: lab(e) });
         });
+
+        // 4) radio groups (required, none selected)
+        const seen = {};
+        document.querySelectorAll('input[type=radio]').forEach(r => {
+            if (r.offsetParent === null) return;
+            const rg = r.closest('[role=radiogroup], fieldset');
+            const name = r.name || '';
+            const group = name
+                ? Array.from(document.querySelectorAll('input[type=radio]')).filter(x => x.name === name)
+                : [r];
+            const required = group.some(g => g.required || g.getAttribute('aria-required') === 'true')
+                || (rg && rg.getAttribute('aria-required') === 'true');
+            if (!required) return;
+            const gk = name || ('__' + i);
+            if (seen[gk]) return; seen[gk] = true;
+            if (group.some(g => g.checked)) return;
+            const options = group.map(g => {
+                let lt = '';
+                if (g.labels && g.labels[0]) lt = g.labels[0].innerText;
+                if (!lt && g.getAttribute('aria-label')) lt = g.getAttribute('aria-label');
+                if (!lt) lt = g.value || '';
+                return (lt || '').replace(/\s+/g, ' ').trim().slice(0, 90);
+            }).filter(Boolean);
+            const wrap = rg || r.parentElement || r;
+            const key = mark(wrap);
+            let glabel = '';
+            if (rg) { const lg = rg.querySelector('legend, label'); if (lg) glabel = lg.innerText; }
+            out.push({ key, kind: 'radio', label: (glabel || options.join(' / ')).replace(/\s+/g, ' ').trim().slice(0, 160), options });
+        });
+
         return out;
     }""")
-    # Capture options for each unanswered select by opening it briefly.
+    # Capture options for each unanswered react-select by opening it briefly.
     for f in base:
-        if f["kind"] != "select":
+        if f.get("kind") != "select":
             continue
         try:
-            await page.locator(f'#{f["id"]}').first.click()
+            await page.locator(f'[data-cops-fid="{f["key"]}"]').first.click()
             await page.wait_for_timeout(350)
             opts = page.locator(".select__option")
             oc = await opts.count()
             texts = []
-            for k in range(min(oc, 30)):
+            for k in range(min(oc, 40)):
                 try:
                     texts.append((await opts.nth(k).inner_text()).strip())
                 except Exception:
@@ -429,25 +607,153 @@ async def _collect_unanswered_required(page: Page) -> list[dict]:
     return base
 
 
-async def _llm_fill_unanswered(page: Page, user_data: dict) -> int:
+async def _commit_field(page: Page, field: dict, answer: str) -> bool:
     """
-    Use the LLM to answer residual required questions the heuristics missed
-    (job-specific screeners, free-text). Returns the number of fields filled.
-    Best-effort: any error is swallowed (submission stays gated by verification).
+    Commit `answer` to a collected field and re-verify it is no longer empty.
+    Returns True only when the field now holds a value.  Field kinds:
+      text          — fill the input/textarea
+      native_select — select_option by label (then partial-text fallback)
+      select        — open react-select, click the matching .select__option
+      autocomplete  — type into the combobox, pick the first suggestion
+      radio         — click the option label/input inside the group wrapper
     """
-    if not _LLM_AVAILABLE:
-        return 0
-    api_key = getattr(_settings, "openai_api_key", "") or ""
-    if not api_key:
-        return 0
+    kind = field.get("kind")
+    sel = f'[data-cops-fid="{field.get("key")}"]'
+    ans = (answer or "").strip()
+    if not ans:
+        return False
+    try:
+        if kind == "text":
+            loc = page.locator(sel).first
+            await loc.fill(ans)
+            try:
+                v = await loc.input_value()
+            except Exception:
+                v = ans
+            return bool(v and v.strip())
+
+        if kind == "native_select":
+            loc = page.locator(sel).first
+            try:
+                await loc.select_option(label=ans)
+            except Exception:
+                opt_val = await loc.evaluate(
+                    "(s, a) => { const al = a.trim().toLowerCase();"
+                    " const o = Array.from(s.options).find(o => o.text.trim().toLowerCase() === al)"
+                    " || Array.from(s.options).find(o => o.text.trim().toLowerCase().includes(al));"
+                    " return o ? o.value : null; }",
+                    ans,
+                )
+                if opt_val is None:
+                    return False
+                await loc.select_option(value=opt_val)
+            try:
+                return bool(await loc.input_value())
+            except Exception:
+                return True
+
+        if kind in ("select", "autocomplete"):
+            loc = page.locator(sel).first
+            await loc.click()
+            await page.wait_for_timeout(350)
+            if kind == "autocomplete":
+                await loc.fill(ans)
+                await page.wait_for_timeout(900)
+            target = page.locator(f'.select__option:has-text("{ans[:30]}")').first
+            clicked = False
+            if await target.count() > 0:
+                await target.click()
+                clicked = True
+            else:
+                opt = page.locator(".select__option").first
+                if await opt.count() > 0:
+                    await opt.click()
+                    clicked = True
+                else:
+                    await page.keyboard.press("Escape")
+            await page.wait_for_timeout(150)
+            return clicked
+
+        if kind == "radio":
+            wrap = page.locator(sel).first
+            target = wrap.locator(f'label:has-text("{ans[:40]}")').first
+            if await target.count() > 0:
+                await target.click()
+                return True
+            rb = wrap.locator('input[type=radio]').first
+            if await rb.count() > 0:
+                await rb.check(timeout=1500)
+                return True
+            return False
+    except Exception:
+        try:
+            await page.keyboard.press("Escape")
+        except Exception:
+            pass
+        return False
+    return False
+
+
+async def _fill_unanswered_required(page: Page, user_data: dict) -> dict:
+    """
+    Fill every still-empty required field, committing and re-verifying each.
+
+    Two tiers (mirrors the react-select design):
+      1. Deterministic, compliance-safe heuristics (_pick_answer) for standard
+         questions (work-auth/sponsorship/EEO/consent/etc.) and for the
+         Country/Location autocompletes — no LLM call.
+      2. A SINGLE batched LLM call for everything else (job-specific screeners,
+         free-text, dates) — gpt-4o-mini, one request per job.
+
+    Returns {"heuristic": n, "llm": n, "asked": n}.  Best-effort: any error is
+    swallowed (submission stays gated by _verify_submitted).
+    """
+    stats = {"heuristic": 0, "llm": 0, "asked": 0}
     try:
         fields = await _collect_unanswered_required(page)
     except Exception:
-        return 0
-    fields = [f for f in fields if f.get("label")][:18]
+        return stats
     if not fields:
-        return 0
+        return stats
 
+    remaining: list[dict] = []
+    # ── Tier 1: deterministic ────────────────────────────────────────────────
+    for f in fields:
+        kind = f.get("kind")
+        label = f.get("label", "")
+        committed = False
+        try:
+            if kind == "autocomplete":
+                fid_attr = (f.get("fieldId") or "").lower()
+                if "country" in fid_attr or "country" in label.lower():
+                    val = user_data.get("country") or "United States"
+                else:
+                    val = user_data.get("location") or "Remote"
+                committed = await _commit_field(page, f, val)
+            elif kind in ("select", "native_select", "radio") and _is_standard_question(label):
+                opts = _clean_options(f.get("options") or [])
+                if opts:
+                    choice = _pick_answer(label, opts)
+                    if choice:
+                        committed = await _commit_field(page, f, choice)
+        except Exception:
+            committed = False
+        if committed:
+            stats["heuristic"] += 1
+        else:
+            remaining.append(f)
+
+    # ── Tier 2: one batched LLM call for the rest ────────────────────────────
+    llm_fields = [f for f in remaining if f.get("label")][:18]
+    if not (_LLM_AVAILABLE and llm_fields):
+        logger.info("careerops.fill_unanswered", **stats)
+        return stats
+    api_key = getattr(_settings, "openai_api_key", "") or ""
+    if not api_key:
+        logger.info("careerops.fill_unanswered", **stats)
+        return stats
+
+    stats["asked"] = len(llm_fields)
     first = user_data.get("first_name", "")
     last = user_data.get("last_name", "")
     profile = (
@@ -457,11 +763,13 @@ async def _llm_fill_unanswered(page: Page, user_data: dict) -> int:
         f"Work authorization: authorized to work in the US; does NOT require visa sponsorship.\n"
         f"Resume:\n{(user_data.get('resume_text','') or '')[:1400]}"
     )
-    questions = [
-        {"id": f["id"], "question": f["label"], "type": f["kind"],
-         **({"options": f["options"]} if f.get("options") else {})}
-        for f in fields
-    ]
+    questions = []
+    for f in llm_fields:
+        q = {"id": f["key"], "question": f["label"], "type": f["kind"]}
+        opts = _clean_options(f.get("options") or [])
+        if opts:
+            q["options"] = opts
+        questions.append(q)
     prompt = (
         f"{profile}\n\nAnswer these application questions as JSON "
         f'(object of id -> answer):\n{json.dumps(questions, ensure_ascii=False)}'
@@ -472,9 +780,9 @@ async def _llm_fill_unanswered(page: Page, user_data: dict) -> int:
         )
     except Exception as exc:
         logger.warning("careerops.llm_call_failed", error=str(exc))
-        return 0
+        logger.info("careerops.fill_unanswered", **stats)
+        return stats
 
-    # Parse JSON (tolerate code fences / surrounding prose).
     answers: dict = {}
     try:
         answers = json.loads(raw)
@@ -485,44 +793,20 @@ async def _llm_fill_unanswered(page: Page, user_data: dict) -> int:
                 answers = json.loads(m.group(0))
             except Exception:
                 answers = {}
-    if not isinstance(answers, dict) or not answers:
-        return 0
-
-    filled = 0
-    by_id = {f["id"]: f for f in fields}
-    for fid, ans in answers.items():
-        f = by_id.get(fid)
-        if not f or ans is None:
-            continue
-        ans = str(ans).strip()
-        if not ans:
-            continue
-        try:
-            if f["kind"] == "text":
-                await page.locator(f'#{fid}').first.fill(ans)
-                filled += 1
-            else:  # select — open and click the matching option
-                await page.locator(f'#{fid}').first.click()
-                await page.wait_for_timeout(350)
-                target = page.locator(f'.select__option:has-text("{ans[:30]}")').first
-                if await target.count() > 0:
-                    await target.click()
-                    filled += 1
-                else:
-                    opt = page.locator(".select__option").first
-                    if await opt.count() > 0:
-                        await opt.click()
-                        filled += 1
-                    else:
-                        await page.keyboard.press("Escape")
-                await page.wait_for_timeout(150)
-        except Exception:
+    if isinstance(answers, dict):
+        by_key = {f["key"]: f for f in llm_fields}
+        for fid, ans in answers.items():
+            f = by_key.get(fid)
+            if not f or ans is None:
+                continue
             try:
-                await page.keyboard.press("Escape")
+                if await _commit_field(page, f, str(ans)):
+                    stats["llm"] += 1
             except Exception:
                 pass
-    logger.info("careerops.llm_filled", count=filled, asked=len(fields))
-    return filled
+
+    logger.info("careerops.fill_unanswered", **stats)
+    return stats
 
 
 async def _fill_autocomplete(page: Page, field_id: str, value: str) -> bool:
@@ -580,12 +864,16 @@ async def _fill_questions_by_label(page: Page, mapping: list[tuple[list[str], st
 
 
 async def _check_required_boxes(page: Page) -> None:
-    """Tick any unchecked checkboxes (consent / acknowledgement gates)."""
+    """
+    Tick any unchecked checkboxes (consent / acknowledgement gates), including
+    custom ARIA checkbox widgets (div/span role=checkbox) that aren't backed by
+    a real <input> and so are missed by the input[type=checkbox] pass.
+    """
     boxes = page.locator('input[type="checkbox"]')
     try:
         n = await boxes.count()
     except Exception:
-        return
+        n = 0
     for i in range(n):
         b = boxes.nth(i)
         try:
@@ -593,11 +881,24 @@ async def _check_required_boxes(page: Page) -> None:
                 await b.check(timeout=1500)
         except Exception:
             pass
+    # Custom ARIA checkbox widgets not backed by an <input type=checkbox>.
+    try:
+        widgets = page.locator('[role="checkbox"][aria-checked="false"]')
+        wn = await widgets.count()
+    except Exception:
+        wn = 0
+    for i in range(min(wn, 20)):
+        try:
+            w = widgets.nth(i)
+            if await w.is_visible():
+                await w.click(timeout=1500)
+        except Exception:
+            pass
 
 
 async def _poll_greenhouse_code(
     email: str, company: str, resend_key: str, since_iso: str,
-    attempts: int = 6, delay: float = 4.0,
+    attempts: int = 8, delay: float = 4.0,
 ) -> Optional[str]:
     """
     Poll the Resend inbound mailbox for Greenhouse's "Security code for your
@@ -657,13 +958,23 @@ async def _complete_greenhouse_verification(
     # Greenhouse renders the security code as N single-character boxes
     # (id="security-input-0" … "security-input-{n-1}", maxlength=1).
     # Also support a single-field variant just in case.
+    #
+    # The code step often renders a few seconds AFTER the first submit, so poll
+    # for the field to appear (up to ~15 s) before concluding it is absent.
+    # Checking only once was a major cause of false "unconfirmed" results: we saw
+    # no field, gave up, and reported the application as failed even though
+    # Greenhouse was about to ask for the code (the honest gate stays intact —
+    # we still only report success after the code is entered and confirmed).
     boxes = page.locator('input[id^="security-input-"]')
     single = None
-    try:
-        n_boxes = await boxes.count()
-    except Exception:
-        n_boxes = 0
-    if n_boxes == 0:
+    n_boxes = 0
+    for _attempt in range(8):  # ~15 s total
+        try:
+            n_boxes = await boxes.count()
+        except Exception:
+            n_boxes = 0
+        if n_boxes > 0:
+            break
         for sel in ['input#security_code', 'input[name*="security"]',
                     'input[aria-label*="ecurity code"]']:
             loc = page.locator(sel).first
@@ -673,8 +984,11 @@ async def _complete_greenhouse_verification(
                     break
             except Exception:
                 pass
-        if single is None:
-            return False  # no security-code field present
+        if single is not None:
+            break
+        await page.wait_for_timeout(1900)
+    if n_boxes == 0 and single is None:
+        return False  # no security-code field present after waiting
 
     resend_key = os.environ.get("RESEND_API_KEY", "")
     import datetime
@@ -824,17 +1138,27 @@ class CareerOpsApplicator:
                 (["full name", "your name", "legal name"], full_name),
             ])
 
-            # Resume (real PDF).
+            # Resume (real PDF).  Try resume-named inputs first and VERIFY the
+            # file attached; only fall back to a bare file input if needed.
+            # This fixes "Resume/CV is required" misses where the first matching
+            # input was the wrong one or the widget re-rendered.
             resume_text = user_data.get("resume_text", "")
             if resume_text:
+                uploaded = False
                 for sel in [
-                    'input[type="file"][name*="resume"]',
-                    'input[type="file"][id*="resume"]',
+                    'input[type="file"][name*="resume" i]',
+                    'input[type="file"][id*="resume" i]',
+                    'input[type="file"][aria-label*="resume" i]',
+                    'input[type="file"][name*="cv" i]',
+                    'input[type="file"][accept*="pdf"]',
                     'input[type="file"]',
                 ]:
                     if await page.locator(sel).count() > 0:
-                        await _upload_resume(page, sel, resume_text)
-                        break
+                        if await _upload_resume(page, sel, resume_text):
+                            uploaded = True
+                            break
+                if not uploaded:
+                    logger.warning("careerops.greenhouse.resume_not_attached", url=job_url)
 
             # Cover letter (text field if present).
             cover_letter = user_data.get("cover_letter", "")
@@ -844,13 +1168,22 @@ class CareerOpsApplicator:
 
             # Screening / EEO react-select questions + consent checkboxes.
             answered = await _answer_react_selects(page)
-            # LLM pass: answer residual job-specific questions the heuristics
-            # missed (free-text screeners, non-obvious dropdowns).
-            llm_filled = await _llm_fill_unanswered(page, user_data)
             await _check_required_boxes(page)
+            # Broadened fill: every still-empty required field (native selects,
+            # radios, broader text/textarea, dates, autocompletes) — heuristics
+            # for compliance-safe standards, one batched LLM call for the rest.
+            fill_stats = await _fill_unanswered_required(page, user_data)
+            # Re-tick any consent boxes revealed while filling.
+            await _check_required_boxes(page)
+            required_empty = await _count_required_empty(page)
             logger.info(
                 "careerops.greenhouse.filled",
-                url=job_url, selects_answered=answered, llm_filled=llm_filled,
+                url=job_url,
+                selects_answered=answered,
+                heuristic_filled=fill_stats.get("heuristic", 0),
+                llm_filled=fill_stats.get("llm", 0),
+                llm_asked=fill_stats.get("asked", 0),
+                required_empty_before_submit=required_empty,
             )
 
             submit = page.locator('input[type="submit"], button[type="submit"]').first
