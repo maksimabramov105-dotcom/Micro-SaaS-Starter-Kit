@@ -53,14 +53,16 @@ The core **works and is live**. Live batch test: **5/6 real Greenhouse applicati
 - Real **PDF** resume upload (was .txt, which ATSes reject).
 - Greenhouse email-**code** completion step.
 - **LLM filler** for job-specific questions (commit `74deca8`).
-- Throughput tuning to fit ~2 attempts/run (commit `594c750`, current HEAD).
-- Earlier in session: pause-button fix, OAuth copy, CI deploy `command_timeout` 30m, Cloudflare-524 dynamic timeout.
+- **Backgrounded apply loop** with Next.js `after()` (commits `9c6cc63` + `a1df632`). `run-campaigns/route.ts` POST now authenticates, schedules the work via `after()`, and returns 200 in ~0.17s; the full run (`runCampaigns()`, a module-level fn) executes in the background free of Cloudflare's timeout. `RUN_BUDGET_MS` 90s→280s, `MAX_APPLIES_PER_CAMPAIGN` 2→8 (now just an OOM ceiling). Each campaign gets a **fair time slice** (`RUN_BUDGET_MS / campaigns-left-to-run`) so no campaign starves the others. Live-verified: a run now makes ~7 attempts across BOTH campaigns vs the old ~2.
+- Earlier in session: pause-button fix, OAuth copy, CI deploy `command_timeout` 30m.
 
-## The NEXT task (highest priority) — make it reliable every run
-Production reality: only ~2 apply attempts fit per cron run (bounded by Cloudflare's ~100s origin timeout via `RUN_BUDGET_MS=90s`), and per-**job** variance means a run can hit 2 incompatible jobs and apply 0. The capability is proven; reliability per-run is the gap.
+## The NEXT task (highest priority) — push per-job success up
+Step 1 (background the loop) is **DONE** — each run now tries many jobs across all campaigns. The remaining gap is **per-job success rate**: in the post-deploy live test, all 7 attempts FAILED (0 submitted), split as 5× "submission not confirmed (required fields or email code incomplete)" + 2× Playwright timeout. The jobs were senior/specialized Greenhouse roles (Engineering Manager, Applied AI Scientist, Corporate Solutions Engineer) with many custom required fields. The capability is proven (5/6 in an earlier batch), but these forms expose the field-detection gap.
 
-1. **Background the apply loop** with Next.js `after()` (from `next/server`). This is self-hosted (long-running Node server, not serverless), so `after()` callbacks keep running after the response. Move the CAREEROPS loop in `run-campaigns/route.ts` into `after(async () => {...})`, return 200 immediately, and raise the internal budget (e.g. 280s) so each run tries MANY jobs. This is the single biggest reliability lever. NOTE: it's a ~600-line block; extract to a module-level async function rather than re-indenting in place (CI runs `npm run lint` — don't introduce lint/indent failures).
-2. **Broaden required-field detection** in `_collect_unanswered_required()` / the fillers so the LLM catches every field type (the residual misses that cause per-job failures — e.g. Mercury-style forms, date fields, checkbox groups). Push per-job success ~80% → ~95%.
+1. **Broaden required-field detection** in `_collect_unanswered_required()` / the fillers so the LLM catches every field type (the residual misses that cause per-job failures — e.g. Mercury-style forms, date fields, checkbox groups). Push per-job success ~80% → ~95%. This is now the single biggest lever.
+2. **Two follow-ups observed during the backgrounding work** (in `run-campaigns/route.ts`):
+   - *Boundary timeouts*: `PLAYWRIGHT_MIN_BUDGET=28s` lets an attempt START with as little as 28s left, but a full Greenhouse application (with email-code step) needs ~32-40s, so the last attempt in a time slice can get "operation aborted due to timeout". Consider raising `PLAYWRIGHT_MIN_BUDGET` toward ~45s (so `playwrightTimeout = remaining-5` clears the typical completion time) — trade-off: fewer attempts per slice.
+   - *Dedup permanently excludes FAILED jobs*: `appliedUrls` is built from ALL of the user's `JobApplication` rows regardless of status, so a job that failed only due to a boundary timeout (or a transient miss) is never retried. Consider excluding recent FAILED-by-timeout rows from the dedup set, or a bounded retry.
 
 ## Deferred (revisit later)
 - **LinkedIn Easy Apply**: code path is complete (UI → encrypted creds → `worker/worker/autoapply/linkedin.py`, now with honest verification). Blockers: needs a user's LinkedIn password; **datacenter-IP login likely triggers LinkedIn security checkpoints**; account-ban risk. To validate, get a throwaway LinkedIn account and test login from the VPS IP. May need residential proxies.
