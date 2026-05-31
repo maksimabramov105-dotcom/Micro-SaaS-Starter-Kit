@@ -60,10 +60,20 @@ const MAX_APPLIES_PER_CAMPAIGN = 8
  * budget so each run attempts many jobs across companies.  The cron fires every
  * 2 h, so a multi-minute background run never overlaps the next one.
  *
+ * Sizing is driven by MEASURED completion times: a full Greenhouse application
+ * ALWAYS requires the emailed security-code step and takes ~60-100 s end to end
+ * (fill + submit + poll inbox for the code + resubmit).  So each attempt needs
+ * up to ~100 s (PLAYWRIGHT_MAX_TIMEOUT) and only starts with ≥105 s left
+ * (PLAYWRIGHT_MIN_BUDGET).  600 s gives a 2-campaign run a fair ~300 s slice
+ * each → ~2-3 completing attempts per campaign, and ~5-6 for a single-campaign
+ * user.  Attempts run ONE Playwright page at a time (closed in finally), so the
+ * budget length does NOT change peak memory — only concurrency would, and that
+ * is always 1.  The cron fires every 2 h, so a ~10 min run never overlaps.
+ *
  * Any already-running Playwright call is allowed to finish; only new ones
  * are blocked once the budget expires.
  */
-const RUN_BUDGET_MS = 280_000
+const RUN_BUDGET_MS = 600_000
 
 // ── Types from worker API ─────────────────────────────────────────────────────
 
@@ -592,15 +602,34 @@ async function runCampaigns(
       continue
     }
 
-    // Collect jobs already applied to (avoid duplicates)
-    const appliedUrls = new Set(
-      (
-        await prisma.jobApplication.findMany({
-          where: { userId: user.id },
-          select: { jobUrl: true },
-        })
-      ).map((a) => a.jobUrl)
-    )
+    // Build the dedup set of job URLs to SKIP this run.
+    //
+    // We must never resubmit a job that genuinely went through, but a job that
+    // only FAILED (e.g. a boundary timeout or a transient field-detection miss)
+    // SHOULD be retried — especially now that field detection is broader.  So:
+    //   - exclude any status that means submitted/in-flight (SUBMITTED, QUEUED,
+    //     INTERVIEW, OFFER, REJECTED — anything that is NOT a FAILED attempt)
+    //   - allow FAILED jobs to be retried, but only up to MAX_FAILED_RETRIES
+    //     times so a permanently-incompatible job stops wasting budget.
+    const MAX_FAILED_RETRIES = 3
+    const priorApplications = await prisma.jobApplication.findMany({
+      where: { userId: user.id },
+      select: { jobUrl: true, status: true },
+    })
+    const appliedUrls = new Set<string>()
+    const failedCounts = new Map<string, number>()
+    for (const a of priorApplications) {
+      if (a.status === 'FAILED') {
+        failedCounts.set(a.jobUrl, (failedCounts.get(a.jobUrl) ?? 0) + 1)
+      } else {
+        // Submitted / queued / interview / offer / rejected — never resend.
+        appliedUrls.add(a.jobUrl)
+      }
+    }
+    // Give up on jobs that have already failed too many times.
+    for (const [url, count] of failedCounts) {
+      if (count >= MAX_FAILED_RETRIES) appliedUrls.add(url)
+    }
 
     // Scrape 100+ jobs from multiple boards with multiple keyword variations.
     //
@@ -750,22 +779,26 @@ async function runCampaigns(
       //
       // Two-part check:
       //   1. Minimum remaining budget — only START a Playwright call if there is
-      //      enough budget left to finish it (a full application with the email
-      //      verification step takes ~32-40 s).
+      //      enough budget left to FINISH it including the email-code flow.
       //   2. Dynamic Playwright timeout — caps each fetch to (remaining - 5 s),
       //      max PLAYWRIGHT_MAX_TIMEOUT, so the final attempt cannot overrun the
       //      budget.
       //
-      // A full Greenhouse application includes the email-verification step
-      // (submit → fetch the emailed security code from the inbox → enter it →
-      // resubmit).  Observed successful applications complete in ~32-40 s.
-      // We START an application when ≥28 s of budget remains and cap each attempt
-      // at 46 s.  With RUN_BUDGET_MS=280 s (background, no Cloudflare timeout)
-      // that fits many attempts per run; because scrapedJobs is round-robin
-      // interleaved across companies, those attempts hit DIFFERENT companies, so
-      // one hard company (e.g. Cloudflare) no longer zeroes the run.
-      const PLAYWRIGHT_MIN_BUDGET = 28_000
-      const PLAYWRIGHT_MAX_TIMEOUT = 46_000
+      // A full Greenhouse application ALWAYS includes the email-verification
+      // step (submit → poll the inbox for the emailed security code → enter it →
+      // resubmit) and, per in-container measurement across many companies, takes
+      // ~60-100 s end to end — NOT the ~38 s previously assumed.  The old
+      // PLAYWRIGHT_MIN_BUDGET=28 s / cap=46 s let an attempt START with far too
+      // little budget, so it got capped below its real completion time and
+      // aborted ("operation aborted due to timeout") — which is a big reason
+      // production submitted ~0.  Now: START only when ≥105 s remains and cap
+      // each attempt at 100 s, so a started attempt has time to finish the code
+      // flow.  With RUN_BUDGET_MS=600 s and fair per-campaign slices (~300 s for
+      // 2 campaigns) this allows ~2-3 attempts/campaign; because scrapedJobs is
+      // round-robin interleaved across companies, those attempts hit DIFFERENT
+      // companies, so one hard company (e.g. Cloudflare) no longer zeroes the run.
+      const PLAYWRIGHT_MIN_BUDGET = 105_000
+      const PLAYWRIGHT_MAX_TIMEOUT = 100_000
       const elapsedNow = Date.now() - runStart
       // Honor the tighter of the global run budget and this campaign's fair
       // time slice, so one campaign cannot starve the others.
