@@ -24,12 +24,8 @@ jobs:
             echo "::error::Campaign runner returned HTTP $HTTP_STATUS: $BODY"
             exit 1
           fi
-          # Print summary fields for easy reading in Actions log
-          echo "$BODY" | python3 -c "
-          import json, sys
-          d = json.load(sys.stdin)
-          print(f\"Applied : {d.get('totalApplied', 0)}\")
-          print(f\"Failed  : {d.get('totalFailed', 0)}\")
-          print(f\"Skipped : {d.get('totalSkipped', 0)}\")
-          print(f\"Campaigns: {d.get('campaigns', 0)}\")
-          " 2>/dev/null || true
+          # The endpoint schedules the apply loop in the background (Next after())
+          # and returns 200 immediately, so the actual applied/failed counts are
+          # NOT in this response — they land in the web/worker logs once the
+          # background run finishes. This step only confirms the run was accepted.
+          echo "Campaign run scheduled (results appear in web/worker logs)."

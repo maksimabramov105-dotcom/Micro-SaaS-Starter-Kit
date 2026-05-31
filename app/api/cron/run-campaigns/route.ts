@@ -25,7 +25,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { canSendApplication, consumeQuota } from '@/lib/quota'
 import { trackEvent } from '@/lib/analytics-advanced'
@@ -42,27 +42,28 @@ import { isResumeQualityV2 } from '@/lib/flags'
  * OOM guard: attemptsThisCampaign >= MAX_APPLIES_PER_CAMPAIGN breaks the
  * inner loop so a single runaway campaign can never exhaust VPS memory.
  *
- * TIMING NOTE (multi-campaign runs):
- * Overhead per run = pre-scrape (~12 s) + per-campaign setup/scraping (~12 s each).
- * Each Playwright attempt takes ~16 s on the VPS.
- * With Cloudflare's ~100 s proxy timeout and RUN_BUDGET_MS = 82 s, the total
- * Playwright budget is roughly (82 - 12_prescrape - N * 12_setup) / 16_per_attempt.
- * For 2 campaigns that works out to ≈ 3.6 total attempts.  Capping each campaign
- * at 2 keeps Campaign 1 to ~56 s elapsed so Campaign 2 can still start
- * a Playwright attempt (~68 s < 82 s) before the wall-clock guard fires.
+ * The run now executes in the background via after() (see POST), so the real
+ * limiter is the wall-clock budget (RUN_BUDGET_MS), not Cloudflare's proxy
+ * timeout.  This per-campaign cap stays as a memory/fairness ceiling: it stops
+ * one campaign with many matching jobs from consuming the whole budget before
+ * other campaigns get a turn.  Actual submissions are still bounded by the
+ * user/campaign daily quota regardless of this value.
  */
-const MAX_APPLIES_PER_CAMPAIGN = 2
+const MAX_APPLIES_PER_CAMPAIGN = 8
 
 /**
  * Global wall-clock budget (ms) for the entire cron run.
- * Cloudflare's reverse-proxy read timeout is ~100 s; we stop launching new
- * Playwright attempts at 82 s to guarantee the endpoint returns a JSON body
- * before Cloudflare drops the connection with a 524 error.
+ *
+ * The apply loop runs in the background via after() (self-hosted Node server),
+ * so it is NOT bounded by Cloudflare's ~100 s proxy timeout anymore — the HTTP
+ * response already returned 200 before this loop starts.  We give it a generous
+ * budget so each run attempts many jobs across companies.  The cron fires every
+ * 2 h, so a multi-minute background run never overlaps the next one.
  *
  * Any already-running Playwright call is allowed to finish; only new ones
  * are blocked once the budget expires.
  */
-const RUN_BUDGET_MS = 90_000
+const RUN_BUDGET_MS = 280_000
 
 // ── Types from worker API ─────────────────────────────────────────────────────
 
@@ -219,7 +220,6 @@ async function careeropsApply(
 
 export async function POST(req: Request) {
   const runAt = new Date().toISOString()
-  const runStart = Date.now()
   console.log('[run-campaigns] cron fired', { runAt })
 
   // ── Auth ──────────────────────────────────────────────────────────────────
@@ -240,6 +240,38 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'WORKER_SECRET not configured' }, { status: 500 })
   }
 
+  // ── Background the entire campaign run ────────────────────────────────────
+  //
+  // This app is self-hosted (a long-running Node server, NOT serverless), so
+  // after() callbacks keep running after the HTTP response is flushed.  We
+  // return 200 immediately and run the full apply loop in the background with a
+  // generous wall-clock budget (RUN_BUDGET_MS), so each cron run can attempt
+  // MANY jobs instead of the ~2 that fit inside Cloudflare's ~100 s proxy
+  // timeout when the loop ran inline on the request.
+  after(async () => {
+    try {
+      await runCampaigns(workerUrl, workerSecret, runAt)
+    } catch (err) {
+      console.error('[run-campaigns] background run crashed', err)
+    }
+  })
+
+  return NextResponse.json({ scheduled: true, runAt })
+}
+
+// ── Background campaign runner ──────────────────────────────────────────────
+//
+// Contains all the heavy work (Greenhouse pre-scrape, LinkedIn sessions, quota
+// distribution, and the CAREEROPS Playwright apply loop).  Runs inside after()
+// so it executes after the cron HTTP response has already returned 200, free of
+// Cloudflare's proxy timeout.
+async function runCampaigns(
+  workerUrl: string,
+  workerSecret: string,
+  runAt: string,
+): Promise<void> {
+  const runStart = Date.now()
+
   // ── Load active campaigns with user + resume ─────────────────────────────
   const campaigns = await prisma.autoApplyCampaign.findMany({
     where: { isActive: true, source: { in: ['CAREEROPS', 'LINKEDIN'] } },
@@ -256,7 +288,8 @@ export async function POST(req: Request) {
   console.log('[run-campaigns] active campaigns', { count: campaigns.length })
 
   if (campaigns.length === 0) {
-    return NextResponse.json({ message: 'No active campaigns', applied: 0 })
+    console.log('[run-campaigns] no active campaigns')
+    return
   }
 
   const careerOpsCampaigns = campaigns.filter((c) => c.source === 'CAREEROPS')
@@ -697,26 +730,24 @@ export async function POST(req: Request) {
       if (appliedThisCampaign >= campaignRemaining) break
       // Per-campaign OOM cap: stop if this campaign has used its Playwright budget
       if (attemptsThisCampaign >= MAX_APPLIES_PER_CAMPAIGN) break
-      // Dynamic wall-clock guard — prevents Cloudflare 524 timeout.
+      // Wall-clock guard for the background run (RUN_BUDGET_MS).
       //
       // Two-part check:
-      //   1. Minimum remaining budget (15 s) — only start a Playwright call if
-      //      there's at least 15 s left (fast attempt ~7 s + DB writes + buffer).
-      //   2. Dynamic Playwright timeout — caps the fetch to (remaining - 5 s),
-      //      max 50 s.  This replaces the old hardcoded 120 s limit which could
-      //      let a slow call run past Cloudflare's ~100 s proxy timeout even
-      //      when the budget check had already passed.
+      //   1. Minimum remaining budget — only START a Playwright call if there is
+      //      enough budget left to finish it (a full application with the email
+      //      verification step takes ~32-40 s).
+      //   2. Dynamic Playwright timeout — caps each fetch to (remaining - 5 s),
+      //      max PLAYWRIGHT_MAX_TIMEOUT, so the final attempt cannot overrun the
+      //      budget.
       //
       // A full Greenhouse application includes the email-verification step
       // (submit → fetch the emailed security code from the inbox → enter it →
       // resubmit).  Observed successful applications complete in ~32-40 s.
-      // We START an application when ≥28 s of budget remains and cap each
-      // attempt at 46 s, which fits ~2 attempts per run under RUN_BUDGET_MS=90 s
-      // (still below Cloudflare's ~100 s proxy timeout).  Because scrapedJobs is
-      // round-robin interleaved across companies, the 2 attempts hit DIFFERENT
-      // companies, so one hard company (e.g. Cloudflare) no longer zeroes the run.
-      // NOTE: to scale well beyond 2 apps/run, move this loop off the
-      // Cloudflare-fronted HTTP request onto a background task (Next after()).
+      // We START an application when ≥28 s of budget remains and cap each attempt
+      // at 46 s.  With RUN_BUDGET_MS=280 s (background, no Cloudflare timeout)
+      // that fits many attempts per run; because scrapedJobs is round-robin
+      // interleaved across companies, those attempts hit DIFFERENT companies, so
+      // one hard company (e.g. Cloudflare) no longer zeroes the run.
       const PLAYWRIGHT_MIN_BUDGET = 28_000
       const PLAYWRIGHT_MAX_TIMEOUT = 46_000
       const elapsedNow = Date.now() - runStart
@@ -894,9 +925,7 @@ export async function POST(req: Request) {
   const totalFailed = summary.reduce((s, c) => s + c.failed, 0)
   const totalSkipped = summary.reduce((s, c) => s + c.skipped, 0)
 
-  console.log('[run-campaigns] complete', { totalApplied, totalFailed, totalSkipped })
-
-  return NextResponse.json({
+  console.log('[run-campaigns] complete', {
     runAt,
     campaigns: summary.length,
     totalApplied,
