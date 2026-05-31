@@ -1,9 +1,12 @@
-/* _common.css — shared ATS-safe print CSS for all resume templates */
+/* _common.css — shared ATS-safe print CSS for all resume templates.
+ * Single column, real text, standard section names → ATS-parseable, while the
+ * typography below is tuned to read as polished/professional (per-template
+ * files override fonts + accent colour). */
 
 /* Page setup */
 @page {
     size: Letter;
-    margin: 0.55in 0.6in;
+    margin: 0.5in 0.62in;
 }
 
 /* Reset */
@@ -14,14 +17,16 @@
 }
 
 body {
-    font-size: 11pt;
-    line-height: 1.4;
-    color: #000;
+    font-family: Carlito, Calibri, "DejaVu Sans", Arial, sans-serif;
+    font-size: 10.5pt;
+    line-height: 1.42;
+    color: #1f2933;
     background: #fff;
     -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
 }
 
-/* Single-column layout — no flexbox columns, no tables */
+/* Single-column layout — no multi-column, no tables */
 .resume {
     width: 100%;
     max-width: 100%;
@@ -29,116 +34,145 @@ body {
 
 /* Contact block — always at top of body, NOT in <header> */
 .contact-block {
-    margin-bottom: 10pt;
+    margin-bottom: 12pt;
 }
 
 .contact-block h1 {
-    font-size: 16pt;
-    font-weight: bold;
-    margin-bottom: 3pt;
+    font-size: 23pt;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1.05;
+    margin-bottom: 4pt;
+    color: #16202b;
 }
 
 .contact-block .contact-line {
     font-size: 9.5pt;
-    color: #333;
+    color: #52606d;
+    letter-spacing: 0.01em;
 }
 
 /* Section headings — exact ATS-parseable names */
 .section-heading {
     font-size: 11pt;
-    font-weight: bold;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
-    border-bottom: 1pt solid #000;
-    padding-bottom: 2pt;
-    margin-top: 10pt;
-    margin-bottom: 5pt;
+    letter-spacing: 0.09em;
+    color: #16202b;
+    border-bottom: 1.25pt solid #16202b;
+    padding-bottom: 2.5pt;
+    margin-top: 13pt;
+    margin-bottom: 6pt;
+    page-break-after: avoid;
+}
+
+/* Summary */
+.summary-text {
+    font-size: 10.5pt;
+    line-height: 1.46;
+    color: #2b3640;
 }
 
 /* Experience entries */
 .exp-entry {
-    margin-bottom: 7pt;
+    margin-bottom: 9pt;
+    page-break-inside: avoid;
 }
 
 .exp-header {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
+    gap: 10pt;
 }
 
 .exp-title {
-    font-weight: bold;
-    font-size: 10.5pt;
+    font-weight: 700;
+    font-size: 11pt;
+    color: #16202b;
 }
 
 .exp-dates {
     font-size: 9.5pt;
-    color: #444;
+    color: #6b7480;
     white-space: nowrap;
 }
 
 .exp-company {
     font-size: 10pt;
-    color: #222;
+    font-style: italic;
+    color: #3e4c59;
     margin-bottom: 3pt;
 }
 
-/* Bullet list */
+/* Bullet list — render the marker via ::before in a sans font so the bullet is
+ * a clean round dot in every template (serif fonts like EB Garamond render the
+ * default disc marker as a stray glyph). */
 ul.bullets {
-    margin-left: 14pt;
-    margin-top: 2pt;
+    margin-left: 0;
+    margin-top: 3pt;
+    padding-left: 15pt;
+    list-style: none;
 }
 
 ul.bullets li {
     font-size: 10pt;
-    margin-bottom: 1.5pt;
-    line-height: 1.35;
+    margin-bottom: 2.5pt;
+    line-height: 1.4;
+    position: relative;
+    padding-left: 11pt;
+}
+
+ul.bullets li::before {
+    content: "•";
+    position: absolute;
+    left: 0;
+    font-family: "DejaVu Sans", "Liberation Sans", sans-serif;
+    color: inherit;
 }
 
 /* Education */
 .edu-entry {
-    margin-bottom: 5pt;
+    margin-bottom: 6pt;
+    page-break-inside: avoid;
 }
 
 .edu-degree {
-    font-weight: bold;
-    font-size: 10pt;
+    font-weight: 700;
+    font-size: 10.5pt;
+    color: #16202b;
 }
 
 .edu-school {
     font-size: 10pt;
+    color: #3e4c59;
 }
 
 .edu-year {
     font-size: 9.5pt;
-    color: #444;
+    color: #6b7480;
 }
 
 /* Skills */
 .skills-block {
     font-size: 10pt;
-    line-height: 1.5;
+    line-height: 1.6;
+    color: #2b3640;
 }
 
 .skill-category {
-    font-weight: bold;
+    font-weight: 700;
+    color: #16202b;
 }
 
 /* Projects */
 .proj-entry {
-    margin-bottom: 5pt;
+    margin-bottom: 6pt;
+    page-break-inside: avoid;
 }
 
 .proj-name {
-    font-weight: bold;
+    font-weight: 700;
     font-size: 10pt;
-}
-
-/* Avoid orphaned headings */
-.section-heading {
-    page-break-after: avoid;
-}
-
-.exp-entry, .edu-entry, .proj-entry {
-    page-break-inside: avoid;
+    color: #16202b;
 }

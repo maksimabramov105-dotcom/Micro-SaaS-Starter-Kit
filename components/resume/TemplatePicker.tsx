@@ -48,15 +48,20 @@ export function TemplatePicker({ resumeId, initialTemplateId }: TemplatePickerPr
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
-  async function saveTemplate() {
-    setError(null)
+  // Selecting a template applies it immediately: it persists to the DB AND the
+  // Download button (below) carries ?template=<id>, so the downloaded PDF always
+  // matches what is selected — no separate "Save" click required.
+  function selectTemplate(id: string) {
+    if (id === selected) return
+    setSelected(id)
     setSaved(false)
+    setError(null)
     startTransition(async () => {
       try {
         const res = await fetch(`/api/resumes/${resumeId}/template`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ templateId: selected }),
+          body: JSON.stringify({ templateId: id }),
         })
         if (!res.ok) {
           const data = await res.json().catch(() => ({}))
@@ -80,7 +85,7 @@ export function TemplatePicker({ resumeId, initialTemplateId }: TemplatePickerPr
           <button
             key={tpl.id}
             type="button"
-            onClick={() => { setSelected(tpl.id); setSaved(false) }}
+            onClick={() => selectTemplate(tpl.id)}
             className={cn(
               'group flex flex-col items-center rounded-lg border-2 p-2 text-left transition-all',
               selected === tpl.id
@@ -108,29 +113,24 @@ export function TemplatePicker({ resumeId, initialTemplateId }: TemplatePickerPr
       </div>
 
       <div className="flex items-center gap-3">
-        <Button
-          onClick={saveTemplate}
-          disabled={isPending}
-          size="sm"
-          variant={saved ? 'outline' : 'default'}
-        >
-          {isPending ? 'Saving…' : saved ? '✓ Saved' : 'Save template'}
-        </Button>
-
-        <Button asChild size="sm" variant="outline">
-          <a href={`/api/resumes/${resumeId}/pdf`} download>
+        <Button asChild size="sm">
+          <a href={`/api/resumes/${resumeId}/pdf?template=${selected}`} download>
             Download PDF
           </a>
         </Button>
 
+        <span className="text-sm text-slate-600">
+          {isPending
+            ? 'Saving…'
+            : (
+              <>
+                Selected: <strong>{TEMPLATES.find((t) => t.id === selected)?.name}</strong>
+                {saved && ' ✓'}
+              </>
+            )}
+        </span>
+
         {error && <p className="text-sm text-red-600">{error}</p>}
-        {saved && (
-          <p className="text-sm text-green-700">
-            Template saved. Next download will use <strong>{
-              TEMPLATES.find(t => t.id === selected)?.name
-            }</strong>.
-          </p>
-        )}
       </div>
     </div>
   )

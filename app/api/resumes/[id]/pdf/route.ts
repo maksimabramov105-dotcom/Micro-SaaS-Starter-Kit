@@ -21,7 +21,15 @@ interface RouteContext {
   params: Promise<{ id: string }>
 }
 
-export async function GET(_req: Request, { params }: RouteContext) {
+const ALLOWED_TEMPLATES = new Set([
+  'modern_minimalist',
+  'classic_executive',
+  'tech_compact',
+  'creative_accent',
+  'new_grad',
+])
+
+export async function GET(req: Request, { params }: RouteContext) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return new Response('Unauthorized', { status: 401 })
 
@@ -43,8 +51,16 @@ export async function GET(_req: Request, { params }: RouteContext) {
   const useTemplates = await isPdfTemplatesV1(session.user.id)
   if (useTemplates) {
     try {
-      const templateId = (resume as Record<string, unknown>).templateId as string | undefined
-        ?? 'modern_minimalist'
+      // The download link passes ?template=<id> so the PDF always matches the
+      // template the user is currently looking at — no dependency on a separate
+      // "Save" click landing first. Falls back to the saved templateId, then the
+      // default.
+      const requested = new URL(req.url).searchParams.get('template')
+      const savedTemplateId = (resume as Record<string, unknown>).templateId as string | undefined
+      const templateId =
+        requested && ALLOWED_TEMPLATES.has(requested)
+          ? requested
+          : (savedTemplateId ?? 'modern_minimalist')
       const resumeData = adaptResumeData(generated, resume.title)
 
       const pdfBytes = await renderResumePdf({ resumeId: id, templateId, resumeData })

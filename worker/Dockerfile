@@ -8,8 +8,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libcups2 libdrm2 libxkbcommon0 libatspi2.0-0 libxcomposite1 \
       libxdamage1 libxfixes3 libxrandr2 libgbm1 libpango-1.0-0 \
       libcairo2 libasound2 libx11-6 libx11-xcb1 libxcb1 libxext6 \
-      libxss1 libxtst6 fonts-liberation ca-certificates wget \
+      libxss1 libxtst6 ca-certificates wget \
       libpangoft2-1.0-0 libgdk-pixbuf-xlib-2.0-0 libffi-dev shared-mime-info \
+      fonts-liberation fonts-dejavu-core fonts-crosextra-carlito \
+      fonts-crosextra-caladea fonts-ebgaramond \
+    && fc-cache -f \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -51,6 +54,14 @@ COPY worker/ ./worker/
 
 # Tell Playwright where to find the browser at runtime
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
+# The runtime user is `worker` with no real home; without a writable cache dir
+# fontconfig cannot persist its cache and re-scans every PDF render (slow) and
+# emits "No writable cache directories". Point HOME/XDG_CACHE_HOME at a writable
+# location so WeasyPrint renders are fast and quiet (the system font cache built
+# by `fc-cache -f` above is also read-only-usable).
+ENV HOME=/tmp \
+    XDG_CACHE_HOME=/tmp/.cache
 
 USER worker
 EXPOSE 8000
