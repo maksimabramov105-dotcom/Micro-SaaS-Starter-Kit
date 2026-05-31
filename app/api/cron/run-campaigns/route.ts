@@ -302,8 +302,27 @@ async function runCampaigns(
     return
   }
 
-  const careerOpsCampaigns = campaigns.filter((c) => c.source === 'CAREEROPS')
-  const linkedInCampaigns = campaigns.filter((c) => c.source === 'LINKEDIN')
+  // LinkedIn Easy Apply needs the user's LinkedIn email + password to log in.
+  // Most users have no LinkedIn account and never enter credentials. Instead of
+  // doing nothing for them, a credential-less LinkedIn campaign falls back to
+  // the CAREEROPS (Greenhouse) engine, which auto-applies with NO user
+  // credentials and whose replies still flow to the in-app inbox. LinkedIn
+  // campaigns WITH credentials still use the LinkedIn path.
+  const hasLinkedInCreds = (c: (typeof campaigns)[number]): boolean => {
+    const enc = (c as { linkedinPasswordEnc?: string | null }).linkedinPasswordEnc
+    return Boolean(c.linkedinEmail && enc)
+  }
+  const careerOpsCampaigns = campaigns.filter(
+    (c) => c.source === 'CAREEROPS' || (c.source === 'LINKEDIN' && !hasLinkedInCreds(c)),
+  )
+  const linkedInCampaigns = campaigns.filter(
+    (c) => c.source === 'LINKEDIN' && hasLinkedInCreds(c),
+  )
+  console.log('[run-campaigns] campaign split', {
+    careerOps: careerOpsCampaigns.length,
+    linkedIn: linkedInCampaigns.length,
+    note: 'credential-less LinkedIn campaigns run via the CAREEROPS engine',
+  })
 
   // ── Pre-scrape Greenhouse ONCE for the entire run ─────────────────────────
   //
