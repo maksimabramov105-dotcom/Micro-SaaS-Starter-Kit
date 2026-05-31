@@ -41,6 +41,7 @@ P16 improvements (2026-05-19):
   - apply(): routes jobvite and ashby to their dedicated handlers.
 """
 import asyncio
+import json
 import random
 import re
 import tempfile
@@ -52,6 +53,17 @@ import structlog
 from playwright.async_api import async_playwright, BrowserContext, Page
 
 logger = structlog.get_logger(__name__)
+
+# LLM client (reused from the resume pipeline) for answering job-specific
+# screening questions the deterministic heuristics can't resolve.
+try:
+    from worker.ai.resume import _call_openai
+    from worker.config import settings as _settings
+    _LLM_AVAILABLE = True
+except Exception:  # pragma: no cover - keeps applicator usable without AI deps
+    _LLM_AVAILABLE = False
+    _call_openai = None  # type: ignore
+    _settings = None  # type: ignore
 
 _ATS_PATTERNS: dict[str, list[str]] = {
     "greenhouse":      [r"greenhouse\.io", r"boards\.greenhouse"],
@@ -347,6 +359,170 @@ async def _answer_react_selects(page: Page) -> int:
             except Exception:
                 pass
     return answered
+
+
+_LLM_SYSTEM = (
+    "You are completing a job application on behalf of a candidate. "
+    "Answer every question truthfully and favorably using the candidate profile. "
+    "For multiple-choice questions you MUST return EXACTLY one of the provided "
+    "options, copied verbatim. For free-text questions return a concise, "
+    "professional answer (a number when a number is asked for; 1-2 sentences "
+    "otherwise). Respond with ONLY a JSON object mapping each question id to its "
+    "answer string. No prose, no markdown."
+)
+
+
+async def _collect_unanswered_required(page: Page) -> list[dict]:
+    """
+    Gather still-empty required fields after the heuristic pass:
+    react-selects still showing a placeholder, and empty question_* text inputs.
+    For selects we open each once to capture its options.
+    """
+    base = await page.evaluate("""() => {
+        const out = [];
+        document.querySelectorAll('.select__container').forEach(c => {
+            const inp = c.querySelector('input[role=combobox]');
+            if (!inp) return;
+            if (inp.id === 'country' || inp.id === 'candidate-location') return;
+            const required = inp.getAttribute('aria-required') === 'true';
+            const answered = c.querySelector('.select__single-value, .select__multi-value');
+            if (required && !answered) {
+                let lab = ''; const l = c.querySelector('label'); if (l) lab = l.innerText;
+                out.push({ id: inp.id, kind: 'select', label: (lab||'').trim().slice(0,140) });
+            }
+        });
+        document.querySelectorAll('input[id^=question_], textarea[id^=question_]').forEach(e => {
+            if (e.getAttribute('role') === 'combobox') return;
+            if (e.offsetParent === null) return;
+            const required = e.required || e.getAttribute('aria-required') === 'true';
+            if (required && (!e.value || !e.value.trim())) {
+                let lab = ''; if (e.labels && e.labels[0]) lab = e.labels[0].innerText;
+                out.push({ id: e.id, kind: 'text', label: (lab||'').trim().slice(0,140) });
+            }
+        });
+        return out;
+    }""")
+    # Capture options for each unanswered select by opening it briefly.
+    for f in base:
+        if f["kind"] != "select":
+            continue
+        try:
+            await page.locator(f'#{f["id"]}').first.click()
+            await page.wait_for_timeout(350)
+            opts = page.locator(".select__option")
+            oc = await opts.count()
+            texts = []
+            for k in range(min(oc, 30)):
+                try:
+                    texts.append((await opts.nth(k).inner_text()).strip())
+                except Exception:
+                    pass
+            f["options"] = texts
+            await page.keyboard.press("Escape")
+            await page.wait_for_timeout(120)
+        except Exception:
+            f["options"] = []
+            try:
+                await page.keyboard.press("Escape")
+            except Exception:
+                pass
+    return base
+
+
+async def _llm_fill_unanswered(page: Page, user_data: dict) -> int:
+    """
+    Use the LLM to answer residual required questions the heuristics missed
+    (job-specific screeners, free-text). Returns the number of fields filled.
+    Best-effort: any error is swallowed (submission stays gated by verification).
+    """
+    if not _LLM_AVAILABLE:
+        return 0
+    api_key = getattr(_settings, "openai_api_key", "") or ""
+    if not api_key:
+        return 0
+    try:
+        fields = await _collect_unanswered_required(page)
+    except Exception:
+        return 0
+    fields = [f for f in fields if f.get("label")][:18]
+    if not fields:
+        return 0
+
+    first = user_data.get("first_name", "")
+    last = user_data.get("last_name", "")
+    profile = (
+        f"Candidate: {first} {last}\n"
+        f"Email: {user_data.get('email','')}\n"
+        f"Location: {user_data.get('location','')}, {user_data.get('country','United States')}\n"
+        f"Work authorization: authorized to work in the US; does NOT require visa sponsorship.\n"
+        f"Resume:\n{(user_data.get('resume_text','') or '')[:1400]}"
+    )
+    questions = [
+        {"id": f["id"], "question": f["label"], "type": f["kind"],
+         **({"options": f["options"]} if f.get("options") else {})}
+        for f in fields
+    ]
+    prompt = (
+        f"{profile}\n\nAnswer these application questions as JSON "
+        f'(object of id -> answer):\n{json.dumps(questions, ensure_ascii=False)}'
+    )
+    try:
+        raw = await asyncio.wait_for(
+            _call_openai(prompt, _LLM_SYSTEM, api_key, max_tokens=900), timeout=25
+        )
+    except Exception as exc:
+        logger.warning("careerops.llm_call_failed", error=str(exc))
+        return 0
+
+    # Parse JSON (tolerate code fences / surrounding prose).
+    answers: dict = {}
+    try:
+        answers = json.loads(raw)
+    except Exception:
+        m = re.search(r"\{.*\}", raw, re.S)
+        if m:
+            try:
+                answers = json.loads(m.group(0))
+            except Exception:
+                answers = {}
+    if not isinstance(answers, dict) or not answers:
+        return 0
+
+    filled = 0
+    by_id = {f["id"]: f for f in fields}
+    for fid, ans in answers.items():
+        f = by_id.get(fid)
+        if not f or ans is None:
+            continue
+        ans = str(ans).strip()
+        if not ans:
+            continue
+        try:
+            if f["kind"] == "text":
+                await page.locator(f'#{fid}').first.fill(ans)
+                filled += 1
+            else:  # select — open and click the matching option
+                await page.locator(f'#{fid}').first.click()
+                await page.wait_for_timeout(350)
+                target = page.locator(f'.select__option:has-text("{ans[:30]}")').first
+                if await target.count() > 0:
+                    await target.click()
+                    filled += 1
+                else:
+                    opt = page.locator(".select__option").first
+                    if await opt.count() > 0:
+                        await opt.click()
+                        filled += 1
+                    else:
+                        await page.keyboard.press("Escape")
+                await page.wait_for_timeout(150)
+        except Exception:
+            try:
+                await page.keyboard.press("Escape")
+            except Exception:
+                pass
+    logger.info("careerops.llm_filled", count=filled, asked=len(fields))
+    return filled
 
 
 async def _fill_autocomplete(page: Page, field_id: str, value: str) -> bool:
@@ -668,8 +844,14 @@ class CareerOpsApplicator:
 
             # Screening / EEO react-select questions + consent checkboxes.
             answered = await _answer_react_selects(page)
+            # LLM pass: answer residual job-specific questions the heuristics
+            # missed (free-text screeners, non-obvious dropdowns).
+            llm_filled = await _llm_fill_unanswered(page, user_data)
             await _check_required_boxes(page)
-            logger.info("careerops.greenhouse.filled", url=job_url, selects_answered=answered)
+            logger.info(
+                "careerops.greenhouse.filled",
+                url=job_url, selects_answered=answered, llm_filled=llm_filled,
+            )
 
             submit = page.locator('input[type="submit"], button[type="submit"]').first
             if await submit.count() > 0:
