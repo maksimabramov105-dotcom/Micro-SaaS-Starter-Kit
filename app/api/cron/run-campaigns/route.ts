@@ -62,7 +62,7 @@ const MAX_APPLIES_PER_CAMPAIGN = 2
  * Any already-running Playwright call is allowed to finish; only new ones
  * are blocked once the budget expires.
  */
-const RUN_BUDGET_MS = 82_000
+const RUN_BUDGET_MS = 90_000
 
 // ── Types from worker API ─────────────────────────────────────────────────────
 
@@ -707,16 +707,18 @@ export async function POST(req: Request) {
       //      let a slow call run past Cloudflare's ~100 s proxy timeout even
       //      when the budget check had already passed.
       //
-      // A full Greenhouse application now includes the email-verification step
+      // A full Greenhouse application includes the email-verification step
       // (submit → fetch the emailed security code from the inbox → enter it →
-      // resubmit), which takes ~40-55 s end-to-end.  We therefore only START an
-      // application when ≥45 s of budget remains, and cap each attempt at 65 s.
-      // With RUN_BUDGET_MS=82 s this completes ~1 real application per run while
-      // staying under Cloudflare's ~100 s proxy timeout.
-      // NOTE: to scale beyond ~1 app/run, move the apply loop off this
-      // Cloudflare-fronted HTTP request onto a background queue/worker.
-      const PLAYWRIGHT_MIN_BUDGET = 45_000
-      const PLAYWRIGHT_MAX_TIMEOUT = 65_000
+      // resubmit).  Observed successful applications complete in ~32-40 s.
+      // We START an application when ≥28 s of budget remains and cap each
+      // attempt at 46 s, which fits ~2 attempts per run under RUN_BUDGET_MS=90 s
+      // (still below Cloudflare's ~100 s proxy timeout).  Because scrapedJobs is
+      // round-robin interleaved across companies, the 2 attempts hit DIFFERENT
+      // companies, so one hard company (e.g. Cloudflare) no longer zeroes the run.
+      // NOTE: to scale well beyond 2 apps/run, move this loop off the
+      // Cloudflare-fronted HTTP request onto a background task (Next after()).
+      const PLAYWRIGHT_MIN_BUDGET = 28_000
+      const PLAYWRIGHT_MAX_TIMEOUT = 46_000
       const elapsedNow = Date.now() - runStart
       const remainingBudget = RUN_BUDGET_MS - elapsedNow
       if (remainingBudget < PLAYWRIGHT_MIN_BUDGET) {
