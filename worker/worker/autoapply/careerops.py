@@ -726,10 +726,16 @@ async def _fill_unanswered_required(page: Page, user_data: dict) -> dict:
             if kind == "autocomplete":
                 fid_attr = (f.get("fieldId") or "").lower()
                 if "country" in fid_attr or "country" in label.lower():
-                    val = user_data.get("country") or "United States"
+                    committed = await _fill_autocomplete(
+                        page, f.get("fieldId") or "country",
+                        user_data.get("country") or "United States",
+                    )
                 else:
-                    val = user_data.get("location") or "Remote"
-                committed = await _commit_field(page, f, val)
+                    # Location: robust geocomplete with real-city fallbacks.
+                    committed = await _fill_location_autocomplete(
+                        page, f.get("fieldId") or "candidate-location",
+                        user_data.get("location", ""),
+                    )
             elif kind in ("select", "native_select", "radio") and _is_standard_question(label):
                 opts = _clean_options(f.get("options") or [])
                 if opts:
@@ -809,25 +815,77 @@ async def _fill_unanswered_required(page: Page, user_data: dict) -> dict:
     return stats
 
 
+async def _autocomplete_answered(page: Page, field_id: str) -> bool:
+    """True if the given Country/Location combobox now shows a selected value."""
+    try:
+        return await page.evaluate(
+            "(fid) => { const inp = document.getElementById(fid);"
+            " if (!inp) return false; const c = inp.closest('.select__container');"
+            " if (!c) return !!(inp.value && inp.value.trim());"
+            " return !!c.querySelector('.select__single-value, .select__multi-value'); }",
+            field_id,
+        )
+    except Exception:
+        return False
+
+
 async def _fill_autocomplete(page: Page, field_id: str, value: str) -> bool:
-    """Fill a Greenhouse autocomplete combobox (Country / Location) by typing
-    then selecting the first suggested option."""
+    """
+    Fill a Greenhouse autocomplete combobox (Country / Location) by TYPING (so
+    the async geo/suggestion lookup fires) then clicking the first suggestion.
+    Returns True ONLY when a value is actually selected (verified) — the old
+    version pressed Enter and returned True even when nothing matched, which left
+    required Location fields silently empty and blocked submission.
+    """
     try:
         inp = page.locator(f'#{field_id}').first
         if await inp.count() == 0 or not value:
             return False
         await inp.click()
-        await inp.fill(value)
-        await page.wait_for_timeout(1000)
+        await inp.fill("")
+        await inp.type(value, delay=20)
+        await page.wait_for_timeout(1100)
         opt = page.locator('.select__option').first
         if await opt.count() > 0:
             await opt.click()
-            return True
-        # fall back to keyboard select
-        await page.keyboard.press("Enter")
-        return True
+            await page.wait_for_timeout(200)
+            return await _autocomplete_answered(page, field_id)
+        try:
+            await page.keyboard.press("Escape")
+        except Exception:
+            pass
+        return False
     except Exception:
         return False
+
+
+async def _fill_location_autocomplete(page: Page, field_id: str, preferred: str) -> bool:
+    """
+    Fill a Greenhouse "Location (City)" geocomplete robustly.  Users' stored
+    location is often non-geocodable ("USA REMOTE", "USA", "Remote"), which
+    matches no suggestion and leaves this REQUIRED field empty — the single
+    biggest production blocker.  Try the user's value only if it looks like a
+    real place, then progressively more concrete fallbacks, stopping as soon as a
+    suggestion is selected.
+    """
+    if await _autocomplete_answered(page, field_id):
+        return True
+    candidates: list[str] = []
+    p = (preferred or "").strip()
+    generic = {"usa remote", "usa", "remote", "us", "united states",
+               "remote usa", "usa, remote", "remote, usa", "anywhere"}
+    if p and p.lower() not in generic:
+        candidates.append(p)
+    candidates += [
+        "New York, NY, United States",
+        "San Francisco, CA, United States",
+        "Remote",
+        "United States",
+    ]
+    for val in candidates:
+        if await _fill_autocomplete(page, field_id, val):
+            return True
+    return False
 
 
 async def _fill_questions_by_label(page: Page, mapping: list[tuple[list[str], str]]) -> None:
@@ -1118,11 +1176,13 @@ class CareerOpsApplicator:
             # question_* id) and is required on many boards — fill it directly.
             await _fill(page, "#preferred_name", first)
 
-            # Country / Location autocomplete comboboxes.
+            # Country / Location autocomplete comboboxes.  Location uses the
+            # robust geocomplete filler (user location is often non-geocodable
+            # junk like "USA REMOTE" — fall back to a real city so the REQUIRED
+            # "Location (City)" field gets a value).
             await _fill_autocomplete(page, "country", user_data.get("country", "") or "United States")
-            await _fill_autocomplete(
-                page, "candidate-location",
-                user_data.get("location", "") or "Remote",
+            await _fill_location_autocomplete(
+                page, "candidate-location", user_data.get("location", ""),
             )
 
             # Per-job question_* text inputs, matched by label.
@@ -1186,8 +1246,21 @@ class CareerOpsApplicator:
                 required_empty_before_submit=required_empty,
             )
 
+            # Close any react-select menu still open from the last fill (an open
+            # dropdown overlay can intercept the submit click and silently no-op,
+            # leaving the form un-submitted with no code step) and bring the
+            # button into view before clicking.
+            try:
+                await page.keyboard.press("Escape")
+                await page.wait_for_timeout(250)
+            except Exception:
+                pass
             submit = page.locator('input[type="submit"], button[type="submit"]').first
             if await submit.count() > 0:
+                try:
+                    await submit.scroll_into_view_if_needed(timeout=3000)
+                except Exception:
+                    pass
                 await submit.click()
                 try:
                     await page.wait_for_load_state("networkidle", timeout=12000)
