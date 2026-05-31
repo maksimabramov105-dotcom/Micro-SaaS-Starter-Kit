@@ -979,6 +979,14 @@ async def _poll_greenhouse_code(
                 rows = r.json().get("data", []) if r.status_code == 200 else []
             except Exception:
                 continue
+            # Collect candidate security-code emails for this inbox in the
+            # window.  We PREFER one whose subject names the company, but fall
+            # back to the most recent — Greenhouse subjects sometimes use a brand
+            # name that differs from our company string (e.g. Intercom's code
+            # email reads "...to Fin"), which previously caused false misses.
+            # Applications run sequentially and we poll right after submitting,
+            # so the most recent code email in the window is reliably ours.
+            candidates = []
             for m in rows:
                 to = ",".join(m.get("to") or []).lower()
                 frm = (m.get("from") or "").lower()
@@ -988,10 +996,15 @@ async def _poll_greenhouse_code(
                     continue
                 if "greenhouse" not in frm or "security code" not in subj:
                     continue
-                if company_key and company_key not in subj:
-                    continue
                 if since_iso and created < since_iso:
                     continue  # stale (from a previous attempt)
+                candidates.append((created, subj, m))
+            if not candidates:
+                continue
+            candidates.sort(key=lambda c: c[0], reverse=True)  # newest first
+            matched = [c for c in candidates if company_key and company_key in c[1]]
+            rest = [c for c in candidates if not (company_key and company_key in c[1])]
+            for _created, _subj, m in matched + rest:
                 try:
                     rd = await client.get(f"https://api.resend.com/emails/inbound/{m['id']}")
                     body = rd.json()
