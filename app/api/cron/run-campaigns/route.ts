@@ -44,9 +44,9 @@ import { isResumeQualityV2 } from '@/lib/flags'
  *
  * The run now executes in the background via after() (see POST), so the real
  * limiter is the wall-clock budget (RUN_BUDGET_MS), not Cloudflare's proxy
- * timeout.  This per-campaign cap stays as a memory/fairness ceiling: it stops
- * one campaign with many matching jobs from consuming the whole budget before
- * other campaigns get a turn.  Actual submissions are still bounded by the
+ * timeout.  Cross-campaign fairness is handled by a per-campaign time slice
+ * (campaignDeadline in the loop below), so this cap is now purely an OOM/runaway
+ * ceiling — it should rarely bite.  Actual submissions are still bounded by the
  * user/campaign daily quota regardless of this value.
  */
 const MAX_APPLIES_PER_CAMPAIGN = 8
@@ -498,7 +498,7 @@ async function runCampaigns(
   }
 
   // ── Process each CAREEROPS campaign ──────────────────────────────────────
-  for (const campaign of careerOpsCampaigns) {
+  for (const [campaignIndex, campaign] of careerOpsCampaigns.entries()) {
     const { user, resume } = campaign
     const campaignLog: {
       campaignId: string
@@ -712,11 +712,27 @@ async function runCampaigns(
     //   appliedThisCampaign  — successful SUBMITTED apps (daily-limit tracking)
     //   attemptsThisCampaign — every Playwright attempt, success or fail (OOM cap)
     //
-    // The inner loop also checks the global RUN_BUDGET_MS wall-clock guard so the
-    // endpoint always returns within Cloudflare's ~100 s proxy timeout when there
-    // are multiple campaigns in a single run.
+    // The inner loop also checks the global RUN_BUDGET_MS wall-clock guard plus a
+    // per-campaign time slice (campaignDeadline) so every campaign gets a turn.
     let appliedThisCampaign = 0
     let attemptsThisCampaign = 0
+
+    // Fair budget sharing across campaigns.
+    //
+    // Divide the REMAINING wall-clock budget equally among the campaigns that
+    // still have to run this invocation.  Without this, the first campaign could
+    // spend the entire RUN_BUDGET_MS on its own (possibly failing) attempts and
+    // starve every later campaign — they would get 0 attempts on EVERY run, not
+    // just this one (campaign order is stable).  Dividing the *remaining* budget
+    // means a campaign that finishes early hands its leftover to the next one
+    // (whose share is recomputed from what is actually left), while the final
+    // campaign always gets the whole remainder.  The global RUN_BUDGET_MS guard
+    // below is still the absolute ceiling.
+    const campaignsRemainingToRun = careerOpsCampaigns.length - campaignIndex
+    const campaignBudgetMs = Math.floor(
+      (RUN_BUDGET_MS - (Date.now() - runStart)) / campaignsRemainingToRun
+    )
+    const campaignDeadline = Date.now() + campaignBudgetMs
 
     // Job boards whose "apply_url" is their own listing page, not a direct ATS URL.
     // CareerOps fills ATS forms (Greenhouse, Lever, Workable, etc.) and cannot work on
@@ -751,9 +767,18 @@ async function runCampaigns(
       const PLAYWRIGHT_MIN_BUDGET = 28_000
       const PLAYWRIGHT_MAX_TIMEOUT = 46_000
       const elapsedNow = Date.now() - runStart
-      const remainingBudget = RUN_BUDGET_MS - elapsedNow
+      // Honor the tighter of the global run budget and this campaign's fair
+      // time slice, so one campaign cannot starve the others.
+      const remainingBudget = Math.min(
+        RUN_BUDGET_MS - elapsedNow,
+        campaignDeadline - Date.now(),
+      )
       if (remainingBudget < PLAYWRIGHT_MIN_BUDGET) {
-        console.log('[run-campaigns] time budget reached, stopping', { elapsed: elapsedNow, campaign: campaign.id })
+        console.log('[run-campaigns] time budget reached, stopping', {
+          elapsed: elapsedNow,
+          campaign: campaign.id,
+          campaignBudgetMs,
+        })
         if (!campaignLog.error) campaignLog.error = `time budget (${elapsedNow}ms)`
         break
       }
