@@ -650,3 +650,17 @@ model ExperimentAssignment {
   @@index([experimentKey, variant])
   @@index([experimentKey, assignedAt])
 }
+
+// ---------------------------------------------------------------------------
+// Marketing leads (top-of-funnel email capture, e.g. /free-resume-teardown)
+// ---------------------------------------------------------------------------
+
+model Lead {
+  id        String   @id @default(cuid())
+  email     String
+  source    String   @default("unknown") // which lander captured it
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([email])
+}

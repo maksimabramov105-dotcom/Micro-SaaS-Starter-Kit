@@ -39,3 +39,9 @@ next-env.d.ts
 
 # prisma — migrations are source code and must be committed
 # prisma/migrations  (intentionally not ignored)
+
+# python worker build artifacts (regenerated; never tracked)
+__pycache__/
+*.pyc
+.coverage
+*.egg-info/
