@@ -5,6 +5,7 @@ import Script from 'next/script'
 import { Providers } from './providers'
 import { Analytics } from '@vercel/analytics/react'
 import { PageViewTracker } from '@/components/page-view-tracker'
+import { StickyCta } from '@/components/sticky-cta'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -41,6 +42,8 @@ export default function RootLayout({
         {/* First-party pageview + traffic-source tracking (works on the
             self-hosted VPS, where Vercel Analytics above does not report). */}
         <PageViewTracker />
+        {/* Sticky marketing CTA — appears after scroll, hidden on app/auth routes. */}
+        <StickyCta />
         {/* Cloudflare Web Analytics — privacy-friendly pageviews/referrers.
             Only injected when NEXT_PUBLIC_CF_BEACON_TOKEN is set. (You can also
             enable it dashboard-side with zero code since the site is on CF.) */}
