@@ -144,9 +144,15 @@ jobs:
           # appleboy/ssh-action defaults command_timeout to 10m. On this VPS the
           # web image pull (~927 MB) over a slow link + near-full disk routinely
           # takes 8-10 min on its own, tripping the default and aborting the
-          # deploy mid-pull. Raise to 30m so the full pull+migrate+smoke sequence
+          # deploy mid-pull. Raise so the full pull+migrate+smoke sequence
           # always completes. (See deploy failures 2026-05-30.)
-          command_timeout: 30m
+          #
+          # Bumped 30m -> 60m on 2026-06-01: when the worker Dockerfile base layer
+          # changes (e.g. adding fonts), the ~2 GB worker image must re-download
+          # in full, which exceeded 30m on this link and left the worker DOWN.
+          # Such full re-pulls are rare (only on base-layer changes); normal
+          # deploys reuse cached layers and finish in a few minutes.
+          command_timeout: 60m
           script: |
             export IMAGE_TAG="${GITHUB_SHA}"
             export OWNER="${{ env.OWNER }}"
