@@ -3,6 +3,7 @@ import { authOptions } from '@/lib/auth'
 import { getOrAssignVariant } from '@/lib/experiments'
 import { Navbar } from '@/components/navbar'
 import { PricingCards } from '@/components/pricing-cards'
+import { LaunchBanner } from '@/components/launch-banner'
 
 export const metadata = {
   title: 'Pricing — ResumeAI',
@@ -28,6 +29,7 @@ export default async function PricingPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
+      <LaunchBanner />
       <Navbar />
       <main className="flex-1">
         <section className="w-full py-12 md:py-24 lg:py-32">
@@ -56,6 +58,11 @@ export default async function PricingPage() {
                 </p>
               </div>
             </div>
+
+            <p className="mx-auto mb-8 max-w-2xl text-center text-sm text-emerald-700 dark:text-emerald-300">
+              🚀 Launch week: enter code <strong className="font-mono">LAUNCH40</strong> at checkout for{' '}
+              <strong>40% off your first year</strong> (ends June 8).
+            </p>
 
             <PricingCards />
           </div>

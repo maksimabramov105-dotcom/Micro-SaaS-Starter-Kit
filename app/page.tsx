@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { PRICING_PLANS, getMonthlyEquivalent } from '@/lib/pricing'
+import { LaunchBanner } from '@/components/launch-banner'
 
 // SoftwareApplication structured data for rich results (HOMEPAGE_COPY.md §9).
 // No aggregateRating until we have real reviews — never fake ratings.
@@ -34,6 +35,8 @@ export default function HomePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
+
+      <LaunchBanner />
 
       {/* Navbar */}
       <nav className="sticky top-0 z-50 border-b border-slate-100 bg-white/90 backdrop-blur">

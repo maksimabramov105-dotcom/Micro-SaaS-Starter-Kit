@@ -4,6 +4,7 @@ import { Inter } from 'next/font/google'
 import Script from 'next/script'
 import { Providers } from './providers'
 import { Analytics } from '@vercel/analytics/react'
+import { PageViewTracker } from '@/components/page-view-tracker'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -37,6 +38,19 @@ export default function RootLayout({
       <body className={inter.className}>
         <Providers>{children}</Providers>
         <Analytics />
+        {/* First-party pageview + traffic-source tracking (works on the
+            self-hosted VPS, where Vercel Analytics above does not report). */}
+        <PageViewTracker />
+        {/* Cloudflare Web Analytics — privacy-friendly pageviews/referrers.
+            Only injected when NEXT_PUBLIC_CF_BEACON_TOKEN is set. (You can also
+            enable it dashboard-side with zero code since the site is on CF.) */}
+        {process.env.NEXT_PUBLIC_CF_BEACON_TOKEN && (
+          <Script
+            src="https://static.cloudflareinsights.com/beacon.min.js"
+            data-cf-beacon={`{"token": "${process.env.NEXT_PUBLIC_CF_BEACON_TOKEN}"}`}
+            strategy="afterInteractive"
+          />
+        )}
         {/* Tolt affiliate tracking — only injected when NEXT_PUBLIC_TOLT_REFERRAL_ID is set */}
         {process.env.NEXT_PUBLIC_TOLT_REFERRAL_ID && (
           <Script
