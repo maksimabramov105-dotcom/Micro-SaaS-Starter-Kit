@@ -1,9 +1,40 @@
 import Link from 'next/link'
-import { PRICING_PLANS } from '@/lib/pricing'
+import { PRICING_PLANS, getMonthlyEquivalent } from '@/lib/pricing'
+
+// SoftwareApplication structured data for rich results (HOMEPAGE_COPY.md §9).
+// No aggregateRating until we have real reviews — never fake ratings.
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'ResumeAI-Bot',
+  applicationCategory: 'BusinessApplication',
+  operatingSystem: 'Web',
+  url: 'https://resumeai-bot.ru',
+  description:
+    'AI resume builder that tailors your resume to each role and auto-applies to jobs across 50+ countries.',
+  offers: [
+    { '@type': 'Offer', name: 'Free', price: '0', priceCurrency: 'USD' },
+    { '@type': 'Offer', name: 'Pro (monthly)', price: '19.99', priceCurrency: 'USD' },
+    { '@type': 'Offer', name: 'Pro (yearly)', price: '199', priceCurrency: 'USD' },
+    { '@type': 'Offer', name: 'Unlimited (monthly)', price: '29.99', priceCurrency: 'USD' },
+  ],
+}
+
+// Homepage pricing: show Free + the YEARLY plans by default so the first price a
+// visitor sees is the better-value annual plan (HOMEPAGE_COPY.md §6). Kept as a
+// static server-rendered list so prices stay in the raw HTML for SEO.
+const HOMEPAGE_PLANS = PRICING_PLANS.filter(
+  (p) => p.intervalKey === null || p.intervalKey === 'year',
+)
 
 export default function HomePage() {
   return (
     <main className="flex min-h-screen flex-col bg-white">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+
       {/* Navbar */}
       <nav className="sticky top-0 z-50 border-b border-slate-100 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
@@ -11,6 +42,9 @@ export default function HomePage() {
             ResumeAI
           </Link>
           <div className="flex items-center gap-6">
+            <Link href="#how" className="hidden text-sm text-slate-600 hover:text-slate-900 sm:block">
+              How it works
+            </Link>
             <Link href="#pricing" className="text-sm text-slate-600 hover:text-slate-900">
               Pricing
             </Link>
@@ -24,48 +58,107 @@ export default function HomePage() {
         </div>
       </nav>
 
-      {/* Hero */}
+      {/* Hero (HOMEPAGE_COPY.md §1) */}
       <section className="flex flex-col items-center justify-center px-4 py-24 text-center">
-        <h1 className="text-5xl font-bold tracking-tight text-slate-900 sm:text-6xl">
-          Land your next job faster
+        <p className="mb-4 text-sm font-semibold uppercase tracking-wide text-emerald-600">
+          AI resume builder + auto-apply · 50+ countries
+        </p>
+        <h1 className="max-w-4xl text-4xl font-bold tracking-tight text-slate-900 sm:text-6xl">
+          Land a job abroad. Our AI writes your resume and auto-applies to jobs in 50+ countries
+          &mdash; while you sleep.
         </h1>
         <p className="mt-6 max-w-2xl text-xl text-slate-500">
-          AI-powered resume tailoring and auto-apply — built for serious job seekers. Let ResumeAI
-          handle the applications while you focus on interviews.
+          ResumeAI-Bot tailors your resume to each role and submits applications across top job
+          boards and company career pages &mdash; so you get more interviews with a fraction of the
+          effort. Built for job seekers going global, not just US LinkedIn.
         </p>
         <div className="mt-10">
           <Link
             href="/login"
             className="rounded-lg bg-emerald-600 px-8 py-3 text-lg font-semibold text-white hover:bg-emerald-700 transition-colors"
           >
-            Start free &rarr;
+            Start free &mdash; 3 applications/day &rarr;
           </Link>
+          <p className="mt-3 text-sm text-slate-500">
+            No credit card · 30-day money-back guarantee on paid plans
+          </p>
+        </div>
+
+        {/* Honest trust strip — no fabricated metrics (HOMEPAGE_COPY.md §1) */}
+        <div className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-slate-500">
+          <span>🌍 Apply in 50+ countries</span>
+          <span>🆓 Free to start — no credit card</span>
+          <span>🔒 We never sell your data</span>
+          <span>💸 30-day money-back guarantee</span>
         </div>
       </section>
 
-      {/* 3-step flow */}
-      <section className="bg-slate-50 px-4 py-20">
+      {/* Why ResumeAI-Bot — honest value/trust block (HOMEPAGE_COPY.md §4).
+          NOTE: this replaces the testimonials slot. We are NOT shipping
+          fabricated customer quotes — fake testimonials are illegal (FTC 2024
+          fake-reviews rule, EU UCPD) and erode the trust this page is built on.
+          Swap in a real-testimonials section here once you have genuine quotes. */}
+      <section className="border-y border-slate-100 bg-white px-4 py-16">
+        <div className="mx-auto max-w-5xl">
+          <h2 className="mb-10 text-center text-3xl font-bold text-slate-900">
+            Why job seekers choose ResumeAI-Bot
+          </h2>
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              {
+                icon: '🌍',
+                title: 'Truly global',
+                body: 'Most auto-apply tools only work on US LinkedIn. We cover 50+ countries — perfect for relocating, going remote, or applying across the EU, Gulf, and Asia.',
+              },
+              {
+                icon: '🤖',
+                title: 'A resume tuned to every job',
+                body: "We don't blast one generic resume. Our AI rewrites yours per role so it passes the ATS and reads like you wrote it for that company.",
+              },
+              {
+                icon: '⚡',
+                title: 'Volume that lands interviews',
+                body: 'Interviews are a numbers game. We send dozens of tailored applications so you get more shots on goal — without the burnout.',
+              },
+              {
+                icon: '🔒',
+                title: 'Private by design',
+                body: 'We never sell your data, and you stay in control of what gets sent. See the data-safety FAQ for exactly how it works.',
+              },
+            ].map((c) => (
+              <div key={c.title} className="rounded-xl border border-slate-200 bg-slate-50 p-6">
+                <div className="mb-3 text-2xl">{c.icon}</div>
+                <h3 className="mb-2 text-base font-semibold text-slate-900">{c.title}</h3>
+                <p className="text-sm text-slate-500">{c.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 3-step flow (HOMEPAGE_COPY.md §3) */}
+      <section id="how" className="bg-slate-50 px-4 py-20">
         <div className="mx-auto max-w-5xl">
           <h2 className="mb-12 text-center text-3xl font-bold text-slate-900">How it works</h2>
           <div className="grid gap-8 md:grid-cols-3">
             {[
               {
                 step: '1',
-                title: 'Build your resume',
+                title: 'Add your details',
                 description:
-                  'Answer a few questions about your experience and goals. Our AI crafts a tailored, ATS-optimised resume in seconds.',
+                  'Upload an existing resume or answer a few questions. Our AI learns your experience.',
               },
               {
                 step: '2',
-                title: 'Set up a campaign',
+                title: 'Pick your countries & roles',
                 description:
-                  'Choose job boards, set keywords, locations, and daily limits. We apply to matching roles automatically on your behalf.',
+                  'Choose from 50+ countries and the job types you want. We find matching openings.',
               },
               {
                 step: '3',
-                title: 'Track & respond',
+                title: 'We apply for you',
                 description:
-                  'Monitor every application in your dashboard. Get notified when recruiters respond and manage interviews in one place.',
+                  'The AI tailors your resume to each role and submits applications across the top job boards. You track everything from one dashboard.',
               },
             ].map(({ step, title, description }) => (
               <div
@@ -83,60 +176,149 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Pricing */}
-      <section id="pricing" className="px-4 py-20">
+      {/* Comparison (HOMEPAGE_COPY.md §5). Competitor facts verified Jun 2026:
+          Sonara shut down Feb 2024 (since acquired by BOLD); LazyApply is a
+          one-time "lifetime" purchase from $99, not an annual fee. */}
+      <section className="px-4 py-20">
+        <div className="mx-auto max-w-4xl">
+          <h2 className="mb-2 text-center text-3xl font-bold text-slate-900">Why we&apos;re different</h2>
+          <p className="mb-8 text-center text-slate-500">
+            Most auto-apply tools are US / LinkedIn-only. We cover the world.
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-left text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 text-slate-500">
+                  <th className="py-3 pr-4 font-medium"></th>
+                  <th className="py-3 px-4 font-bold text-emerald-700">ResumeAI-Bot</th>
+                  <th className="py-3 px-4 font-medium">Sonara</th>
+                  <th className="py-3 px-4 font-medium">LazyApply</th>
+                </tr>
+              </thead>
+              <tbody className="text-slate-700">
+                {[
+                  ['Countries covered', '50+', 'shut down (2024)', 'US-focused'],
+                  ['AI resume per role', '✓', 'limited', 'limited'],
+                  ['Free tier', '✓ 3/day', '✕', '✕'],
+                  ['30-day money-back', '✓', '—', '✕'],
+                  ['Price', '$19.99/mo', '—', 'from $99 one-time'],
+                ].map(([label, ...cells]) => (
+                  <tr key={label} className="border-b border-slate-100">
+                    <td className="py-3 pr-4 font-medium text-slate-900">{label}</td>
+                    {cells.map((c, i) => (
+                      <td
+                        key={i}
+                        className={`py-3 px-4 ${i === 0 ? 'font-semibold text-emerald-700' : ''}`}
+                      >
+                        {c}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-4 text-center text-sm text-slate-500">
+            Sonara shut down in 2024 — ResumeAI-Bot is a still-running alternative that covers more
+            countries.
+          </p>
+        </div>
+      </section>
+
+      {/* Pricing (HOMEPAGE_COPY.md §6 — annual shown by default) */}
+      <section id="pricing" className="bg-slate-50 px-4 py-20">
         <div className="mx-auto max-w-5xl">
           <h2 className="mb-4 text-center text-3xl font-bold text-slate-900">
             Simple, transparent pricing
           </h2>
           <p className="mb-12 text-center text-slate-500">
-            Start for free. Upgrade when you need more power.
+            Start for free. Upgrade when you need more power — 30-day money-back guarantee on every
+            paid plan.
           </p>
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            {PRICING_PLANS.map((plan) => (
-              <div
-                key={plan.id}
-                className={`rounded-xl border p-6 ${
-                  plan.id === 'pro'
-                    ? 'border-emerald-500 bg-emerald-50 shadow-md'
-                    : 'border-slate-200 bg-white'
-                }`}
-              >
-                {plan.id === 'pro' && (
-                  <div className="mb-3 inline-block rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold text-white">
-                    Most popular
-                  </div>
-                )}
-                <h3 className="text-lg font-bold text-slate-900">{plan.name}</h3>
-                <div className="mt-2 flex items-end gap-1">
-                  <span className="text-3xl font-bold text-slate-900">
-                    {plan.price === 0 ? 'Free' : `$${plan.price}`}
-                  </span>
-                  {plan.period && (
-                    <span className="mb-1 text-sm text-slate-500">/ {plan.period}</span>
-                  )}
-                </div>
-                <ul className="mt-4 space-y-2">
-                  {plan.features.map((f) => (
-                    <li key={f} className="flex items-center gap-2 text-sm text-slate-600">
-                      <span className="text-emerald-500">&#10003;</span>
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-                <Link
-                  href="/login"
-                  className={`mt-6 block w-full rounded-lg px-4 py-2 text-center text-sm font-semibold transition-colors ${
-                    plan.id === 'pro'
-                      ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                      : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
+          <div className="grid gap-6 md:grid-cols-3">
+            {HOMEPAGE_PLANS.map((plan) => {
+              const isPro = plan.id === 'pro_yearly'
+              const isYearly = plan.intervalKey === 'year'
+              const monthlyEquiv = isYearly ? getMonthlyEquivalent(plan) : null
+              return (
+                <div
+                  key={plan.id}
+                  className={`rounded-xl border p-6 ${
+                    isPro
+                      ? 'border-emerald-500 bg-emerald-50 shadow-md'
+                      : 'border-slate-200 bg-white'
                   }`}
                 >
-                  Get started
-                </Link>
-              </div>
-            ))}
+                  {isPro && (
+                    <div className="mb-3 inline-block rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold text-white">
+                      Most popular
+                    </div>
+                  )}
+                  <h3 className="text-lg font-bold text-slate-900">{plan.name}</h3>
+                  <div className="mt-2 flex items-end gap-1">
+                    <span className="text-3xl font-bold text-slate-900">
+                      {plan.price === 0 ? 'Free' : `$${plan.price}`}
+                    </span>
+                    {plan.period && (
+                      <span className="mb-1 text-sm text-slate-500">/ {plan.period}</span>
+                    )}
+                  </div>
+                  {monthlyEquiv && (
+                    <p className="mt-1 text-xs text-slate-500">
+                      ≈ ${monthlyEquiv.toFixed(2)}/mo, billed annually
+                    </p>
+                  )}
+                  <ul className="mt-4 space-y-2">
+                    {plan.features.map((f) => (
+                      <li key={f} className="flex items-center gap-2 text-sm text-slate-600">
+                        <span className="text-emerald-500">&#10003;</span>
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                  <Link
+                    href="/login"
+                    className={`mt-6 block w-full rounded-lg px-4 py-2 text-center text-sm font-semibold transition-colors ${
+                      isPro
+                        ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                        : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    Get started
+                  </Link>
+                </div>
+              )
+            })}
           </div>
+          <p className="mt-6 text-center text-sm text-slate-500">
+            See monthly pricing on the{' '}
+            <Link href="/pricing" className="text-emerald-600 underline underline-offset-2">
+              full pricing page
+            </Link>
+            .
+          </p>
+        </div>
+      </section>
+
+      {/* Final CTA band (HOMEPAGE_COPY.md §8) */}
+      <section className="px-4 py-20 text-center">
+        <h2 className="mx-auto max-w-3xl text-3xl font-bold text-slate-900">
+          Your next job could be in any of 50+ countries. Let&apos;s go find it.
+        </h2>
+        <p className="mx-auto mt-4 max-w-2xl text-slate-500">
+          Start free — 3 applications a day, no credit card. Upgrade only when you see the
+          interviews come in.
+        </p>
+        <div className="mt-8">
+          <Link
+            href="/login"
+            className="rounded-lg bg-emerald-600 px-8 py-3 text-lg font-semibold text-white hover:bg-emerald-700 transition-colors"
+          >
+            Start applying free &rarr;
+          </Link>
+          <p className="mt-3 text-sm text-slate-500">
+            30-day money-back guarantee on all paid plans.
+          </p>
         </div>
       </section>
 
@@ -144,13 +326,22 @@ export default function HomePage() {
       <footer className="border-t border-slate-100 bg-slate-50 px-4 py-8">
         <div className="mx-auto flex max-w-5xl flex-col items-center gap-4 text-sm text-slate-500 sm:flex-row sm:justify-between">
           <span>&copy; {new Date().getFullYear()} ResumeAI. All rights reserved.</span>
-          <div className="flex gap-6">
+          <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">
+            <Link href="/faq" className="hover:text-slate-900">
+              FAQ
+            </Link>
+            <Link href="/refund-policy" className="hover:text-slate-900">
+              Refund Policy
+            </Link>
             <Link href="/terms" className="hover:text-slate-900">
               Terms
             </Link>
             <Link href="/privacy" className="hover:text-slate-900">
               Privacy
             </Link>
+            <a href="mailto:support@resumeai-bot.ru" className="hover:text-slate-900">
+              Contact
+            </a>
           </div>
         </div>
       </footer>

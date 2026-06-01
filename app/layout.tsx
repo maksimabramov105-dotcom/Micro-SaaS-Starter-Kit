@@ -7,19 +7,23 @@ import { Analytics } from '@vercel/analytics/react'
 
 const inter = Inter({ subsets: ['latin'] })
 
+const SITE_TITLE = 'ResumeAI-Bot — AI Resume Builder + Auto-Apply to Jobs in 50+ Countries'
+const SITE_DESCRIPTION =
+  'Build an ATS-ready resume with AI and auto-apply to jobs across 50+ countries. Free tier, 30-day money-back guarantee.'
+
 export const metadata: Metadata = {
-  title: 'ResumeAI',
-  description: 'AI-generated resumes and automated job applications',
+  title: SITE_TITLE,
+  description: SITE_DESCRIPTION,
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
   openGraph: {
-    title: 'ResumeAI',
-    description: 'AI-generated resumes and automated job applications',
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'ResumeAI',
-    description: 'AI-generated resumes and automated job applications',
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
   },
 }
 

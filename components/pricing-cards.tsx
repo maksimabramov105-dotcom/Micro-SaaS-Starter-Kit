@@ -38,7 +38,9 @@ const SAVINGS = {
 export function PricingCards() {
   const { data: session } = useSession()
   const router = useRouter()
-  const [interval, setInterval] = useState<BillingInterval>('month')
+  // Default to yearly so the first price shown is the better-value annual plan
+  // (HOMEPAGE_COPY.md §6).
+  const [interval, setInterval] = useState<BillingInterval>('year')
   const [isLoading, setIsLoading] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 

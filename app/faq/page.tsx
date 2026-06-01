@@ -43,6 +43,16 @@ const faqs = [
       'We take security seriously. All data is encrypted in transit and at rest. We use industry-standard security practices and regularly audit our systems.',
   },
   {
+    question: 'Do you store my job-site passwords?',
+    answer:
+      "No. ResumeAI-Bot never asks for or stores your job-site passwords. We apply on your behalf by completing the public application forms employers post (for example on Greenhouse), using your resume details and a dedicated ResumeAI email address — so there's no job-board login to share. The one optional exception is LinkedIn auto-apply, which requires your LinkedIn login: if you choose to enable it those credentials are encrypted, and if you skip it we still auto-apply everywhere else.",
+  },
+  {
+    question: 'Will employers know I used a tool?',
+    answer:
+      'No. Your applications are submitted with your own tailored resume under your name and a dedicated email address — they look like applications you sent yourself.',
+  },
+  {
     question: 'Can I use the API?',
     answer:
       'API access is available on Pro and Unlimited plans. You can generate API keys from your dashboard settings to integrate with our platform programmatically.',
@@ -90,8 +100,8 @@ export default function FaqPage() {
             <CardContent>
               <p className="text-sm text-gray-600">
                 Email us at{' '}
-                <a href="mailto:support@example.com" className="text-primary underline">
-                  support@example.com
+                <a href="mailto:support@resumeai-bot.ru" className="text-primary underline">
+                  support@resumeai-bot.ru
                 </a>{' '}
                 and we&apos;ll get back to you as soon as possible.
               </p>
