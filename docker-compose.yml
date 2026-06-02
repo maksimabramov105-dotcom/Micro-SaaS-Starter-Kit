@@ -57,6 +57,13 @@ services:
       GITHUB_SECRET: ${GITHUB_SECRET:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       RESEND_FROM: ${RESEND_FROM:-noreply@resumeai-bot.ru}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      # OpenAI / OpenRouter — used by the inbox reply classifier
+      # (lib/inbox/classify.ts). Without these the web container had no API key,
+      # so every recruiter reply fell through to UNCLASSIFIED.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
       STRIPE_PUBLIC_KEY: ${STRIPE_PUBLIC_KEY:-}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
