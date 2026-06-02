@@ -1,4 +1,12 @@
-resumeai-bot.ru, www.resumeai-bot.ru {
+# Canonical redirect: www -> apex. Keeps OAuth state/PKCE cookies and the
+# Google/GitHub redirect_uri on a single origin, which fixes the intermittent
+# "We had trouble linking that account" + Google 400 errors at sign-in
+# (NEXTAUTH_URL is the apex, so cookies/callbacks must live on the apex too).
+www.resumeai-bot.ru {
+	redir https://resumeai-bot.ru{uri} permanent
+}
+
+resumeai-bot.ru {
 	encode gzip
 
 	header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
