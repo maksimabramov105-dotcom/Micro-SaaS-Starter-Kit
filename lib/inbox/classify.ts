@@ -75,15 +75,23 @@ export async function classifyEmail(params: ClassifyParams): Promise<ClassifyRes
     `Body (first 500 chars): ${bodyText.slice(0, 500)}`,
   ].join('\n')
 
+  // Respect the configured provider. In production OPENAI_API_KEY is an
+  // OpenRouter key (sk-or-…) with OPENAI_BASE_URL=https://openrouter.ai/api and
+  // OPENAI_MODEL=openai/gpt-4o-mini. Hardcoding api.openai.com + 'gpt-4o-mini'
+  // caused every non-auto-responder email to 401 → UNCLASSIFIED, so real
+  // recruiter replies were never categorised.
+  const baseUrl = (process.env.OPENAI_BASE_URL || 'https://api.openai.com').replace(/\/+$/, '')
+  const model = process.env.OPENAI_MODEL || 'gpt-4o-mini'
+
   try {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    const res = await fetch(`${baseUrl}/v1/chat/completions`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: userMessage },
@@ -94,7 +102,7 @@ export async function classifyEmail(params: ClassifyParams): Promise<ClassifyRes
     })
 
     if (!res.ok) {
-      console.error('[inbox/classify] OpenAI error', res.status)
+      console.error('[inbox/classify] classifier API error', res.status)
       return { classification: 'UNCLASSIFIED', confidence: 0 }
     }
 

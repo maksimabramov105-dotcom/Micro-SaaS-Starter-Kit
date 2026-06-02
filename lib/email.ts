@@ -12,16 +12,27 @@ interface EmailOptions {
   to: string
   subject: string
   html: string
+  from?: string
+  replyTo?: string
 }
 
-export async function sendEmail({ to, subject, html }: EmailOptions) {
+// Resolve the sender address once, with a safe fallback chain:
+//   EMAIL_FROM (explicit) → RESEND_FROM (verified domain sender) → resend sandbox.
+// Without this, an unset EMAIL_FROM silently sent every transactional email from
+// the unverified onboarding@resend.dev sandbox address.
+function defaultFrom(): string {
+  return process.env.EMAIL_FROM || process.env.RESEND_FROM || 'onboarding@resend.dev'
+}
+
+export async function sendEmail({ to, subject, html, from, replyTo }: EmailOptions) {
   const resend = getResend()
   try {
     const data = await resend.emails.send({
-      from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
+      from: from || defaultFrom(),
       to,
       subject,
       html,
+      ...(replyTo ? { replyTo } : {}),
     })
 
     return { success: true, data }

@@ -26,6 +26,7 @@ export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { classifyEmail } from '@/lib/inbox/classify'
+import { notifyHumanReply, shouldNotify } from '@/lib/inbox/notify'
 import { verifyResendSignature, parseFrom, parseToAddress } from '@/lib/inbox/inbound-utils'
 import { publishEvent } from '@/lib/redis'
 
@@ -87,14 +88,20 @@ export async function POST(req: Request) {
   // ── 4. Look up user ─────────────────────────────────────────────────────
   const user = await prisma.user.findUnique({
     where: { inboxHandle: parsed.handle },
-    select: { id: true },
+    select: { id: true, email: true, name: true },
   })
   if (!user) {
     console.warn('[inbox/inbound] no user for handle', parsed.handle)
     return NextResponse.json({ ok: true, skipped: 'unknown_handle' })
   }
 
-  // ── 5. Validate applicationId ───────────────────────────────────────────
+  const { fromName, fromEmail } = parseFrom(rawFrom)
+
+  // ── 5. Resolve which application this reply belongs to ──────────────────
+  // Preferred: explicit applicationId from plus-addressing (handle+appId@…).
+  // Fallback: most senders reply to the bare handle, so heuristically match the
+  // sender's company against the user's recent submitted applications. This is
+  // what lets status updates + notifications work without plus-addressing.
   let applicationId: string | null = null
   if (parsed.applicationId) {
     const app = await prisma.jobApplication.findFirst({
@@ -103,8 +110,9 @@ export async function POST(req: Request) {
     })
     applicationId = app?.id ?? null
   }
-
-  const { fromName, fromEmail } = parseFrom(rawFrom)
+  if (!applicationId) {
+    applicationId = await matchApplicationByCompany(user.id, fromEmail, fromName, subject)
+  }
 
   // ── 6. Classify ─────────────────────────────────────────────────────────
   const { classification } = await classifyEmail({ fromEmail, subject, bodyText })
@@ -124,34 +132,73 @@ export async function POST(req: Request) {
   })
 
   // ── 8. Side-effects based on classification ─────────────────────────────
+  // Status transitions only apply when we could tie the reply to a specific
+  // application (plus-address or company heuristic).
   if (applicationId) {
-    if (classification === 'INTERVIEW_REQUEST') {
-      await Promise.all([
-        prisma.applicationEvent.create({
+    try {
+      if (classification === 'INTERVIEW_REQUEST') {
+        await prisma.jobApplication.update({
+          where: { id: applicationId },
+          data: { status: 'INTERVIEW', responseAt: new Date() },
+        })
+        await prisma.applicationEvent.create({
           data: {
             applicationId,
             type: 'interview_requested',
             payload: { messageId: message.id, fromEmail },
           },
-        }),
-        prisma.jobApplication.update({
+        })
+      } else if (classification === 'REJECTION') {
+        await prisma.jobApplication.update({
           where: { id: applicationId },
-          data: { status: 'INTERVIEW', responseAt: new Date() },
+          data: { status: 'REJECTED', responseAt: new Date() },
+        })
+        await prisma.applicationEvent.create({
+          data: {
+            applicationId,
+            type: 'rejected',
+            payload: { messageId: message.id, fromEmail },
+          },
+        })
+      } else if (classification === 'QUESTION') {
+        await prisma.applicationEvent.create({
+          data: {
+            applicationId,
+            type: 'recruiter_question',
+            payload: { messageId: message.id, fromEmail },
+          },
+        })
+      }
+    } catch (err) {
+      console.error('[inbox/inbound] status side-effect failed', err)
+    }
+  }
+
+  // ── 9. Notify the user (and admins) of any *human* reply ────────────────
+  // Fires regardless of whether we linked an application, so a real reply is
+  // never silently buried. Best-effort: never blocks the 200 response.
+  if (shouldNotify(classification)) {
+    try {
+      await Promise.all([
+        notifyHumanReply({
+          userEmail: user.email,
+          classification,
+          fromName,
+          fromEmail,
+          subject,
+          company: fromName,
+        }),
+        publishEvent('application_events', {
+          type: 'human_reply',
+          classification,
+          userId: user.id,
+          applicationId,
+          company: fromName || fromEmail,
+          timestamp: new Date().toISOString(),
         }),
       ])
-      // P18: notify via Telegram
-      await publishEvent('application_events', {
-        type: 'interview_reply',
-        userId: user.id,
-        applicationId,
-        company: fromName || fromEmail,
-        timestamp: new Date().toISOString(),
-      })
-    } else if (classification === 'REJECTION') {
-      await prisma.jobApplication.update({
-        where: { id: applicationId },
-        data: { status: 'REJECTED', responseAt: new Date() },
-      })
+    } catch (err) {
+      console.error('[inbox/inbound] notification failed', err)
     }
   }
 
@@ -164,4 +211,53 @@ export async function POST(req: Request) {
   })
 
   return NextResponse.json({ ok: true, messageId: message.id })
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────
+
+// ATS / mail-relay domains whose second-level name is NOT the hiring company.
+const RELAY_DOMAINS = new Set([
+  'greenhouse-mail', 'greenhouse', 'lever', 'myworkday', 'workday', 'ashbyhq',
+  'ashby', 'smartrecruiters', 'icims', 'jobvite', 'gmail', 'googlemail',
+  'outlook', 'hotmail', 'yahoo', 'resend', 'amazonses', 'sendgrid',
+])
+
+/**
+ * Best-effort: link a reply to one of the user's recent submitted applications
+ * by matching the sender's company against JobApplication.company. Returns the
+ * id of the most recent match, or null. Conservative — only matches on a
+ * meaningful (≥3 char) company token, never on relay/ATS domains.
+ */
+async function matchApplicationByCompany(
+  userId: string,
+  fromEmail: string,
+  fromName: string | null,
+  subject: string,
+): Promise<string | null> {
+  const domain = (fromEmail.split('@')[1] || '').toLowerCase()
+  const labels = domain.split('.').filter(Boolean)
+  // Second-level label is usually the company (gusto.com → "gusto",
+  // recruiting.intercom.com → "intercom").
+  const sld = labels.length >= 2 ? labels[labels.length - 2] : ''
+
+  const candidates = [sld, fromName?.toLowerCase() ?? '']
+    .map((c) => c.trim())
+    .filter((c) => c.length >= 3 && !RELAY_DOMAINS.has(c))
+
+  for (const token of candidates) {
+    const app = await prisma.jobApplication.findFirst({
+      where: {
+        userId,
+        company: { contains: token, mode: 'insensitive' },
+        status: { in: ['SUBMITTED', 'QUEUED', 'INTERVIEW'] },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    })
+    if (app) return app.id
+  }
+
+  // Last resort: a company name mentioned in the subject (e.g. "… at Acme").
+  void subject
+  return null
 }
