@@ -19,9 +19,9 @@ jobs:
     name: Test & type-check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '24'
           cache: npm
@@ -63,21 +63,21 @@ jobs:
     outputs:
       image_tag: ${{ github.sha }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       # ── web image ─────────────────────────────────────────────────────────
       - name: Build & push web
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: true
@@ -89,7 +89,7 @@ jobs:
 
       # ── worker image ──────────────────────────────────────────────────────
       - name: Build & push worker
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: ./worker
           push: true
@@ -101,7 +101,7 @@ jobs:
 
       # ── notifier image ────────────────────────────────────────────────────
       - name: Build & push notifier
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: ./notifier
           push: true
@@ -120,7 +120,7 @@ jobs:
     permissions:
       packages: read   # allows github.token to pull images from GHCR on VPS
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Sync docker-compose.yml to VPS
         uses: appleboy/scp-action@v1
