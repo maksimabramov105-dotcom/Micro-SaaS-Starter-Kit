@@ -1,6 +1,7 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { getAdminAnalytics } from '@/lib/analytics'
 import { Users, CreditCard, TrendingUp, Activity } from 'lucide-react'
@@ -20,6 +21,12 @@ export default async function AdminPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold">Admin Dashboard</h1>
         <p className="text-gray-500">Overview of your SaaS metrics</p>
+        <Link
+          href="/dashboard/admin/analytics"
+          className="mt-2 inline-block text-sm font-medium text-emerald-600 hover:underline"
+        >
+          → Marketing analytics (traffic by source, funnel, leads)
+        </Link>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
