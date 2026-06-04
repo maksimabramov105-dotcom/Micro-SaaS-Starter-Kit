@@ -954,9 +954,43 @@ async def _check_required_boxes(page: Page) -> None:
             pass
 
 
+# Greenhouse's verification email reads:
+#   "Copy and paste this code into the security code field on your
+#    application: R2JpYKXl  After you enter the code, resubmit your application."
+# Codes are 6–12 mixed-case alphanumerics (not plain 6-digit numbers), so we
+# anchor on the surrounding phrasing and prefer a token that mixes letters and
+# digits — which also avoids capturing ordinary English words.
+_CODE_PATTERNS = [
+    re.compile(r"code\s+field\s+on\s+your\s+application[:\s]+([A-Za-z0-9]{6,12})", re.I),
+    re.compile(r"(?:security|verification)\s+code\s+(?:is\b|:)[\s:]*([A-Za-z0-9]{6,12})", re.I),
+    re.compile(r"\bcode[:\s]+([A-Za-z0-9]{6,12})\b", re.I),
+    re.compile(r"application[:\s]*([A-Za-z0-9]{6,12})", re.I),  # legacy fallback
+]
+
+
+def _extract_security_code(text: str) -> Optional[str]:
+    """
+    Extract a Greenhouse email security code from a (HTML-stripped) email body.
+    Prefers a letter+digit mixed token (the real code format) over a purely
+    numeric/alpha match.  Returns None when no plausible code is present.
+    """
+    if not text:
+        return None
+    flat = re.sub(r"\s+", " ", text)
+    candidates: list[str] = []
+    for pat in _CODE_PATTERNS:
+        candidates.extend(m.group(1) for m in pat.finditer(flat))
+    if not candidates:
+        return None
+    for tok in candidates:
+        if any(c.isdigit() for c in tok) and any(c.isalpha() for c in tok):
+            return tok
+    return candidates[0]
+
+
 async def _poll_greenhouse_code(
     email: str, company: str, resend_key: str, since_iso: str,
-    attempts: int = 8, delay: float = 4.0,
+    attempts: int = 10, delay: float = 4.0,
 ) -> Optional[str]:
     """
     Poll the Resend inbound mailbox for Greenhouse's "Security code for your
@@ -969,7 +1003,6 @@ async def _poll_greenhouse_code(
     if not resend_key:
         return None
     headers = {"Authorization": f"Bearer {resend_key}"}
-    code_re = re.compile(r"application[:\s]*([A-Za-z0-9]{6,12})", re.I)
     company_key = company.lower()[:6]
     async with httpx.AsyncClient(timeout=15, headers=headers) as client:
         for _ in range(attempts):
@@ -1011,10 +1044,9 @@ async def _poll_greenhouse_code(
                     html = body.get("html") or body.get("text") or ""
                 except Exception:
                     continue
-                text = re.sub(r"<[^>]+>", " ", html)
-                match = code_re.search(text)
-                if match:
-                    return match.group(1)
+                code = _extract_security_code(re.sub(r"<[^>]+>", " ", html))
+                if code:
+                    return code
     return None
 
 
@@ -1040,6 +1072,12 @@ async def _complete_greenhouse_verification(
     single = None
     n_boxes = 0
     for _attempt in range(8):  # ~15 s total
+        # The confirmation page sometimes renders a few seconds after the first
+        # submit (no code step at all). Re-check before concluding the code field
+        # is simply slow — this rescues "submit_unconfirmed" cases where the
+        # application actually went through but the thank-you was late to paint.
+        if await _verify_submitted(page):
+            return True
         try:
             n_boxes = await boxes.count()
         except Exception:

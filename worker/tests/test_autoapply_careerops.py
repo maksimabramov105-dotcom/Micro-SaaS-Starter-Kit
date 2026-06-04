@@ -13,7 +13,42 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from worker.autoapply.careerops import CareerOpsApplicator, detect_ats
+from worker.autoapply.careerops import (
+    CareerOpsApplicator,
+    detect_ats,
+    _extract_security_code,
+)
+
+
+# ── _extract_security_code ──────────────────────────────────────────────────
+
+class TestExtractSecurityCode:
+    def test_real_greenhouse_template(self):
+        # Verbatim body from a real Greenhouse verification email.
+        body = ("Hi Alex, Copy and paste this code into the security code field "
+                "on your application: R2JpYKXl After you enter the code, resubmit "
+                "your application. (c) 2026 Greenhouse")
+        assert _extract_security_code(body) == "R2JpYKXl"
+
+    def test_prefers_mixed_letter_digit_token(self):
+        body = "enter the code on your application: 7Hj2Kp9 then resubmit shortly"
+        assert _extract_security_code(body) == "7Hj2Kp9"
+
+    def test_security_code_is_phrasing(self):
+        assert _extract_security_code("Your security code is: A1B2C3") == "A1B2C3"
+
+    def test_purely_numeric_code(self):
+        assert _extract_security_code("Your code: 481920 expires soon") == "481920"
+
+    def test_collapses_whitespace_and_newlines(self):
+        body = "code field on your\n  application:\n\tR2JpYKXl\n"
+        assert _extract_security_code(body) == "R2JpYKXl"
+
+    def test_no_code_returns_none(self):
+        assert _extract_security_code("Thanks for applying to Acme!") is None
+
+    def test_empty_returns_none(self):
+        assert _extract_security_code("") is None
 
 
 # ── detect_ats ────────────────────────────────────────────────────────────────
