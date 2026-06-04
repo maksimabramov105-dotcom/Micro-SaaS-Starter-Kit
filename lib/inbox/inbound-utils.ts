@@ -143,8 +143,15 @@ export function extractCompanyFromSubject(subject: string): string | null {
   // 2. Stop at a spaced dash separator ("Acme - Senior Role").
   const dash = company.search(/ [-–—] /)
   if (dash >= 0) company = company.slice(0, dash)
-  // 3. Drop a trailing "for/at/the …" clause.
-  company = company.replace(/ (?:for|at|the) .*$/i, '')
+  // 3. Drop a trailing "for/at/the …" clause (linear via indexOf — a regex
+  //    like / (?:for|at|the) .*$/ backtracks polynomially on repeated " at ").
+  const lower = company.toLowerCase()
+  let cut = -1
+  for (const sep of [' for ', ' at ', ' the ']) {
+    const i = lower.indexOf(sep)
+    if (i >= 0 && (cut === -1 || i < cut)) cut = i
+  }
+  if (cut >= 0) company = company.slice(0, cut)
   // 4. Strip a trailing corporate suffix, then trailing whitespace.
   company = company.replace(COMPANY_SUFFIXES, '').trim()
 
