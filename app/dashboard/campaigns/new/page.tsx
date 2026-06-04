@@ -19,6 +19,12 @@ const formSchema = z.object({
   dailyLimit: z.coerce.number().min(1).max(100),
   linkedinEmail: z.string().optional(),
   linkedinPassword: z.string().optional(),
+  // Eligibility profile (Phase 1) — initial values supplied via defaultValues.
+  remoteOnly: z.boolean(),
+  needsVisaSponsorship: z.boolean(),
+  willingToRelocate: z.boolean(),
+  authorizedCountries: z.string().optional(),
+  languages: z.string().optional(),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -58,6 +64,9 @@ export default function NewCampaignPage() {
     defaultValues: {
       source: 'CAREEROPS',
       dailyLimit: 5,
+      remoteOnly: true,
+      needsVisaSponsorship: false,
+      willingToRelocate: false,
     },
   })
 
@@ -75,6 +84,8 @@ export default function NewCampaignPage() {
           keywords: data.keywords.split('\n').map((s) => s.trim()).filter(Boolean),
           locations: data.locations.split('\n').map((s) => s.trim()).filter(Boolean),
           excludeCompanies: data.excludeCompanies.split('\n').map((s) => s.trim()).filter(Boolean),
+          authorizedCountries: (data.authorizedCountries ?? '').split(/[\n,]/).map((s) => s.trim()).filter(Boolean),
+          languages: (data.languages ?? '').split(/[\n,]/).map((s) => s.trim()).filter(Boolean),
         }),
       })
       if (!res.ok) {
@@ -190,6 +201,36 @@ export default function NewCampaignPage() {
               {errors.dailyLimit && (
                 <p className="mt-1 text-xs text-red-500">{errors.dailyLimit.message}</p>
               )}
+            </div>
+
+            {/* Eligibility profile (Phase 1) — drives honest screening answers
+                and the pre-apply knockout filter. */}
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-3">
+              <p className="text-sm font-medium text-slate-800">Eligibility</p>
+              <p className="text-xs text-slate-500">
+                We only apply where you can actually work, and answer
+                work-authorization questions honestly based on this.
+              </p>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" className="accent-emerald-600" {...register('remoteOnly')} />
+                Remote only (recommended) — skip on-site roles
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" className="accent-emerald-600" {...register('needsVisaSponsorship')} />
+                I need visa sponsorship
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" className="accent-emerald-600" {...register('willingToRelocate')} />
+                I&apos;m willing to relocate
+              </label>
+              <div>
+                <Label htmlFor="authorizedCountries">Countries where I can legally work (comma-separated)</Label>
+                <Input id="authorizedCountries" placeholder="United States, Germany" {...register('authorizedCountries')} />
+              </div>
+              <div>
+                <Label htmlFor="languages">Languages (comma-separated)</Label>
+                <Input id="languages" placeholder="English, German" {...register('languages')} />
+              </div>
             </div>
 
             {/* LinkedIn credentials — only shown when source = LINKEDIN */}

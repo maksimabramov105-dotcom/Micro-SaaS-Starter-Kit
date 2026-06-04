@@ -13,11 +13,98 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from worker.autoapply import eligibility as elig
 from worker.autoapply.careerops import (
     CareerOpsApplicator,
     detect_ats,
     _extract_security_code,
+    _pick_answer,
 )
+
+
+# ── eligibility resolver ─────────────────────────────────────────────────────
+
+INTL = {  # internationally-located candidate, not US-authorized
+    "authorized_countries": ["Germany"],
+    "needs_visa_sponsorship": True,
+    "willing_to_relocate": False,
+    "remote_only": False,
+    "languages": ["English", "German"],
+}
+US_AUTH = {
+    "authorized_countries": ["United States"],
+    "needs_visa_sponsorship": False,
+    "willing_to_relocate": False,
+    "remote_only": False,
+    "languages": ["English"],
+}
+
+
+class TestEligibilityResolver:
+    def test_normalize_country_aliases(self):
+        assert elig.normalize_country("US") == "united states"
+        assert elig.normalize_country("United States") == "united states"
+        assert elig.normalize_country("  USA ") == "united states"
+
+    def test_work_authorized(self):
+        assert elig.work_authorized(US_AUTH, "United States") is True
+        assert elig.work_authorized(INTL, "United States") is False
+        assert elig.work_authorized(INTL, "Germany") is True
+        assert elig.work_authorized(None, "United States") is False
+
+    def test_requires_sponsorship(self):
+        assert elig.requires_sponsorship(INTL) is True
+        assert elig.requires_sponsorship(US_AUTH) is False
+
+    def test_knockout_remote_job_always_ok(self):
+        assert elig.knockout_reason(INTL, "United States", job_is_remote=True) is None
+
+    def test_knockout_remote_only_skips_onsite(self):
+        prof = {**INTL, "remote_only": True}
+        assert elig.knockout_reason(prof, "United States", job_is_remote=False) == "remote_only"
+
+    def test_knockout_work_auth_for_us_onsite_intl(self):
+        # international profile, US on-site → work_auth knockout
+        assert elig.knockout_reason(INTL, "United States", job_is_remote=False) == "work_auth"
+
+    def test_knockout_none_when_authorized(self):
+        assert elig.knockout_reason(US_AUTH, "United States", job_is_remote=False) is None
+
+    def test_knockout_relocate_without_sponsorship_ok(self):
+        prof = {"authorized_countries": [], "needs_visa_sponsorship": False,
+                "willing_to_relocate": True, "remote_only": False, "languages": []}
+        assert elig.knockout_reason(prof, "Canada", job_is_remote=False) is None
+
+    def test_knockout_unknown_country_not_skipped(self):
+        prof = {**INTL, "remote_only": False}
+        assert elig.knockout_reason(prof, "", job_is_remote=False) is None
+
+
+# ── _pick_answer honest mapping ──────────────────────────────────────────────
+
+class TestPickAnswerEligibility:
+    YES_NO = ["Yes", "No"]
+    SPONSOR_OPTS = ["Yes, I will require sponsorship", "No, I do not require sponsorship"]
+
+    def test_authorization_honest_no_for_intl(self):
+        ans = _pick_answer("Are you legally authorized to work in the US?",
+                           self.YES_NO, INTL, "United States")
+        assert ans == "No"
+
+    def test_authorization_yes_when_authorized(self):
+        ans = _pick_answer("Are you authorized to work in the United States?",
+                           self.YES_NO, US_AUTH, "United States")
+        assert ans == "Yes"
+
+    def test_sponsorship_yes_when_needed(self):
+        ans = _pick_answer("Will you now or in the future require visa sponsorship?",
+                           self.SPONSOR_OPTS, INTL, "United States")
+        assert ans == "Yes, I will require sponsorship"
+
+    def test_sponsorship_no_when_not_needed(self):
+        ans = _pick_answer("Do you require sponsorship?",
+                           self.SPONSOR_OPTS, US_AUTH, "United States")
+        assert ans == "No, I do not require sponsorship"
 
 
 # ── _extract_security_code ──────────────────────────────────────────────────

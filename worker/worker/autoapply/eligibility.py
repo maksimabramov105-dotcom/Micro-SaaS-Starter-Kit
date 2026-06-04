@@ -1,0 +1,109 @@
+"""
+eligibility.py — honest work-authorization / sponsorship / location answers.
+
+Phase 1: replaces the old blanket "authorized to work in the US, no visa
+sponsorship needed" assumption.  Answers are derived from the candidate's
+eligibility profile (threaded from AutoApplyCampaign) and the JOB's country,
+so the worker never claims false authorization.
+
+The profile is a plain dict (decoded from the worker payload):
+    {
+      "authorized_countries": ["United States", "Germany"],  # where they can work
+      "needs_visa_sponsorship": false,
+      "willing_to_relocate": false,
+      "remote_only": true,
+      "languages": ["English", "German"],
+    }
+"""
+from __future__ import annotations
+
+from typing import Optional
+
+# Common country spellings/abbreviations → a normalized comparison key.
+_COUNTRY_ALIASES = {
+    "us": "united states",
+    "usa": "united states",
+    "u.s.": "united states",
+    "u.s.a.": "united states",
+    "united states of america": "united states",
+    "america": "united states",
+    "uk": "united kingdom",
+    "u.k.": "united kingdom",
+    "great britain": "united kingdom",
+    "england": "united kingdom",
+    "uae": "united arab emirates",
+    "deutschland": "germany",
+}
+
+
+def normalize_country(value: str) -> str:
+    """Lowercase, collapse whitespace, and canonicalize common aliases."""
+    if not value:
+        return ""
+    v = " ".join(str(value).strip().lower().split())
+    return _COUNTRY_ALIASES.get(v, v)
+
+
+def work_authorized(eligibility: Optional[dict], job_country: str) -> bool:
+    """
+    True only when the candidate is authorized to work in the job's country.
+    With no profile or no resolvable job country we return False (conservative —
+    never claim authorization we cannot back up).
+    """
+    if not eligibility:
+        return False
+    jc = normalize_country(job_country)
+    if not jc:
+        return False
+    authorized = {
+        normalize_country(c) for c in (eligibility.get("authorized_countries") or [])
+    }
+    return jc in authorized
+
+
+def requires_sponsorship(eligibility: Optional[dict]) -> bool:
+    """Whether the candidate needs visa sponsorship (honest, profile-driven)."""
+    if not eligibility:
+        return False
+    return bool(eligibility.get("needs_visa_sponsorship"))
+
+
+def willing_to_relocate(eligibility: Optional[dict]) -> bool:
+    if not eligibility:
+        return False
+    return bool(eligibility.get("willing_to_relocate"))
+
+
+def remote_only(eligibility: Optional[dict]) -> bool:
+    # Default True: safest for an internationally-located candidate (best
+    # eligibility + reply rate) until they explicitly opt into on-site.
+    if not eligibility:
+        return True
+    return bool(eligibility.get("remote_only", True))
+
+
+def knockout_reason(
+    eligibility: Optional[dict], job_country: str, job_is_remote: bool
+) -> Optional[str]:
+    """
+    Pre-apply eligibility gate.  Returns a short reason string when the
+    candidate should NOT apply (so the caller can skip + log instead of burning
+    quota), or None when the application is worth attempting.
+
+    Reasons: "remote_only", "work_auth".
+    """
+    if job_is_remote:
+        return None  # remote roles skip the work-authorization knockout
+    if remote_only(eligibility):
+        return "remote_only"
+    jc = normalize_country(job_country)
+    if not jc:
+        return None  # unknown on-site location — don't skip on uncertainty
+    if work_authorized(eligibility, jc):
+        return None
+    # Not authorized in the job's country. Relocating still requires the right to
+    # work there, so only treat it as eligible when the candidate is willing to
+    # relocate AND does not need sponsorship (e.g. holds qualifying citizenship).
+    if willing_to_relocate(eligibility) and not requires_sponsorship(eligibility):
+        return None
+    return "work_auth"

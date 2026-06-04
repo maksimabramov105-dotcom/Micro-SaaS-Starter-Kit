@@ -37,6 +37,11 @@ export async function POST(req: Request) {
     dailyLimit,
     linkedinEmail,
     linkedinPassword,
+    authorizedCountries,
+    needsVisaSponsorship,
+    willingToRelocate,
+    remoteOnly,
+    languages,
   } = body as {
     resumeId: string
     source: string
@@ -46,6 +51,11 @@ export async function POST(req: Request) {
     dailyLimit: number
     linkedinEmail?: string
     linkedinPassword?: string
+    authorizedCountries?: string[]
+    needsVisaSponsorship?: boolean
+    willingToRelocate?: boolean
+    remoteOnly?: boolean
+    languages?: string[]
   }
 
   if (!resumeId || !source) {
@@ -82,6 +92,12 @@ export async function POST(req: Request) {
       dailyLimit: Number(dailyLimit) || 5,
       linkedinEmail: linkedinEmail || null,
       linkedinPasswordEnc: linkedinPasswordEnc || null,
+      // Eligibility profile (Phase 1). Defaults: remote-only on, no sponsorship.
+      authorizedCountries: Array.isArray(authorizedCountries) ? authorizedCountries : [],
+      needsVisaSponsorship: Boolean(needsVisaSponsorship),
+      willingToRelocate: Boolean(willingToRelocate),
+      remoteOnly: remoteOnly === undefined ? true : Boolean(remoteOnly),
+      languages: Array.isArray(languages) ? languages : [],
     },
   })
 
