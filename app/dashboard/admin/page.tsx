@@ -27,6 +27,12 @@ export default async function AdminPage() {
         >
           → Marketing analytics (traffic by source, funnel, leads)
         </Link>
+        <Link
+          href="/dashboard/admin/sourcing"
+          className="mt-2 ml-4 inline-block text-sm font-medium text-emerald-600 hover:underline"
+        >
+          → Sourcing funnel (applications by source)
+        </Link>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">

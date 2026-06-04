@@ -240,6 +240,10 @@ export default function NewCampaignPage() {
                 <p className="text-xs text-amber-600">
                   Your password is encrypted before being stored and never exposed in plain text.
                 </p>
+                <p className="text-xs font-medium text-amber-700">
+                  ⚠️ Replies to LinkedIn Easy Apply jobs show up in your LinkedIn inbox —
+                  not your ResumeAI inbox — so they can&apos;t be tracked here.
+                </p>
                 <div>
                   <Label htmlFor="linkedinEmail">LinkedIn email</Label>
                   <Input
