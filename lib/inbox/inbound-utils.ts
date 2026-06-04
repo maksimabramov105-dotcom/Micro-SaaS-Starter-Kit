@@ -105,3 +105,41 @@ export function parseToAddress(
 
   return { handle: local, applicationId: null }
 }
+
+// ── Subject parsing ──────────────────────────────────────────────────────────
+
+// Corporate suffixes to strip from a company name extracted from a subject line.
+const COMPANY_SUFFIXES = /\b(inc|incorporated|llc|l\.l\.c|ltd|limited|corp|corporation|co|gmbh|plc|sa|ag|bv|pty)\.?$/i
+
+/**
+ * Extract the hiring company from a confirmation/verification subject line.
+ *
+ * ATS relays (e.g. Greenhouse → no-reply@us.greenhouse-mail.io) send confirmation
+ * and email-verification messages where the *sender domain* is the relay and the
+ * actual company appears only in the subject:
+ *   "Security code for your application to Cloudflare"      → "Cloudflare"
+ *   "Thank you for applying to Mixpanel"                    → "Mixpanel"
+ *   "Thank You for Applying to Checkr!"                     → "Checkr"
+ *   "Security code for your application to Gusto, Inc."     → "Gusto"
+ *
+ * Conservative: anchors on the explicit "applying/application … to <X>" phrasing
+ * (never a bare "to"), stops at the first clause/punctuation boundary, and strips
+ * trailing corporate suffixes. Returns null when no company can be confidently read.
+ */
+export function extractCompanyFromSubject(subject: string): string | null {
+  if (!subject) return null
+  const m = subject.match(/\b(?:applying|application|applied)\s+(?:to|for)\s+(.+)$/i)
+  if (!m) return null
+
+  // Take the company up to the first boundary (comma, dash, !, ., parens, "for/at/the").
+  let company = m[1]
+    .split(/[,!?.()–—]|\s+[-–—]\s+|\s+\b(?:for|at|the)\b\s+/i)[0]
+    .trim()
+    .replace(COMPANY_SUFFIXES, '')
+    .trim()
+    .replace(/[,\s]+$/, '')
+
+  // Reject empty/too-short leftovers (e.g. a lone "the").
+  if (company.length < 2) return null
+  return company
+}

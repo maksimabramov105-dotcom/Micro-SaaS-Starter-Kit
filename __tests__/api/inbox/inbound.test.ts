@@ -18,6 +18,7 @@ import {
   verifyResendSignature,
   parseFrom,
   parseToAddress,
+  extractCompanyFromSubject,
 } from '@/lib/inbox/inbound-utils'
 import { isAutoResponder } from '@/lib/inbox/classify'
 
@@ -183,6 +184,48 @@ describe('parseToAddress', () => {
     // Callers normalise arrays before calling; verify plain string works
     const result = parseToAddress('bob-x1y2@inbox.resumeai-bot.ru', DOMAIN)
     expect(result?.handle).toBe('bob-x1y2')
+  })
+})
+
+// ── extractCompanyFromSubject ───────────────────────────────────────────────
+
+describe('extractCompanyFromSubject', () => {
+  it('extracts company from a Greenhouse security-code subject', () => {
+    expect(extractCompanyFromSubject('Security code for your application to Cloudflare')).toBe('Cloudflare')
+  })
+
+  it('extracts company from a "thank you for applying to" subject', () => {
+    expect(extractCompanyFromSubject('Thank you for applying to Mixpanel')).toBe('Mixpanel')
+  })
+
+  it('is case-insensitive on the phrasing and stops at trailing "!"', () => {
+    expect(extractCompanyFromSubject('Thank You for Applying to Checkr!')).toBe('Checkr')
+  })
+
+  it('strips a trailing corporate suffix after a comma', () => {
+    expect(extractCompanyFromSubject('Security code for your application to Gusto, Inc.')).toBe('Gusto')
+  })
+
+  it('keeps multi-word company names', () => {
+    expect(extractCompanyFromSubject('Security code for your application to Chime Financial')).toBe('Chime Financial')
+  })
+
+  it('handles "applied to"', () => {
+    expect(extractCompanyFromSubject('You applied to Robinhood')).toBe('Robinhood')
+  })
+
+  it('returns null when there is no "applying/application to" phrasing', () => {
+    expect(extractCompanyFromSubject('Your interview is scheduled')).toBeNull()
+    expect(extractCompanyFromSubject('Re: question about the role')).toBeNull()
+  })
+
+  it('does NOT match on a bare "to"', () => {
+    // "to" without the application phrasing must not be treated as a company cue
+    expect(extractCompanyFromSubject('Welcome to the team')).toBeNull()
+  })
+
+  it('returns null for empty input', () => {
+    expect(extractCompanyFromSubject('')).toBeNull()
   })
 })
 
