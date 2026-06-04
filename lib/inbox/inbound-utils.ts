@@ -131,13 +131,20 @@ export function extractCompanyFromSubject(subject: string): string | null {
   const m = subject.match(/\b(?:applying|application|applied)\s+(?:to|for)\s+(.+)$/i)
   if (!m) return null
 
-  // Take the company up to the first boundary (comma, dash, !, ., parens, "for/at/the").
+  // Trim the captured tail to just the company name. Each step uses a
+  // linear-time regex (no `\s+X\s+` or `[,\s]+$` patterns) to avoid ReDoS on
+  // attacker-influenceable email subjects.
   let company = m[1]
-    .split(/[,!?.()–—]|\s+[-–—]\s+|\s+\b(?:for|at|the)\b\s+/i)[0]
-    .trim()
-    .replace(COMPANY_SUFFIXES, '')
-    .trim()
-    .replace(/[,\s]+$/, '')
+  // 1. Stop at the first hard delimiter (punctuation / newline).
+  const delim = company.search(/[,!?.()\n]/)
+  if (delim >= 0) company = company.slice(0, delim)
+  // 2. Stop at a spaced dash separator ("Acme - Senior Role").
+  const dash = company.search(/ [-–—] /)
+  if (dash >= 0) company = company.slice(0, dash)
+  // 3. Drop a trailing "for/at/the …" clause.
+  company = company.replace(/ (?:for|at|the) .*$/i, '')
+  // 4. Strip a trailing corporate suffix, then trailing whitespace.
+  company = company.replace(COMPANY_SUFFIXES, '').trim()
 
   // Reject empty/too-short leftovers (e.g. a lone "the").
   if (company.length < 2) return null
