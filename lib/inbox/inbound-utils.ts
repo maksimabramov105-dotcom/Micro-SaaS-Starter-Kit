@@ -128,15 +128,17 @@ const COMPANY_SUFFIXES = /\b(inc|incorporated|llc|l\.l\.c|ltd|limited|corp|corpo
  */
 export function extractCompanyFromSubject(subject: string): string | null {
   if (!subject) return null
-  const m = subject.match(/\b(?:applying|application|applied)\s+(?:to|for)\s+(.+)$/i)
+  // Normalize whitespace ONCE (linear), so every matcher below can use single
+  // literal spaces and avoid the `\s+X\s+` adjacency that causes polynomial
+  // ReDoS on attacker-influenceable email subjects.
+  const s = subject.replace(/\s+/g, ' ').trim()
+  const m = /\b(?:applying|application|applied) (?:to|for) (.+)$/i.exec(s)
   if (!m) return null
 
-  // Trim the captured tail to just the company name. Each step uses a
-  // linear-time regex (no `\s+X\s+` or `[,\s]+$` patterns) to avoid ReDoS on
-  // attacker-influenceable email subjects.
+  // Trim the captured tail to just the company name (all linear-time).
   let company = m[1]
-  // 1. Stop at the first hard delimiter (punctuation / newline).
-  const delim = company.search(/[,!?.()\n]/)
+  // 1. Stop at the first hard delimiter (punctuation).
+  const delim = company.search(/[,!?.()]/)
   if (delim >= 0) company = company.slice(0, delim)
   // 2. Stop at a spaced dash separator ("Acme - Senior Role").
   const dash = company.search(/ [-–—] /)
