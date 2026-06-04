@@ -105,3 +105,57 @@ export function parseToAddress(
 
   return { handle: local, applicationId: null }
 }
+
+// ── Subject parsing ──────────────────────────────────────────────────────────
+
+// Corporate suffixes to strip from a company name extracted from a subject line.
+const COMPANY_SUFFIXES = /\b(inc|incorporated|llc|l\.l\.c|ltd|limited|corp|corporation|co|gmbh|plc|sa|ag|bv|pty)\.?$/i
+
+/**
+ * Extract the hiring company from a confirmation/verification subject line.
+ *
+ * ATS relays (e.g. Greenhouse → no-reply@us.greenhouse-mail.io) send confirmation
+ * and email-verification messages where the *sender domain* is the relay and the
+ * actual company appears only in the subject:
+ *   "Security code for your application to Cloudflare"      → "Cloudflare"
+ *   "Thank you for applying to Mixpanel"                    → "Mixpanel"
+ *   "Thank You for Applying to Checkr!"                     → "Checkr"
+ *   "Security code for your application to Gusto, Inc."     → "Gusto"
+ *
+ * Conservative: anchors on the explicit "applying/application … to <X>" phrasing
+ * (never a bare "to"), stops at the first clause/punctuation boundary, and strips
+ * trailing corporate suffixes. Returns null when no company can be confidently read.
+ */
+export function extractCompanyFromSubject(subject: string): string | null {
+  if (!subject) return null
+  // Normalize whitespace ONCE (linear), so every matcher below can use single
+  // literal spaces and avoid the `\s+X\s+` adjacency that causes polynomial
+  // ReDoS on attacker-influenceable email subjects.
+  const s = subject.replace(/\s+/g, ' ').trim()
+  const m = /\b(?:applying|application|applied) (?:to|for) (.+)$/i.exec(s)
+  if (!m) return null
+
+  // Trim the captured tail to just the company name (all linear-time).
+  let company = m[1]
+  // 1. Stop at the first hard delimiter (punctuation).
+  const delim = company.search(/[,!?.()]/)
+  if (delim >= 0) company = company.slice(0, delim)
+  // 2. Stop at a spaced dash separator ("Acme - Senior Role").
+  const dash = company.search(/ [-–—] /)
+  if (dash >= 0) company = company.slice(0, dash)
+  // 3. Drop a trailing "for/at/the …" clause (linear via indexOf — a regex
+  //    like / (?:for|at|the) .*$/ backtracks polynomially on repeated " at ").
+  const lower = company.toLowerCase()
+  let cut = -1
+  for (const sep of [' for ', ' at ', ' the ']) {
+    const i = lower.indexOf(sep)
+    if (i >= 0 && (cut === -1 || i < cut)) cut = i
+  }
+  if (cut >= 0) company = company.slice(0, cut)
+  // 4. Strip a trailing corporate suffix, then trailing whitespace.
+  company = company.replace(COMPANY_SUFFIXES, '').trim()
+
+  // Reject empty/too-short leftovers (e.g. a lone "the").
+  if (company.length < 2) return null
+  return company
+}

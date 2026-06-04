@@ -462,6 +462,15 @@ model AutoApplyCampaign {
   salaryMin        Int?               // legacy: autoapply.db.campaigns.salary_min
   experience       String?            // legacy: autoapply.db.campaigns.experience (e.g. "1-3 years")
 
+  // Eligibility profile (Phase 1) — drives honest work-auth/sponsorship/relocation
+  // screening answers AND the pre-apply knockout filter, so we only apply where the
+  // candidate can actually work (and never claim false authorization).
+  authorizedCountries  String[] @default([])    // countries where the candidate may legally work
+  needsVisaSponsorship Boolean  @default(false)
+  willingToRelocate    Boolean  @default(false)
+  remoteOnly           Boolean  @default(true)   // default: remote-only (best eligibility + reply rate)
+  languages            String[] @default([])
+
   // Throttling
   dailyLimit     Int      // copied from plan tier at creation; legacy: autoapply.db.campaigns.daily_limit
   totalSent      Int      @default(0) // legacy: autoapply.db.campaigns.applications_sent

@@ -27,7 +27,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { classifyEmail } from '@/lib/inbox/classify'
 import { notifyHumanReply, shouldNotify } from '@/lib/inbox/notify'
-import { verifyResendSignature, parseFrom, parseToAddress } from '@/lib/inbox/inbound-utils'
+import { verifyResendSignature, parseFrom, parseToAddress, extractCompanyFromSubject } from '@/lib/inbox/inbound-utils'
 import { publishEvent } from '@/lib/redis'
 
 const INBOX_DOMAIN = process.env.INBOX_DOMAIN ?? 'inbox.resumeai-bot.ru'
@@ -240,7 +240,11 @@ async function matchApplicationByCompany(
   // recruiting.intercom.com → "intercom").
   const sld = labels.length >= 2 ? labels[labels.length - 2] : ''
 
-  const candidates = [sld, fromName?.toLowerCase() ?? '']
+  // ATS relays (Greenhouse, etc.) send from a relay domain with an empty
+  // fromName, so the company is only in the subject ("…applying to Acme").
+  // Try domain/name first (most reliable when present), then the subject.
+  const subjectCompany = extractCompanyFromSubject(subject)?.toLowerCase() ?? ''
+  const candidates = [sld, fromName?.toLowerCase() ?? '', subjectCompany]
     .map((c) => c.trim())
     .filter((c) => c.length >= 3 && !RELAY_DOMAINS.has(c))
 
@@ -257,7 +261,5 @@ async function matchApplicationByCompany(
     if (app) return app.id
   }
 
-  // Last resort: a company name mentioned in the subject (e.g. "… at Acme").
-  void subject
   return null
 }

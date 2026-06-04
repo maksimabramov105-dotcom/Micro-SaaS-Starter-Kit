@@ -52,6 +52,8 @@ import httpx
 import structlog
 from playwright.async_api import async_playwright, BrowserContext, Page
 
+from worker.autoapply import eligibility as _elig
+
 logger = structlog.get_logger(__name__)
 
 # LLM client (reused from the resume pipeline) for answering job-specific
@@ -278,11 +280,19 @@ async def _verify_submitted(page: Page) -> bool:
     return False
 
 
-def _pick_answer(label: str, options: list[str]) -> Optional[str]:
+def _pick_answer(
+    label: str,
+    options: list[str],
+    eligibility: Optional[dict] = None,
+    job_country: str = "",
+) -> Optional[str]:
     """
     Choose the best option text for a screening/EEO question, given its label.
-    Conservative, compliance-safe defaults (decline to self-identify; authorized
-    to work = yes; visa sponsorship = no).  Returns None when no option fits.
+
+    Work-authorization, visa-sponsorship and relocation answers are derived from
+    the candidate's eligibility profile and the job's country (Phase 1) — never a
+    blanket "US authorized". Demographic/EEO questions decline to self-identify.
+    Returns None when no option fits.
     """
     L = label.lower()
 
@@ -298,12 +308,21 @@ def _pick_answer(label: str, options: list[str]) -> Optional[str]:
         "not to disclose", "not to answer", "not to identify", "not to specify",
     )
     if any(k in L for k in ["authoriz", "eligible to work", "legally authorized", "right to work"]):
-        return find("yes") or (options[1] if len(options) > 1 else None)
+        if _elig.work_authorized(eligibility, job_country):
+            return find("yes") or (options[1] if len(options) > 1 else None)
+        # Honest "no" — never claim authorization we cannot back up.
+        return find("no, i am not", "no, i'm not", "no") or (options[0] if options else None)
     if any(k in L for k in ["sponsor", "visa", "immigration support"]):
+        if _elig.requires_sponsorship(eligibility):
+            return find("yes, i", "yes") or (options[0] if options else None)
         return find("no, i do not", "no, i will not", "no") or (options[1] if len(options) > 1 else None)
+    if "relocat" in L:
+        if _elig.willing_to_relocate(eligibility):
+            return find("yes", "willing") or (options[1] if len(options) > 1 else None)
+        return find("no") or (options[0] if options else None)
     if "hear about" in L or "how did you find" in L:
         return find("linkedin", "job board", "company website", "online", "other") or (options[1] if len(options) > 1 else None)
-    if any(k in L for k in ["acknowledge", "hybrid", "onsite", "on-site", "relocat", "commute", "comfortable", "willing", "intend to work", "able to work"]):
+    if any(k in L for k in ["acknowledge", "hybrid", "onsite", "on-site", "commute", "comfortable", "willing", "intend to work", "able to work"]):
         return find("yes", "i acknowledge", "i agree", "i understand", "remote") or (options[1] if len(options) > 1 else None)
     if any(k in L for k in ["former employer", "non-compete", "subject to any agreement", "restrictive covenant"]):
         return find("no") or (options[1] if len(options) > 1 else None)
@@ -317,11 +336,17 @@ def _pick_answer(label: str, options: list[str]) -> Optional[str]:
     return decline or (options[1] if len(options) > 1 else (options[0] if options else None))
 
 
-async def _answer_react_selects(page: Page) -> int:
+async def _answer_react_selects(
+    page: Page,
+    eligibility: Optional[dict] = None,
+    job_country: str = "",
+    answers_sink: Optional[list] = None,
+) -> int:
     """
     Answer every required react-select (Greenhouse/modern ATS) combobox by
     opening it, reading the rendered options, and clicking the best match.
-    Returns the number of selects answered.
+    Returns the number of selects answered.  Each applied answer is appended to
+    answers_sink (when provided) as {"question", "answer", "source"} for audit.
     """
     containers = page.locator(".select__container")
     answered = 0
@@ -354,7 +379,7 @@ async def _answer_react_selects(page: Page) -> int:
                     texts.append((await opts.nth(k).inner_text()).strip())
                 except Exception:
                     pass
-            choice = _pick_answer(label, texts)
+            choice = _pick_answer(label, texts, eligibility, job_country)
             clicked = False
             if choice:
                 target = page.locator(f'.select__option:has-text("{choice[:30]}")').first
@@ -362,6 +387,10 @@ async def _answer_react_selects(page: Page) -> int:
                     await target.click()
                     answered += 1
                     clicked = True
+                    if answers_sink is not None and label:
+                        answers_sink.append(
+                            {"question": label, "answer": choice, "source": "heuristic"}
+                        )
             if not clicked:
                 await page.keyboard.press("Escape")
             await page.wait_for_timeout(200)
@@ -380,8 +409,9 @@ _LLM_SYSTEM = (
     "options, copied verbatim. For free-text questions return a concise, "
     "professional answer (a number when a number is asked for; 1-2 sentences "
     "otherwise). "
-    "Work-authorization questions: the candidate IS authorized to work and does "
-    "NOT require visa sponsorship. "
+    "For work-authorization, visa-sponsorship and relocation questions, answer "
+    "STRICTLY according to the work-authorization facts given in the candidate "
+    "profile — never assume authorization or sponsorship status not stated there. "
     "Demographic / EEO / diversity questions (gender, race, ethnicity, veteran "
     "status, disability, sexual orientation, pronouns): choose the option that "
     "declines to self-identify (e.g. 'Decline to self-identify', 'I don't wish "
@@ -694,7 +724,9 @@ async def _commit_field(page: Page, field: dict, answer: str) -> bool:
     return False
 
 
-async def _fill_unanswered_required(page: Page, user_data: dict) -> dict:
+async def _fill_unanswered_required(
+    page: Page, user_data: dict, answers_sink: Optional[list] = None
+) -> dict:
     """
     Fill every still-empty required field, committing and re-verifying each.
 
@@ -705,9 +737,15 @@ async def _fill_unanswered_required(page: Page, user_data: dict) -> dict:
       2. A SINGLE batched LLM call for everything else (job-specific screeners,
          free-text, dates) — gpt-4o-mini, one request per job.
 
+    Work-auth/sponsorship/relocation answers (both tiers) are derived from the
+    candidate's eligibility profile and the job's country — never a blanket "US
+    authorized".  Applied answers are appended to answers_sink for audit.
+
     Returns {"heuristic": n, "llm": n, "asked": n}.  Best-effort: any error is
     swallowed (submission stays gated by _verify_submitted).
     """
+    eligibility = user_data.get("eligibility")
+    job_country = user_data.get("job_country", "")
     stats = {"heuristic": 0, "llm": 0, "asked": 0}
     try:
         fields = await _collect_unanswered_required(page)
@@ -739,9 +777,13 @@ async def _fill_unanswered_required(page: Page, user_data: dict) -> dict:
             elif kind in ("select", "native_select", "radio") and _is_standard_question(label):
                 opts = _clean_options(f.get("options") or [])
                 if opts:
-                    choice = _pick_answer(label, opts)
+                    choice = _pick_answer(label, opts, eligibility, job_country)
                     if choice:
                         committed = await _commit_field(page, f, choice)
+                        if committed and answers_sink is not None and label:
+                            answers_sink.append(
+                                {"question": label, "answer": choice, "source": "heuristic"}
+                            )
         except Exception:
             committed = False
         if committed:
@@ -762,11 +804,31 @@ async def _fill_unanswered_required(page: Page, user_data: dict) -> dict:
     stats["asked"] = len(llm_fields)
     first = user_data.get("first_name", "")
     last = user_data.get("last_name", "")
+    authorized = sorted({c for c in (eligibility or {}).get("authorized_countries", []) if c})
+    auth_line = (
+        f"Authorized to work in: {', '.join(authorized)}. " if authorized
+        else "No work authorization on file. "
+    )
+    if job_country:
+        auth_line += (
+            f"For this {job_country} role the candidate IS authorized to work. "
+            if _elig.work_authorized(eligibility, job_country)
+            else f"For this {job_country} role the candidate is NOT authorized to work. "
+        )
+    spons_line = (
+        "Requires visa sponsorship. " if _elig.requires_sponsorship(eligibility)
+        else "Does NOT require visa sponsorship. "
+    )
+    reloc_line = (
+        "Willing to relocate. " if _elig.willing_to_relocate(eligibility)
+        else "Not willing to relocate. "
+    )
     profile = (
         f"Candidate: {first} {last}\n"
         f"Email: {user_data.get('email','')}\n"
-        f"Location: {user_data.get('location','')}, {user_data.get('country','United States')}\n"
-        f"Work authorization: authorized to work in the US; does NOT require visa sponsorship.\n"
+        f"Location: {user_data.get('location','')}\n"
+        f"Work authorization (answer auth/sponsorship/relocation questions STRICTLY "
+        f"per these facts): {auth_line}{spons_line}{reloc_line}\n"
         f"Resume:\n{(user_data.get('resume_text','') or '')[:1400]}"
     )
     questions = []
@@ -808,6 +870,10 @@ async def _fill_unanswered_required(page: Page, user_data: dict) -> dict:
             try:
                 if await _commit_field(page, f, str(ans)):
                     stats["llm"] += 1
+                    if answers_sink is not None and f.get("label"):
+                        answers_sink.append(
+                            {"question": f["label"], "answer": str(ans), "source": "llm"}
+                        )
             except Exception:
                 pass
 
@@ -954,9 +1020,43 @@ async def _check_required_boxes(page: Page) -> None:
             pass
 
 
+# Greenhouse's verification email reads:
+#   "Copy and paste this code into the security code field on your
+#    application: R2JpYKXl  After you enter the code, resubmit your application."
+# Codes are 6–12 mixed-case alphanumerics (not plain 6-digit numbers), so we
+# anchor on the surrounding phrasing and prefer a token that mixes letters and
+# digits — which also avoids capturing ordinary English words.
+_CODE_PATTERNS = [
+    re.compile(r"code\s+field\s+on\s+your\s+application[:\s]+([A-Za-z0-9]{6,12})", re.I),
+    re.compile(r"(?:security|verification)\s+code\s+(?:is\b|:)[\s:]*([A-Za-z0-9]{6,12})", re.I),
+    re.compile(r"\bcode[:\s]+([A-Za-z0-9]{6,12})\b", re.I),
+    re.compile(r"application[:\s]*([A-Za-z0-9]{6,12})", re.I),  # legacy fallback
+]
+
+
+def _extract_security_code(text: str) -> Optional[str]:
+    """
+    Extract a Greenhouse email security code from a (HTML-stripped) email body.
+    Prefers a letter+digit mixed token (the real code format) over a purely
+    numeric/alpha match.  Returns None when no plausible code is present.
+    """
+    if not text:
+        return None
+    flat = re.sub(r"\s+", " ", text)
+    candidates: list[str] = []
+    for pat in _CODE_PATTERNS:
+        candidates.extend(m.group(1) for m in pat.finditer(flat))
+    if not candidates:
+        return None
+    for tok in candidates:
+        if any(c.isdigit() for c in tok) and any(c.isalpha() for c in tok):
+            return tok
+    return candidates[0]
+
+
 async def _poll_greenhouse_code(
     email: str, company: str, resend_key: str, since_iso: str,
-    attempts: int = 8, delay: float = 4.0,
+    attempts: int = 10, delay: float = 4.0,
 ) -> Optional[str]:
     """
     Poll the Resend inbound mailbox for Greenhouse's "Security code for your
@@ -969,7 +1069,6 @@ async def _poll_greenhouse_code(
     if not resend_key:
         return None
     headers = {"Authorization": f"Bearer {resend_key}"}
-    code_re = re.compile(r"application[:\s]*([A-Za-z0-9]{6,12})", re.I)
     company_key = company.lower()[:6]
     async with httpx.AsyncClient(timeout=15, headers=headers) as client:
         for _ in range(attempts):
@@ -1011,10 +1110,9 @@ async def _poll_greenhouse_code(
                     html = body.get("html") or body.get("text") or ""
                 except Exception:
                     continue
-                text = re.sub(r"<[^>]+>", " ", html)
-                match = code_re.search(text)
-                if match:
-                    return match.group(1)
+                code = _extract_security_code(re.sub(r"<[^>]+>", " ", html))
+                if code:
+                    return code
     return None
 
 
@@ -1040,6 +1138,12 @@ async def _complete_greenhouse_verification(
     single = None
     n_boxes = 0
     for _attempt in range(8):  # ~15 s total
+        # The confirmation page sometimes renders a few seconds after the first
+        # submit (no code step at all). Re-check before concluding the code field
+        # is simply slow — this rescues "submit_unconfirmed" cases where the
+        # application actually went through but the thank-you was late to paint.
+        if await _verify_submitted(page):
+            return True
         try:
             n_boxes = await boxes.count()
         except Exception:
@@ -1240,12 +1344,20 @@ class CareerOpsApplicator:
                     break
 
             # Screening / EEO react-select questions + consent checkboxes.
-            answered = await _answer_react_selects(page)
+            # Honest answers (work-auth/sponsorship/relocation) come from the
+            # eligibility profile + the job's country; every applied answer is
+            # collected for audit logging into ApplicationEvent.
+            eligibility = user_data.get("eligibility")
+            job_country = user_data.get("job_country", "")
+            screening_answers: list = []
+            answered = await _answer_react_selects(
+                page, eligibility, job_country, screening_answers
+            )
             await _check_required_boxes(page)
             # Broadened fill: every still-empty required field (native selects,
             # radios, broader text/textarea, dates, autocompletes) — heuristics
             # for compliance-safe standards, one batched LLM call for the rest.
-            fill_stats = await _fill_unanswered_required(page, user_data)
+            fill_stats = await _fill_unanswered_required(page, user_data, screening_answers)
             # Re-tick any consent boxes revealed while filling.
             await _check_required_boxes(page)
             required_empty = await _count_required_empty(page)
@@ -1281,7 +1393,8 @@ class CareerOpsApplicator:
                     pass
                 if await _verify_submitted(page):
                     logger.info("careerops.greenhouse.submitted", url=job_url)
-                    return {"status": "submitted", "url": job_url, "ats": "greenhouse"}
+                    return {"status": "submitted", "url": job_url, "ats": "greenhouse",
+                            "answers": screening_answers}
 
                 # Greenhouse email-verification step: a security-code field
                 # appears and a code is emailed to the applicant. Fetch it from
@@ -1291,7 +1404,8 @@ class CareerOpsApplicator:
                     page, user_data.get("email", ""), company,
                 ):
                     logger.info("careerops.greenhouse.submitted_after_code", url=job_url)
-                    return {"status": "submitted", "url": job_url, "ats": "greenhouse"}
+                    return {"status": "submitted", "url": job_url, "ats": "greenhouse",
+                            "answers": screening_answers}
 
                 logger.warning("careerops.greenhouse.submit_unconfirmed", url=job_url)
                 return {"status": "error", "url": job_url, "ats": "greenhouse",

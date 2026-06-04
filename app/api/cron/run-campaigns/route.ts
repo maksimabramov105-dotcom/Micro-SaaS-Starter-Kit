@@ -31,6 +31,7 @@ import { canSendApplication, consumeQuota } from '@/lib/quota'
 import { trackEvent } from '@/lib/analytics-advanced'
 import { publishEvent } from '@/lib/redis'
 import { isResumeQualityV2 } from '@/lib/flags'
+import { inferJobLocation, eligibilityKnockout, type EligibilityProfile } from '@/lib/eligibility'
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -97,6 +98,7 @@ interface WorkerJobResult {
     url?: string
     ats?: string
     error?: string
+    answers?: Array<{ question: string; answer: string; source: string }>
   }
   error?: string
 }
@@ -194,7 +196,7 @@ async function careeropsApply(
   workerUrl: string,
   workerSecret: string,
   applyUrl: string,
-  userData: Record<string, string>,
+  userData: Record<string, unknown>,
   timeoutMs = 50_000,  // caller passes remaining budget; hard default 50 s
 ): Promise<WorkerJobResult['result']> {
   try {
@@ -587,6 +589,16 @@ async function runCampaigns(
       location: campaign.locations[0] ?? '',
     }
 
+    // Eligibility profile (Phase 1) — used both for the pre-apply knockout filter
+    // below and threaded to the worker so screening answers are honest.
+    const eligibility: EligibilityProfile = {
+      authorizedCountries: campaign.authorizedCountries,
+      needsVisaSponsorship: campaign.needsVisaSponsorship,
+      willingToRelocate: campaign.willingToRelocate,
+      remoteOnly: campaign.remoteOnly,
+      languages: campaign.languages,
+    }
+
     // How many more can we send today?
     const today = new Date()
     today.setHours(0, 0, 0, 0)
@@ -864,6 +876,27 @@ async function runCampaigns(
         continue
       }
 
+      // ── Pre-apply eligibility knockout (Phase 1) ──────────────────────────
+      // If the candidate honestly could not win this role (on-site in a country
+      // they can't work / remote-only user vs on-site job), SKIP and log the
+      // reason WITHOUT creating a JobApplication — so quota is never burned on
+      // applications that would claim false authorization.
+      const jobLoc = inferJobLocation(job.location ?? '', job.title)
+      const knockout = eligibilityKnockout(eligibility, jobLoc)
+      if (knockout) {
+        campaignLog.skipped++
+        console.log('[run-campaigns] eligibility skip', {
+          campaign: campaign.id,
+          company: job.company,
+          title: job.title,
+          location: job.location,
+          jobCountry: jobLoc.country,
+          isRemote: jobLoc.isRemote,
+          reason: knockout,
+        })
+        continue
+      }
+
       // Check user quota
       const hasQuota = await canSendApplication(user.id)
       if (!hasQuota) {
@@ -918,7 +951,12 @@ async function runCampaigns(
       // code ("Security code for your application to {company}") precisely.
       const result = await careeropsApply(
         workerUrl, workerSecret, applyUrl,
-        { ...userData, _company: job.company },
+        {
+          ...userData,
+          _company: job.company,
+          eligibility,
+          job_country: jobLoc.country ?? '',
+        },
         playwrightTimeout,
       )
       attemptsThisCampaign++ // Always count every Playwright call for OOM cap
@@ -932,6 +970,22 @@ async function runCampaigns(
         await consumeQuota(user.id, application.id)
         campaignLog.applied++
         appliedThisCampaign++
+
+        // Log the honest screening answers + eligibility context for audit.
+        await prisma.applicationEvent.create({
+          data: {
+            applicationId: application.id,
+            type: 'screening',
+            payload: {
+              eligibility: eligibility as unknown as object,
+              jobCountry: jobLoc.country,
+              isRemote: jobLoc.isRemote,
+              answers: result.answers ?? [],
+            },
+          },
+        }).catch((err: unknown) =>
+          console.warn('[run-campaigns] screening event failed', err)
+        )
 
         // Publish Telegram notification
         publishEvent('application_events', {
