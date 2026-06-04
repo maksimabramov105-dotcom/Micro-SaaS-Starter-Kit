@@ -576,6 +576,10 @@ enum JobSource {
   REMOTEOK
   THEMUSE
   MANUAL
+  HIMALAYAS
+  WWR
+  RECRUITEE
+  PERSONIO
 }
 
 enum ApplicationStatus {

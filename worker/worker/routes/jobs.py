@@ -30,7 +30,10 @@ from worker.autoapply.common import prepare_application
 from worker.autoapply.linkedin import LinkedInApplicator
 from worker.config import settings
 from worker.deps import verify_bearer
-from worker.scrapers import adzuna, arbeitnow, greenhouse, remoteok, themuse
+from worker.scrapers import (
+    adzuna, arbeitnow, greenhouse, remoteok, themuse,
+    himalayas, wwr, lever, ashby, recruitee, personio,
+)
 
 logger = structlog.get_logger(__name__)
 router = APIRouter()
@@ -419,6 +422,12 @@ _SCRAPER_MAP = {
     "greenhouse": greenhouse.search,
     "remoteok": remoteok.search,
     "themuse": themuse.search,
+    "himalayas": himalayas.search,
+    "wwr": wwr.search,
+    "lever": lever.search,
+    "ashby": ashby.search,
+    "recruitee": recruitee.search,
+    "personio": personio.search,
 }
 
 

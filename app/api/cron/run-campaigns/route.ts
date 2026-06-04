@@ -30,7 +30,7 @@ import { prisma } from '@/lib/prisma'
 import { canSendApplication, consumeQuota } from '@/lib/quota'
 import { trackEvent } from '@/lib/analytics-advanced'
 import { publishEvent } from '@/lib/redis'
-import { isResumeQualityV2 } from '@/lib/flags'
+import { isResumeQualityV2, isFlagEnabled } from '@/lib/flags'
 import { inferJobLocation, eligibilityKnockout, type EligibilityProfile } from '@/lib/eligibility'
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -88,6 +88,8 @@ interface ScrapedJob {
   apply_url: string
   description: string
   source: string
+  posted_at?: string   // ISO 8601 — used for freshness ranking (Phase 2)
+  remote?: boolean      // adapter-declared remote flag (Phase 2)
 }
 
 interface WorkerJobResult {
@@ -128,16 +130,26 @@ function splitName(fullName: string | null): { first_name: string; last_name: st
   }
 }
 
-/** Map scraper source string → Prisma JobSource enum value */
-function toJobSource(
-  scraperBoard: string
-): 'ADZUNA' | 'ARBEITNOW' | 'REMOTEOK' | 'THEMUSE' | 'CAREEROPS' {
-  const map: Record<string, 'ADZUNA' | 'ARBEITNOW' | 'REMOTEOK' | 'THEMUSE' | 'CAREEROPS'> = {
+type JobSourceValue =
+  | 'ADZUNA' | 'ARBEITNOW' | 'REMOTEOK' | 'THEMUSE' | 'CAREEROPS'
+  | 'HIMALAYAS' | 'WWR' | 'RECRUITEE' | 'PERSONIO'
+
+/** Map scraper source string → Prisma JobSource enum value.
+ *  ATS feeders (greenhouse/lever/ashby) apply via CareerOps → CAREEROPS.
+ *  Remote boards + Recruitee/Personio surface as their own source for the funnel. */
+function toJobSource(scraperBoard: string): JobSourceValue {
+  const map: Record<string, JobSourceValue> = {
     adzuna: 'ADZUNA',
     arbeitnow: 'ARBEITNOW',
-    greenhouse: 'CAREEROPS',  // Greenhouse jobs brokered through CareerOps filler
+    greenhouse: 'CAREEROPS',
+    lever: 'CAREEROPS',
+    ashby: 'CAREEROPS',
     remoteok: 'REMOTEOK',
     themuse: 'THEMUSE',
+    himalayas: 'HIMALAYAS',
+    wwr: 'WWR',
+    recruitee: 'RECRUITEE',
+    personio: 'PERSONIO',
   }
   return map[scraperBoard.toLowerCase()] ?? 'CAREEROPS'
 }
@@ -347,6 +359,21 @@ async function runCampaigns(
     runGreenhouseCache = rawGreenhouse.map((j) => ({ ...j, board: 'greenhouse' }))
     console.log('[run-campaigns] greenhouse pre-scrape', { total: runGreenhouseCache.length })
   }
+
+  // ── Phase 2: per-source enable flags ──────────────────────────────────────
+  // Evaluated once per run. Each source is independently toggleable, and every
+  // scrape is isolated by scrapeBoard's try/catch + timeout, so adding source
+  // #10 can never destabilize source #1.
+  const SOURCE_FLAGS: Record<string, string> = {
+    remoteok: 'source_remoteok', himalayas: 'source_himalayas', wwr: 'source_wwr',
+    lever: 'source_lever', ashby: 'source_ashby', recruitee: 'source_recruitee',
+    personio: 'source_personio',
+  }
+  const enabledSources = new Set<string>()
+  for (const [board, flag] of Object.entries(SOURCE_FLAGS)) {
+    if (await isFlagEnabled(flag)) enabledSources.add(board)
+  }
+  console.log('[run-campaigns] enabled extra sources', { sources: [...enabledSources] })
 
   const summary: Array<{
     campaignId: string
@@ -720,6 +747,16 @@ async function runCampaigns(
         scrapeBoard(workerUrl, workerSecret, 'themuse', kw, location)
           .then((j) => j.map((x) => ({ ...x, board: 'themuse' })))
       ),
+      // ── Phase 2 sources (flag-gated; each isolated by scrapeBoard) ─────────
+      // ATS feeders → direct apply URLs CareerOps can fill (Lever/Ashby handlers,
+      // generic for Recruitee/Personio). Remote boards → mostly redirect/board
+      // URLs that are sourced + funneled but skipped at apply time.
+      ...(['lever', 'ashby', 'himalayas', 'wwr', 'recruitee', 'personio'] as const)
+        .filter((board) => enabledSources.has(board))
+        .map((board) =>
+          scrapeBoard(workerUrl, workerSecret, board, keyword, location)
+            .then((j) => j.map((x) => ({ ...x, board })))
+        ),
     ])
 
     // Flatten and deduplicate by apply_url
@@ -732,6 +769,20 @@ async function runCampaigns(
           scrapedJobs.push(job)
         }
       }
+    }
+
+    // Phase 2: prioritize remote + freshly-posted (<72h) before interleaving, so
+    // each company's column is fresh/remote-first and the round-robin surfaces the
+    // best-eligibility jobs across companies first.
+    {
+      const now = Date.now()
+      const score = (j: ScrapedJob & { board: string }): number => {
+        const remote = j.remote === true || /\bremote\b/i.test(j.location ?? '')
+        const ts = j.posted_at ? Date.parse(j.posted_at) : NaN
+        const fresh = !Number.isNaN(ts) && now - ts < 72 * 3600 * 1000
+        return (remote ? 2 : 0) + (fresh ? 1 : 0)
+      }
+      scrapedJobs.sort((a, b) => score(b) - score(a))
     }
 
     // Interleave by company so each cron run applies to jobs from multiple companies
@@ -927,13 +978,14 @@ async function runCampaigns(
         },
       })
 
-      // Create JobApplication in QUEUED state first
+      // Create JobApplication in QUEUED state first. source = the sourcing board
+      // (ATS feeders collapse to CAREEROPS) so each source shows in the funnel.
       const application = await prisma.jobApplication.create({
         data: {
           userId: user.id,
           resumeId: resume.id,
           campaignId: campaign.id,
-          source: 'CAREEROPS',
+          source: jobSource,
           jobTitle: job.title,
           company: job.company,
           location: job.location ?? '',
