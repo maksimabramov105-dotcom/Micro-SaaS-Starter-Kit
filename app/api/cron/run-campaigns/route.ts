@@ -29,7 +29,7 @@ import { NextResponse, after } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { canSendApplication, consumeQuota } from '@/lib/quota'
 import { trackEvent } from '@/lib/analytics-advanced'
-import { publishEvent } from '@/lib/redis'
+import { publishEvent, getRedis } from '@/lib/redis'
 import { isResumeQualityV2, isFlagEnabled } from '@/lib/flags'
 import { inferJobLocation, eligibilityKnockout, type EligibilityProfile } from '@/lib/eligibility'
 
@@ -307,11 +307,37 @@ export async function POST(req: Request) {
   // generous wall-clock budget (RUN_BUDGET_MS), so each cron run can attempt
   // MANY jobs instead of the ~2 that fit inside Cloudflare's ~100 s proxy
   // timeout when the loop ran inline on the request.
+  // ── Distributed lock (P1 audit) ───────────────────────────────────────────
+  // The cron now fires every 30 min but a run can take up to RUN_BUDGET_MS
+  // (10 min). A SETNX lock with a safety TTL ensures an overlapping fire is
+  // SKIPPED rather than starting a second concurrent run (which would double the
+  // browser memory on a 1-CPU box and could double-apply). If Redis is
+  // unreachable we proceed unlocked (best-effort — preserves prior behaviour).
+  const LOCK_KEY = 'run-campaigns:lock'
+  const LOCK_TTL = 1800 // seconds — auto-releases if the process crashes mid-run
+  let lockAcquired = false
+  let redisReachable = true
+  try {
+    const res = await getRedis().set(LOCK_KEY, runAt, 'EX', LOCK_TTL, 'NX')
+    lockAcquired = res === 'OK'
+  } catch (err) {
+    redisReachable = false
+    console.warn('[run-campaigns] Redis unreachable — proceeding without lock', err)
+  }
+  if (redisReachable && !lockAcquired) {
+    console.log('[run-campaigns] another run holds the lock — skipping this fire')
+    return NextResponse.json({ scheduled: false, reason: 'already-running' })
+  }
+
   after(async () => {
     try {
       await runCampaigns(workerUrl, workerSecret, runAt)
     } catch (err) {
       console.error('[run-campaigns] background run crashed', err)
+    } finally {
+      if (lockAcquired) {
+        try { await getRedis().del(LOCK_KEY) } catch { /* TTL will expire it */ }
+      }
     }
   })
 

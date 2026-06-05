@@ -7,10 +7,27 @@
  */
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getRedis } from '@/lib/redis'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const RATE_LIMIT = 10 // captures per IP per hour — generous for humans, caps spam
 
 export async function POST(req: Request) {
+  // ── Rate limit (P2 audit): public + unauthenticated, so a bot could flood the
+  // Lead table. Per-IP hourly window; fails open if Redis is down so real
+  // captures are never blocked by an outage.
+  const ip = (req.headers.get('x-forwarded-for') ?? '').split(',')[0].trim() || 'unknown'
+  try {
+    const redis = getRedis()
+    const n = await redis.incr(`lead-rl:${ip}`)
+    if (n === 1) await redis.expire(`lead-rl:${ip}`, 3600)
+    if (n > RATE_LIMIT) {
+      return NextResponse.json({ error: 'Too many requests. Please try again later.' }, { status: 429 })
+    }
+  } catch {
+    /* Redis unavailable → skip rate limiting (fail open) */
+  }
+
   let body: unknown
   try {
     body = await req.json()

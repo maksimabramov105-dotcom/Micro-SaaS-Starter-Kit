@@ -2,7 +2,10 @@ name: Run autoapply campaigns
 
 on:
   schedule:
-    - cron: '0 */2 * * *'  # every 2 hours UTC
+    # Every 30 min (~4x the old 2h cadence) to raise total daily throughput.
+    # Safe because run-campaigns takes a Redis SETNX lock, so an overlapping fire
+    # while a run is still in flight is skipped rather than double-applying.
+    - cron: '*/30 * * * *'
   workflow_dispatch:         # manual trigger for testing
 
 jobs:

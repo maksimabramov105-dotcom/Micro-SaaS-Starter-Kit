@@ -48,7 +48,9 @@ services:
     container_name: resumeai-web
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://resumeai:resumeai@postgres:5432/resumeai
+      # connection_limit raises Prisma's pool above the 1-CPU default (~3) so the
+      # web service doesn't starve under concurrent dashboard/cron load (P1 audit).
+      DATABASE_URL: postgresql://resumeai:resumeai@postgres:5432/resumeai?connection_limit=10&pool_timeout=20
       NEXTAUTH_URL: ${NEXTAUTH_URL:-https://resumeai-bot.ru}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
