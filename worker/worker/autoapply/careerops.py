@@ -1418,14 +1418,24 @@ class CareerOpsApplicator:
     # ── Lever ────────────────────────────────────────────────────────────────
 
     async def apply_lever(self, job_url: str, user_data: dict) -> dict:
-        """Lever: jobs.lever.co/company/job-id — click Apply then fill React form."""
+        """Lever: jobs.lever.co/company/job-id — the /apply route is a fully
+        server-rendered form (verified), so go there directly rather than the
+        flaky 'click Apply + wait for networkidle' SPA dance."""
         page = await self.context.new_page()
         try:
-            await page.goto(job_url, timeout=30000)
-            await page.wait_for_load_state("networkidle", timeout=15000)
-            await page.wait_for_timeout(random.randint(1000, 2000))
-
-            await _click_apply_button(page)
+            apply_url = job_url if job_url.rstrip("/").endswith("/apply") else job_url.rstrip("/") + "/apply"
+            await page.goto(apply_url, wait_until="domcontentloaded", timeout=30000)
+            try:
+                await page.wait_for_selector('input[name="name"], input[name="email"]', timeout=15000)
+            except Exception:
+                # Fallback for older layouts: posting page then Apply click.
+                await page.goto(job_url, wait_until="domcontentloaded", timeout=30000)
+                await _click_apply_button(page)
+                try:
+                    await page.wait_for_selector('input[name="name"], input[name="email"]', timeout=12000)
+                except Exception:
+                    return {"status": "form_not_found", "url": job_url, "ats": "lever"}
+            await page.wait_for_timeout(random.randint(800, 1500))
 
             full_name = (
                 f"{user_data.get('first_name', '')} "
@@ -1446,30 +1456,45 @@ class CareerOpsApplicator:
             resume_text = user_data.get("resume_text", "")
             if resume_text:
                 for sel in [
-                    'input[type="file"][name*="resume"]',
+                    'input[type="file"][name*="resume" i]',
+                    'input[type="file"][accept*="pdf"]',
                     'input[type="file"]',
                 ]:
                     if await page.locator(sel).count() > 0:
-                        await _upload_resume(page, sel, resume_text)
-                        break
+                        if await _upload_resume(page, sel, resume_text):
+                            break
 
             cover_letter = user_data.get("cover_letter", "")
-            for sel in [
-                'textarea[name*="comments"]',
-                'textarea[name*="cover"]',
-                'textarea',
-            ]:
+            for sel in ['textarea[name*="comments"]', 'textarea[name*="cover"]', 'textarea']:
                 if cover_letter and await _fill(page, sel, cover_letter[:2000]):
                     break
+
+            # Custom screening questions (Lever cards[…] fields) + EEO/consent —
+            # honest, eligibility-aware answers, collected for audit.
+            eligibility = user_data.get("eligibility")
+            job_country = user_data.get("job_country", "")
+            screening_answers: list = []
+            await _check_required_boxes(page)
+            await _fill_unanswered_required(page, user_data, screening_answers)
+            await _check_required_boxes(page)
+            _ = (eligibility, job_country)  # threaded via user_data into the fill
 
             for txt in ["Submit Application", "Submit"]:
                 btn = page.locator(f'button[type="submit"]:has-text("{txt}")').first
                 if await btn.count() > 0:
+                    try:
+                        await btn.scroll_into_view_if_needed(timeout=3000)
+                    except Exception:
+                        pass
                     await btn.click()
-                    await page.wait_for_load_state("networkidle", timeout=15000)
+                    try:
+                        await page.wait_for_load_state("networkidle", timeout=12000)
+                    except Exception:
+                        pass
                     if await _verify_submitted(page):
                         logger.info("careerops.lever.submitted", url=job_url)
-                        return {"status": "submitted", "url": job_url, "ats": "lever"}
+                        return {"status": "submitted", "url": job_url, "ats": "lever",
+                                "answers": screening_answers}
                     logger.warning("careerops.lever.submit_unconfirmed", url=job_url)
                     return {"status": "error", "url": job_url, "ats": "lever",
                             "error": "submission not confirmed"}
