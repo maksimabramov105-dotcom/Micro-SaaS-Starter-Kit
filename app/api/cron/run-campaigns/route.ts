@@ -31,6 +31,10 @@ import { canSendApplication, consumeQuota } from '@/lib/quota'
 import { trackEvent } from '@/lib/analytics-advanced'
 import { publishEvent, getRedis } from '@/lib/redis'
 import { isResumeQualityV2, isFlagEnabled } from '@/lib/flags'
+import {
+  tryAcquireLock, releaseLock, resetStaleQueued, saveRunSummary,
+  type RunSummary,
+} from '@/lib/run-campaigns-ops'
 import { inferJobLocation, eligibilityKnockout, type EligibilityProfile } from '@/lib/eligibility'
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -316,17 +320,7 @@ export async function POST(req: Request) {
   // SKIPPED rather than starting a second concurrent run (which would double the
   // browser memory on a 1-CPU box and could double-apply). If Redis is
   // unreachable we proceed unlocked (best-effort — preserves prior behaviour).
-  const LOCK_KEY = 'run-campaigns:lock'
-  const LOCK_TTL = 1800 // seconds — auto-releases if the process crashes mid-run
-  let lockAcquired = false
-  let redisReachable = true
-  try {
-    const res = await getRedis().set(LOCK_KEY, runAt, 'EX', LOCK_TTL, 'NX')
-    lockAcquired = res === 'OK'
-  } catch (err) {
-    redisReachable = false
-    console.warn('[run-campaigns] Redis unreachable — proceeding without lock', err)
-  }
+  const { acquired: lockAcquired, redisReachable } = await tryAcquireLock(getRedis())
   if (redisReachable && !lockAcquired) {
     console.log('[run-campaigns] another run holds the lock — skipping this fire')
     return NextResponse.json({ scheduled: false, reason: 'already-running' })
@@ -338,9 +332,7 @@ export async function POST(req: Request) {
     } catch (err) {
       console.error('[run-campaigns] background run crashed', err)
     } finally {
-      if (lockAcquired) {
-        try { await getRedis().del(LOCK_KEY) } catch { /* TTL will expire it */ }
-      }
+      if (lockAcquired) await releaseLock(getRedis())
     }
   })
 
@@ -359,6 +351,20 @@ async function runCampaigns(
   runAt: string,
 ): Promise<void> {
   const runStart = Date.now()
+
+  // ── Self-heal (C2): a previously-killed run can leave JobApplication rows
+  // stuck in QUEUED. The dedup below treats QUEUED as "never resend", so those
+  // rows would block the job forever. The lock guarantees no other run is
+  // mid-flight, so delete QUEUED rows older than the threshold → retryable.
+  let staleQueuedReset = 0
+  try {
+    staleQueuedReset = await resetStaleQueued(prisma)
+    if (staleQueuedReset > 0) {
+      console.log('[run-campaigns] reset stale QUEUED rows', { count: staleQueuedReset })
+    }
+  } catch (err) {
+    console.warn('[run-campaigns] stale-QUEUED reset failed (non-fatal)', err)
+  }
 
   // ── Load active campaigns with user + resume ─────────────────────────────
   const campaigns = await prisma.autoApplyCampaign.findMany({
@@ -1271,13 +1277,25 @@ async function runCampaigns(
   const totalApplied = summary.reduce((s, c) => s + c.applied, 0)
   const totalFailed = summary.reduce((s, c) => s + c.failed, 0)
   const totalSkipped = summary.reduce((s, c) => s + c.skipped, 0)
+  // "attempted" = every real Playwright apply call (submitted + failed).
+  const totalAttempted = totalApplied + totalFailed
+
+  const runSummary: RunSummary = {
+    runAt,
+    attempted: totalAttempted,
+    submitted: totalApplied,
+    failed: totalFailed,
+    skipped: totalSkipped,
+    staleQueuedReset,
+    finishedAt: new Date().toISOString(),
+  }
+  // Persist for the admin funnel view (best-effort; Redis is non-critical here).
+  await saveRunSummary(getRedis(), runSummary)
 
   console.log('[run-campaigns] complete', {
-    runAt,
+    ...runSummary,
     campaigns: summary.length,
-    totalApplied,
-    totalFailed,
-    totalSkipped,
+    durationMs: Date.now() - runStart,
     details: summary,
   })
 }

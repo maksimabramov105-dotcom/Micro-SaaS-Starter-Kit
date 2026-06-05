@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { prisma } from '@/lib/prisma'
 import { isAdminEmail } from '@/lib/pmf/admin'
+import { getRedis } from '@/lib/redis'
+import { getRunSummary } from '@/lib/run-campaigns-ops'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,7 +27,7 @@ export default async function SourcingFunnelPage() {
     session?.user?.role === 'admin' || isAdminEmail(session?.user?.email)
   if (!isAdmin) redirect('/dashboard')
 
-  const [statusRows, eventRows, listingRows, avgFit] = await Promise.all([
+  const [statusRows, eventRows, listingRows, avgFit, lastRun] = await Promise.all([
     prisma.$queryRaw<StatusRow[]>`
       SELECT source::text AS source, status::text AS status, count(*) AS n
       FROM "JobApplication" GROUP BY 1, 2`,
@@ -39,6 +41,7 @@ export default async function SourcingFunnelPage() {
     prisma.$queryRaw<{ source: string; avg: number | null }[]>`
       SELECT source::text AS source, round(avg("fitScore"))::int AS avg
       FROM "JobApplication" WHERE "fitScore" IS NOT NULL GROUP BY 1`,
+    getRunSummary(getRedis()),
   ])
 
   const sources = Array.from(new Set([
@@ -101,6 +104,26 @@ export default async function SourcingFunnelPage() {
         Sorted by <strong>reply-rate</strong> so you can shift volume toward whatever
         replies fastest (typically remote boards + startup ATS &gt;&gt; US-enterprise).
       </p>
+
+      {lastRun && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="text-base">Last cron run</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
+              <span>Attempted: <strong>{lastRun.attempted}</strong></span>
+              <span>Submitted: <strong className="text-emerald-600">{lastRun.submitted}</strong></span>
+              <span>Failed: <strong className="text-red-500">{lastRun.failed}</strong></span>
+              <span>Skipped: <strong>{lastRun.skipped}</strong></span>
+              <span>Stale QUEUED reset: <strong>{lastRun.staleQueuedReset}</strong></span>
+              <span className="text-gray-400">
+                finished {new Date(lastRun.finishedAt).toLocaleString()}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
