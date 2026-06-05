@@ -73,6 +73,18 @@ export default async function DashboardPage() {
     where: { userId, status: 'INTERVIEW' },
   })
 
+  // Honest per-stage status: which recent applications have a CONFIRMED signal
+  // (an ATS confirmation email matched to the application).
+  const recentIds = recentApplications.map((a) => a.id)
+  const confirmedEvents = recentIds.length
+    ? await prisma.applicationEvent.findMany({
+        where: { applicationId: { in: recentIds }, type: 'confirmed' },
+        select: { applicationId: true },
+      })
+    : []
+  const confirmedSet = new Set(confirmedEvents.map((e) => e.applicationId))
+  const hasLinkedIn = recentApplications.some((a) => a.source === 'LINKEDIN')
+
   const plan = getPlanByPriceId(session.user.stripePriceId)
 
   return (
@@ -236,8 +248,24 @@ export default async function DashboardPage() {
         </div>
         {recentApplications.length === 0 ? (
           <Card>
-            <CardContent className="py-8 text-center text-slate-400">
-              No applications yet.
+            <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
+              {campaigns.length === 0 ? (
+                <>
+                  <p className="text-slate-600">No applications yet — you don&apos;t have a campaign running.</p>
+                  <Button asChild size="sm">
+                    <Link href="/dashboard/campaigns/new">Create your first campaign</Link>
+                  </Button>
+                  <p className="max-w-md text-xs text-slate-400">
+                    Pick keywords + locations and we auto-apply to matching jobs. Applications
+                    show up here as <strong>queued → submitted → confirmed</strong>.
+                  </p>
+                </>
+              ) : (
+                <p className="max-w-md text-slate-500">
+                  Your campaign is active. New applications appear here after the next
+                  run (within ~30&nbsp;minutes), with honest per-stage status.
+                </p>
+              )}
             </CardContent>
           </Card>
         ) : (
@@ -283,7 +311,19 @@ export default async function DashboardPage() {
                           )}
                         </td>
                         <td className="px-4 py-3">
-                          <StatusBadge status={app.status} />
+                          <div className="flex flex-col gap-0.5">
+                            <StatusBadge status={app.status} />
+                            {confirmedSet.has(app.id) && (
+                              <span className="text-xs text-emerald-600" title="The employer's ATS sent a confirmation email for this application">
+                                ✓ confirmed by employer
+                              </span>
+                            )}
+                            {app.source === 'LINKEDIN' && (
+                              <span className="text-xs text-amber-600" title="LinkedIn replies arrive in your LinkedIn inbox, not here">
+                                replies in LinkedIn ↗
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-slate-400">
                           {app.appliedAt
@@ -297,6 +337,13 @@ export default async function DashboardPage() {
               </div>
             </CardContent>
           </Card>
+        )}
+        {hasLinkedIn && (
+          <p className="mt-3 text-xs text-slate-400">
+            ↗ Replies to <strong>LinkedIn</strong> Easy Apply jobs land in your LinkedIn
+            inbox and can&apos;t be tracked here — only email-based applications show
+            confirmed/reply status.
+          </p>
         )}
       </section>
     </div>
