@@ -11,6 +11,7 @@ Job records are persisted in Redis (24 h TTL) and mirrored in a local in-process
 dict for zero-latency same-process lookups.  Redis persistence survives worker
 restarts; the local dict is a fast-path cache only.
 """
+import os
 import uuid
 from datetime import datetime, timezone
 from io import BytesIO
@@ -429,15 +430,44 @@ async def score_jobs(body: ScoreRequest) -> dict:
     return {"scores": scores}
 
 
+# Refuse to launch a browser when free memory is below this (MB). Protects the
+# single small VPS from OOM and — critically — makes bounded apply concurrency
+# safe: each concurrent context is gated on real headroom before it spawns. At
+# concurrency=1 the prior browser is already closed, so normal runs aren't
+# affected. Tune via MIN_APPLY_MEMORY_MB (raise it after a VPS resize).
+MIN_APPLY_MEMORY_MB = int(os.environ.get("MIN_APPLY_MEMORY_MB", "300"))
+
+
+def _available_memory_mb() -> int:
+    """MemAvailable in MB (includes reclaimable cache). 999999 if unknown."""
+    try:
+        with open("/proc/meminfo") as f:
+            for line in f:
+                if line.startswith("MemAvailable:"):
+                    return int(line.split()[1]) // 1024
+    except Exception:
+        pass
+    return 999999
+
+
 @router.post("/autoapply/careerops", dependencies=[Depends(verify_bearer)])
 async def autoapply_careerops(body: CareerOpsApplyRequest) -> dict:
     """Submit a job application via the CareerOps ATS filler."""
     job = await _new_job()
+    # ── Memory guard (C1): never spawn a browser without headroom ────────────
+    avail = _available_memory_mb()
+    if avail < MIN_APPLY_MEMORY_MB:
+        logger.warning("job.careerops.insufficient_memory", available_mb=avail, min_mb=MIN_APPLY_MEMORY_MB)
+        _finish(job, {"status": "error", "ats": "deferred",
+                      "error": f"insufficient_memory ({avail}MB < {MIN_APPLY_MEMORY_MB}MB)"})
+        await _redis_save(job)
+        return job.model_dump()
     logger.info(
         "job.careerops.started",
         job_id=job.job_id,
         user_id=body.user_id,
         campaign_id=body.campaign_id,
+        available_mb=avail,
     )
     try:
         applicator = CareerOpsApplicator()

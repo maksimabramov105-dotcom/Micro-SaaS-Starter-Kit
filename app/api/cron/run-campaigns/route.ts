@@ -74,7 +74,10 @@ const MAX_APPLIES_PER_CAMPAIGN = 8
  * Any already-running Playwright call is allowed to finish; only new ones
  * are blocked once the budget expires.
  */
-const RUN_BUDGET_MS = 600_000
+// 20 min. The cron now fires every 30 min and a Redis lock prevents overlap, so
+// a run may use up to 20 min (leaving a ~10 min buffer) — more sequential applies
+// per run WITHOUT raising peak memory (browser concurrency is still 1). [C1(a)]
+const RUN_BUDGET_MS = 1_200_000
 
 // ── Types from worker API ─────────────────────────────────────────────────────
 
@@ -912,6 +915,16 @@ async function runCampaigns(
     let appliedThisCampaign = 0
     let attemptsThisCampaign = 0
 
+    // Per-source circuit breaker (C1 rate limiter): if one ATS host returns
+    // SOURCE_BACKOFF consecutive failures this run, stop applying to it — this
+    // prevents higher throughput from hammering (and getting banned by) a source
+    // that's rate-limiting or broken. Reset on the first success.
+    const SOURCE_BACKOFF = 3
+    const sourceFails = new Map<string, number>()
+    const hostOf = (u: string): string => {
+      try { return new URL(u).host.toLowerCase() } catch { return 'unknown' }
+    }
+
     // Fair budget sharing across campaigns.
     //
     // Divide the REMAINING wall-clock budget equally among the campaigns that
@@ -929,11 +942,17 @@ async function runCampaigns(
     )
     const campaignDeadline = Date.now() + campaignBudgetMs
 
-    // Job boards whose "apply_url" is their own listing page, not a direct ATS URL.
-    // CareerOps fills ATS forms (Greenhouse, Lever, Workable, etc.) and cannot work on
-    // these aggregator pages — skip them to avoid spending Playwright budget on timeouts.
-    // Note: RemoteOK returns "remoteOK.com" (capital letters) so comparison is lowercased.
-    const BOARD_HOSTS = ['remoteok.com', 'themuse.com', 'adzuna.com', 'arbeitnow.com', 'remotive.com', 'himalayas.app', 'weworkremotely.com']
+    // Hosts whose apply page CareerOps cannot fill in headless Chromium — skip
+    // them so we never burn the Playwright budget on guaranteed failures:
+    //  - board/aggregator listing pages (apply_url is their own listing, not an ATS form)
+    //  - jobs.ashbyhq.com: Ashby's /application is a client-only SPA that renders an
+    //    EMPTY shell headless (diagnosed: 0 inputs, body ~113 chars). Reliable Ashby
+    //    apply needs a headful/stealth browser → deferred to the VPS-resize phase.
+    //    (Ashby/Lever are still SOURCED; only the unfillable Ashby apply is skipped.)
+    const BOARD_HOSTS = [
+      'remoteok.com', 'themuse.com', 'adzuna.com', 'arbeitnow.com', 'remotive.com',
+      'himalayas.app', 'weworkremotely.com', 'jobs.ashbyhq.com',
+    ]
     const isBoardUrl = (url: string): boolean =>
       BOARD_HOSTS.some((host) => url.toLowerCase().includes(host))
 
@@ -991,6 +1010,13 @@ async function runCampaigns(
 
       // Skip board listing pages — CareerOps needs a direct ATS URL
       if (isBoardUrl(applyUrl)) {
+        campaignLog.skipped++
+        continue
+      }
+
+      // Per-source circuit breaker: stop hitting a host that keeps failing.
+      const applyHost = hostOf(applyUrl)
+      if ((sourceFails.get(applyHost) ?? 0) >= SOURCE_BACKOFF) {
         campaignLog.skipped++
         continue
       }
@@ -1116,7 +1142,20 @@ async function runCampaigns(
       )
       attemptsThisCampaign++ // Always count every Playwright call for OOM cap
 
+      // Memory guard signal (C1): the worker refused to launch a browser because
+      // the box is low on RAM. Don't record a FAILED attempt (it's transient and
+      // would burn a retry) — delete the QUEUED row and stop this run; the next
+      // cron fire will pick up where we left off once memory frees.
+      if (result?.error?.includes('insufficient_memory')) {
+        await prisma.jobApplication.delete({ where: { id: application.id } }).catch(() => {})
+        appliedUrls.delete(applyUrl)
+        console.warn('[run-campaigns] worker low on memory — pausing run', { campaign: campaign.id, error: result.error })
+        if (!campaignLog.error) campaignLog.error = 'insufficient_memory'
+        break
+      }
+
       if (result?.status === 'submitted') {
+        sourceFails.set(applyHost, 0) // healthy source — reset its breaker
         // Success — mark SUBMITTED and stamp quota
         await prisma.jobApplication.update({
           where: { id: application.id },
@@ -1176,7 +1215,8 @@ async function runCampaigns(
           ats: result.ats,
         })
       } else {
-        // Failed — record error
+        // Failed — bump the per-source breaker and record the error.
+        sourceFails.set(applyHost, (sourceFails.get(applyHost) ?? 0) + 1)
         const errMsg = result?.error ?? result?.status ?? 'unknown'
         await prisma.jobApplication.update({
           where: { id: application.id },
