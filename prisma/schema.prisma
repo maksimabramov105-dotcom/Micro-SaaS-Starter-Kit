@@ -421,6 +421,10 @@ model JobApplication {
   tailoringTokensUsed Int?            // total tokens consumed (resume + cover) for cost tracking
   tailoringModelUsed  String?         // e.g. "gpt-4o-mini"
 
+  // Phase 3: job-fit score (0–100) + reasons, copied from JobListing at apply time.
+  fitScore    Int?
+  fitReasons  String[]  @default([])
+
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -508,6 +512,10 @@ model JobListing {
   postedAt    DateTime?
   scrapedAt   DateTime  @default(now())
   applied     Boolean   @default(false)     // legacy: autoapply.db.vacancies_cache.applied
+
+  // Phase 3: cached job-fit score (0–100) + human-readable reasons.
+  fitScore    Int?
+  fitReasons  String[]  @default([])
 
   @@unique([source, externalId])
   @@index([source])

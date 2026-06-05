@@ -240,6 +240,41 @@ async function careeropsApply(
   }
 }
 
+// ── Job-fit scoring call (Phase 3) ─────────────────────────────────────────────
+
+interface FitScore { score: number; reasons: string[] }
+
+/** Batch-score scraped jobs via the worker's deterministic scorer (no LLM spend). */
+async function scoreJobs(
+  workerUrl: string,
+  workerSecret: string,
+  resumeText: string,
+  jobs: Array<{ id: string; title: string; description: string; location: string; remote: boolean; country: string }>,
+  eligibility: EligibilityProfile,
+  languages: string[],
+  timeoutMs = 15_000,
+): Promise<Map<string, FitScore>> {
+  const out = new Map<string, FitScore>()
+  if (jobs.length === 0) return out
+  try {
+    const res = await fetch(`${workerUrl}/jobs/score`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${workerSecret}` },
+      body: JSON.stringify({ resume_text: resumeText.slice(0, 6000), jobs, eligibility, languages }),
+      signal: AbortSignal.timeout(timeoutMs),
+    })
+    if (!res.ok) {
+      console.warn('[run-campaigns] score returned', res.status)
+      return out
+    }
+    const data = (await res.json()) as { scores?: Record<string, FitScore> }
+    for (const [id, s] of Object.entries(data.scores ?? {})) out.set(id, s)
+  } catch (err) {
+    console.warn('[run-campaigns] score error:', err instanceof Error ? err.message : String(err))
+  }
+  return out
+}
+
 // ── Main handler ──────────────────────────────────────────────────────────────
 
 export async function POST(req: Request) {
@@ -374,6 +409,15 @@ async function runCampaigns(
     if (await isFlagEnabled(flag)) enabledSources.add(board)
   }
   console.log('[run-campaigns] enabled extra sources', { sources: [...enabledSources] })
+
+  // ── Phase 3: job-fit gate ─────────────────────────────────────────────────
+  // The jobfit_min_score flag's rolloutPct doubles as the threshold (0–100):
+  // listings scoring below it are skipped instead of queued. Disabled flag →
+  // scoring is informational only (nothing gated).
+  const fitFlag = await prisma.featureFlag.findUnique({ where: { key: 'jobfit_min_score' } })
+  const fitGateEnabled = fitFlag?.enabled ?? false
+  const fitThreshold = fitFlag?.rolloutPct ?? 45
+  console.log('[run-campaigns] jobfit gate', { fitGateEnabled, fitThreshold })
 
   const summary: Array<{
     campaignId: string
@@ -810,6 +854,20 @@ async function runCampaigns(
 
     const ghMatched = runGreenhouseCache.filter((j) => keywordMatches(j.title, keyword)).length
     campaignLog.scraped = scrapedJobs.length
+
+    // ── Phase 3: batch job-fit scoring (deterministic; cached on JobListing) ──
+    const scoreMap = await scoreJobs(
+      workerUrl, workerSecret, resumeText,
+      scrapedJobs.map((j) => {
+        const loc = inferJobLocation(j.location ?? '', j.title)
+        return {
+          id: j.id, title: j.title, description: j.description ?? '',
+          location: j.location ?? '', remote: j.remote ?? loc.isRemote,
+          country: loc.country ?? '',
+        }
+      }),
+      eligibility, eligibility.languages,
+    )
     console.log('[run-campaigns] scraped', {
       campaign: campaign.id,
       total: scrapedJobs.length,
@@ -948,6 +1006,19 @@ async function runCampaigns(
         continue
       }
 
+      // ── Phase 3: job-fit gate ─────────────────────────────────────────────
+      // Skip low-fit listings (below the jobfit_min_score threshold) before
+      // burning quota. When the gate is disabled the score is still recorded.
+      const fit = scoreMap.get(job.id)
+      if (fitGateEnabled && fit && fit.score < fitThreshold) {
+        campaignLog.skipped++
+        console.log('[run-campaigns] low-fit skip', {
+          campaign: campaign.id, company: job.company, title: job.title,
+          score: fit.score, threshold: fitThreshold, reasons: fit.reasons,
+        })
+        continue
+      }
+
       // Check user quota
       const hasQuota = await canSendApplication(user.id)
       if (!hasQuota) {
@@ -970,11 +1041,15 @@ async function runCampaigns(
           salary: job.salary ?? '',
           description: job.description ?? '',
           url: job.url,
+          fitScore: fit?.score ?? null,
+          fitReasons: fit?.reasons ?? [],
         },
         update: {
           title: job.title,
           company: job.company,
           description: job.description ?? '',
+          fitScore: fit?.score ?? null,
+          fitReasons: fit?.reasons ?? [],
         },
       })
 
@@ -992,6 +1067,8 @@ async function runCampaigns(
           jobUrl: applyUrl,
           vacancyId: job.id,
           status: 'QUEUED',
+          fitScore: fit?.score ?? null,
+          fitReasons: fit?.reasons ?? [],
         },
       })
 

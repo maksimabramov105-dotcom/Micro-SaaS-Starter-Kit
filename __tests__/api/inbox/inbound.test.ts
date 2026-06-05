@@ -19,7 +19,34 @@ import {
   parseFrom,
   parseToAddress,
   extractCompanyFromSubject,
+  isConfirmationSubject,
 } from '@/lib/inbox/inbound-utils'
+
+// ── isConfirmationSubject (Phase 3 CONFIRMED signal) ─────────────────────────
+
+describe('isConfirmationSubject', () => {
+  it('matches ATS confirmation phrasings', () => {
+    expect(isConfirmationSubject('Thank you for applying to Cloudflare')).toBe(true)
+    expect(isConfirmationSubject('We have received your application')).toBe(true)
+    expect(isConfirmationSubject('Your application was submitted')).toBe(true)
+    expect(isConfirmationSubject('Application received')).toBe(true)
+  })
+
+  it('does NOT treat security-code/verification emails as confirmations', () => {
+    expect(isConfirmationSubject('Security code for your application to Figma')).toBe(false)
+    expect(isConfirmationSubject('Your verification code is 123456')).toBe(false)
+  })
+
+  it('does NOT match unrelated subjects', () => {
+    expect(isConfirmationSubject('Interview scheduled for next week')).toBe(false)
+    expect(isConfirmationSubject('Re: question about the role')).toBe(false)
+    expect(isConfirmationSubject('')).toBe(false)
+  })
+
+  it('is case-insensitive', () => {
+    expect(isConfirmationSubject('THANK YOU FOR APPLYING')).toBe(true)
+  })
+})
 import { isAutoResponder } from '@/lib/inbox/classify'
 
 const DOMAIN = 'inbox.resumeai-bot.ru'

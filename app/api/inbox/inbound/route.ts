@@ -27,7 +27,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { classifyEmail } from '@/lib/inbox/classify'
 import { notifyHumanReply, shouldNotify } from '@/lib/inbox/notify'
-import { verifyResendSignature, parseFrom, parseToAddress, extractCompanyFromSubject } from '@/lib/inbox/inbound-utils'
+import { verifyResendSignature, parseFrom, parseToAddress, extractCompanyFromSubject, isConfirmationSubject } from '@/lib/inbox/inbound-utils'
 import { publishEvent } from '@/lib/redis'
 
 const INBOX_DOMAIN = process.env.INBOX_DOMAIN ?? 'inbox.resumeai-bot.ru'
@@ -168,6 +168,21 @@ export async function POST(req: Request) {
             payload: { messageId: message.id, fromEmail },
           },
         })
+      }
+
+      // Phase 3 CONFIRMED signal: an ATS confirmation-of-receipt email tied to
+      // this application. Recorded once per application (dedup) so the funnel can
+      // show queued→submitted→CONFIRMED→reply.
+      if (isConfirmationSubject(subject) || isConfirmationSubject(bodyText.slice(0, 200))) {
+        const already = await prisma.applicationEvent.findFirst({
+          where: { applicationId, type: 'confirmed' },
+          select: { id: true },
+        })
+        if (!already) {
+          await prisma.applicationEvent.create({
+            data: { applicationId, type: 'confirmed', payload: { messageId: message.id, fromEmail } },
+          })
+        }
       }
     } catch (err) {
       console.error('[inbox/inbound] status side-effect failed', err)
