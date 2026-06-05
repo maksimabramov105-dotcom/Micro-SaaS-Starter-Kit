@@ -1,5 +1,15 @@
+import type { Metadata } from 'next'
 import { Navbar } from '@/components/navbar'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+
+const SITE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
+
+export const metadata: Metadata = {
+  title: 'FAQ — ResumeAI-Bot',
+  description:
+    'Answers about AI resume building, auto-apply, pricing, security, refunds, and how applications are submitted on your behalf.',
+  alternates: { canonical: `${SITE}/faq` },
+}
 
 const faqs = [
   {
@@ -65,8 +75,21 @@ const faqs = [
 ]
 
 export default function FaqPage() {
+  const faqJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqs.map((f) => ({
+      '@type': 'Question',
+      name: f.question,
+      acceptedAnswer: { '@type': 'Answer', text: f.answer },
+    })),
+  }
   return (
     <div className="flex min-h-screen flex-col">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
       <Navbar />
       <main className="flex-1">
         <div className="container mx-auto max-w-4xl px-4 py-12">

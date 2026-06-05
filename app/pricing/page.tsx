@@ -4,10 +4,31 @@ import { getOrAssignVariant } from '@/lib/experiments'
 import { Navbar } from '@/components/navbar'
 import { PricingCards } from '@/components/pricing-cards'
 import { LaunchBanner } from '@/components/launch-banner'
+import { PRICING_PLANS } from '@/lib/pricing'
+
+const SITE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
 
 export const metadata = {
   title: 'Pricing — ResumeAI',
   description: 'Simple, transparent pricing with a 30-day money-back guarantee. No risk.',
+  alternates: { canonical: `${SITE}/pricing` },
+}
+
+// Product/Offer JSON-LD built from the canonical plan list (monthly tiers).
+const pricingJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Product',
+  name: 'ResumeAI-Bot',
+  description: 'AI resume builder + auto-apply to jobs across 50+ countries.',
+  brand: { '@type': 'Brand', name: 'ResumeAI-Bot' },
+  offers: PRICING_PLANS.filter((p) => p.intervalKey !== 'year').map((p) => ({
+    '@type': 'Offer',
+    name: `${p.name} plan`,
+    price: p.price,
+    priceCurrency: 'USD',
+    url: `${SITE}/pricing`,
+    availability: 'https://schema.org/InStock',
+  })),
 }
 
 // Headline copy for each pricing_headline_v1 variant
@@ -29,6 +50,10 @@ export default async function PricingPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(pricingJsonLd) }}
+      />
       <LaunchBanner />
       <Navbar />
       <main className="flex-1">
