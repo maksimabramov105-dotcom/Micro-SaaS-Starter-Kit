@@ -1211,7 +1211,13 @@ class CareerOpsApplicator:
         self._pw = await async_playwright().start()
         self.browser = await self._pw.chromium.launch(
             headless=True,
-            args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
+            args=[
+                "--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu",
+                # Reduce automation fingerprinting (helps avoid soft bot-blocks on
+                # Greenhouse/Lever). NOTE: not enough for Ashby, whose SPA stays
+                # un-hydrated headless — that needs a headful/Xvfb browser (post-resize).
+                "--disable-blink-features=AutomationControlled",
+            ],
         )
         self.context = await self.browser.new_context(
             user_agent=(
@@ -1221,6 +1227,13 @@ class CareerOpsApplicator:
             ),
             viewport={"width": 1920, "height": 1080},
             locale="en-US",
+        )
+        # Light stealth: hide the headless/automation tells most ATS check for.
+        await self.context.add_init_script(
+            "Object.defineProperty(navigator,'webdriver',{get:()=>undefined});"
+            "Object.defineProperty(navigator,'languages',{get:()=>['en-US','en']});"
+            "Object.defineProperty(navigator,'plugins',{get:()=>[1,2,3,4,5]});"
+            "window.chrome={runtime:{}};"
         )
 
     async def close(self) -> None:

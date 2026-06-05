@@ -956,10 +956,18 @@ async function runCampaigns(
     const isBoardUrl = (url: string): boolean =>
       BOARD_HOSTS.some((host) => url.toLowerCase().includes(host))
 
-    for (const job of scrapedJobs) {
-      if (appliedThisCampaign >= campaignRemaining) break
+    // ── Apply dispatch (bounded concurrency, C1) ──────────────────────────
+    // APPLY_CONCURRENCY workers pull from scrapedJobs. At the default of 1 this
+    // is exactly the previous sequential loop. >1 is only safe after a VPS
+    // resize — the worker memory guard refuses to launch a browser without
+    // headroom, so the pool degrades gracefully. See docs/SCALING.md.
+    const APPLY_CONCURRENCY = Math.max(1, Math.min(5, Number(process.env.APPLY_CONCURRENCY ?? '1') || 1))
+    let poolStop = false
+    let nextJobIdx = 0
+    const attemptJob = async (job: (typeof scrapedJobs)[number]): Promise<'next' | 'stop'> => {
+      if (appliedThisCampaign >= campaignRemaining) return 'stop'
       // Per-campaign OOM cap: stop if this campaign has used its Playwright budget
-      if (attemptsThisCampaign >= MAX_APPLIES_PER_CAMPAIGN) break
+      if (attemptsThisCampaign >= MAX_APPLIES_PER_CAMPAIGN) return 'stop'
       // Wall-clock guard for the background run (RUN_BUDGET_MS).
       //
       // Two-part check:
@@ -998,33 +1006,33 @@ async function runCampaigns(
           campaignBudgetMs,
         })
         if (!campaignLog.error) campaignLog.error = `time budget (${elapsedNow}ms)`
-        break
+        return 'stop'
       }
       const playwrightTimeout = Math.min(PLAYWRIGHT_MAX_TIMEOUT, remainingBudget - 5_000)
 
       const applyUrl = job.apply_url || job.url
       if (!applyUrl) {
         campaignLog.skipped++
-        continue
+        return 'next'
       }
 
       // Skip board listing pages — CareerOps needs a direct ATS URL
       if (isBoardUrl(applyUrl)) {
         campaignLog.skipped++
-        continue
+        return 'next'
       }
 
       // Per-source circuit breaker: stop hitting a host that keeps failing.
       const applyHost = hostOf(applyUrl)
       if ((sourceFails.get(applyHost) ?? 0) >= SOURCE_BACKOFF) {
         campaignLog.skipped++
-        continue
+        return 'next'
       }
 
       // Skip already-applied
       if (appliedUrls.has(applyUrl)) {
         campaignLog.skipped++
-        continue
+        return 'next'
       }
 
       // Skip blocked companies
@@ -1034,7 +1042,7 @@ async function runCampaigns(
         )
       ) {
         campaignLog.skipped++
-        continue
+        return 'next'
       }
 
       // ── Pre-apply eligibility knockout (Phase 1) ──────────────────────────
@@ -1055,7 +1063,7 @@ async function runCampaigns(
           isRemote: jobLoc.isRemote,
           reason: knockout,
         })
-        continue
+        return 'next'
       }
 
       // ── Phase 3: job-fit gate ─────────────────────────────────────────────
@@ -1068,7 +1076,7 @@ async function runCampaigns(
           campaign: campaign.id, company: job.company, title: job.title,
           score: fit.score, threshold: fitThreshold, reasons: fit.reasons,
         })
-        continue
+        return 'next'
       }
 
       // Check user quota
@@ -1076,7 +1084,7 @@ async function runCampaigns(
       if (!hasQuota) {
         console.log('[run-campaigns] user quota exhausted', user.id)
         if (!campaignLog.error) campaignLog.error = 'user quota exhausted'
-        break
+        return 'stop'
       }
 
       // Upsert the JobListing so we have it in DB
@@ -1151,7 +1159,7 @@ async function runCampaigns(
         appliedUrls.delete(applyUrl)
         console.warn('[run-campaigns] worker low on memory — pausing run', { campaign: campaign.id, error: result.error })
         if (!campaignLog.error) campaignLog.error = 'insufficient_memory'
-        break
+        return 'stop'
       }
 
       if (result?.status === 'submitted') {
@@ -1233,7 +1241,20 @@ async function runCampaigns(
           error: errMsg,
         })
       }
+      return 'next'
     }
+
+    // Drive attemptJob with APPLY_CONCURRENCY workers. At 1 (the default) this is
+    // the original sequential loop; >1 runs a bounded pool (each browser still
+    // gated by the worker memory guard).
+    const runWorker = async (): Promise<void> => {
+      while (!poolStop) {
+        const job = scrapedJobs[nextJobIdx++]
+        if (!job) return
+        if ((await attemptJob(job)) === 'stop') { poolStop = true; return }
+      }
+    }
+    await Promise.all(Array.from({ length: APPLY_CONCURRENCY }, () => runWorker()))
 
     // Update campaign stats
     await prisma.autoApplyCampaign.update({
