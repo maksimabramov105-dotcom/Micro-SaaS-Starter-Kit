@@ -145,6 +145,23 @@ class CareerOpsApplyRequest(BaseModel):
     user_data: dict
 
 
+class ScoreJob(BaseModel):
+    id: str
+    title: str = ""
+    description: str = ""
+    location: str = ""
+    remote: bool = False
+    country: str = ""
+
+
+class ScoreRequest(BaseModel):
+    resume_text: str
+    jobs: list[ScoreJob]
+    eligibility: dict | None = None
+    languages: list[str] = []
+    job_country: str = ""
+
+
 class ScrapeRequest(BaseModel):
     keywords: str
     location: str = ""
@@ -387,6 +404,29 @@ async def autoapply_linkedin(body: LinkedInApplyRequest) -> dict:
 
     await _redis_save(job)
     return job.model_dump()
+
+
+@router.post("/score", dependencies=[Depends(verify_bearer)])
+async def score_jobs(body: ScoreRequest) -> dict:
+    """
+    Batch job-fit scoring (0–100) for a candidate vs a list of jobs. Pure +
+    deterministic (no LLM spend), so the orchestrator can score every listing
+    cheaply before queuing and cache the result on JobListing.
+    """
+    from worker.ai.jobfit import score_job
+
+    scores = {}
+    for j in body.jobs:
+        try:
+            scores[j.id] = score_job(
+                body.resume_text, j.model_dump(),
+                eligibility=body.eligibility, languages=body.languages,
+                job_country=j.country or body.job_country,
+            )
+        except Exception as exc:  # never let one job break the batch
+            logger.warning("job.score.failed", job_id=j.id, error=str(exc))
+            scores[j.id] = {"score": 50, "reasons": ["scoring error — neutral"], "breakdown": {}}
+    return {"scores": scores}
 
 
 @router.post("/autoapply/careerops", dependencies=[Depends(verify_bearer)])

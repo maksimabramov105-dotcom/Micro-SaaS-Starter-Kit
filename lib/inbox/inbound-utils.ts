@@ -159,3 +159,35 @@ export function extractCompanyFromSubject(subject: string): string | null {
   if (company.length < 2) return null
   return company
 }
+
+// Phrases an ATS uses to confirm it received an application. Used to emit the
+// Phase 3 CONFIRMED signal (an AUTOMATED reply that actually confirms receipt,
+// not e.g. a "security code" email). Linear, single-pass scan.
+const _CONFIRMATION_PHRASES = [
+  'thank you for applying',
+  'thank you for your application',
+  'thanks for applying',
+  'application has been received',
+  'application was received',
+  'we have received your application',
+  'we received your application',
+  'received your application',
+  'application has been submitted',
+  'your application was submitted',
+  'application received',
+  'successfully submitted',
+  'submission received',
+  'has been received',
+]
+
+/**
+ * True when an email subject (or short body) reads like an ATS confirmation of
+ * receipt — used to mark a JobApplication CONFIRMED. Deliberately excludes
+ * "security code"/verification emails, which are AUTOMATED but not confirmations.
+ */
+export function isConfirmationSubject(text: string): boolean {
+  if (!text) return false
+  const t = text.toLowerCase()
+  if (t.includes('security code') || t.includes('verification code')) return false
+  return _CONFIRMATION_PHRASES.some((p) => t.includes(p))
+}

@@ -42,7 +42,7 @@ export default async function DashboardPage() {
 
   const userId = session.user.id
 
-  const [resumes, campaigns, recentApplications, replyCount] = await Promise.all([
+  const [resumes, campaigns, recentApplications, replyCount, telegramChat] = await Promise.all([
     prisma.resume.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
@@ -59,6 +59,7 @@ export default async function DashboardPage() {
       include: { resume: { select: { title: true } } },
     }),
     prisma.inboxMessage.count({ where: { userId } }),
+    prisma.telegramChat.findUnique({ where: { userId }, select: { chatId: true } }),
   ])
 
   const now = new Date()
@@ -81,6 +82,25 @@ export default async function DashboardPage() {
         <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
         <p className="text-slate-500">Welcome back, {session.user.name ?? session.user.email}!</p>
       </div>
+
+      {/* Telegram onboarding gap: without a linked chat, notifications are
+          silently dropped by the notifier. Make that explicit + actionable. */}
+      {!telegramChat && (
+        <div className="mb-8 flex flex-col gap-2 rounded-lg border border-amber-300 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-medium text-amber-900">
+              🔔 Telegram isn&apos;t linked — you&apos;re missing application updates
+            </p>
+            <p className="text-xs text-amber-700">
+              Submissions, recruiter replies, and interview requests are sent to Telegram.
+              Until you link it, those notifications aren&apos;t delivered anywhere.
+            </p>
+          </div>
+          <Link href="/dashboard/settings/notifications">
+            <Button size="sm" className="whitespace-nowrap">Link Telegram</Button>
+          </Link>
+        </div>
+      )}
 
       {/* KPI strip */}
       <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
@@ -230,6 +250,7 @@ export default async function DashboardPage() {
                       <th className="px-4 py-3 text-left font-medium text-slate-500">Job</th>
                       <th className="px-4 py-3 text-left font-medium text-slate-500">Company</th>
                       <th className="px-4 py-3 text-left font-medium text-slate-500">Source</th>
+                      <th className="px-4 py-3 text-left font-medium text-slate-500">Fit</th>
                       <th className="px-4 py-3 text-left font-medium text-slate-500">Status</th>
                       <th className="px-4 py-3 text-left font-medium text-slate-500">Applied</th>
                     </tr>
@@ -243,6 +264,24 @@ export default async function DashboardPage() {
                         <td className="px-4 py-3 font-medium text-slate-900">{app.jobTitle}</td>
                         <td className="px-4 py-3 text-slate-600">{app.company}</td>
                         <td className="px-4 py-3 text-slate-400">{app.source}</td>
+                        <td className="px-4 py-3">
+                          {app.fitScore != null ? (
+                            <span
+                              title={app.fitReasons.join(' • ')}
+                              className={
+                                app.fitScore >= 70
+                                  ? 'font-medium text-emerald-600'
+                                  : app.fitScore >= 45
+                                    ? 'font-medium text-amber-600'
+                                    : 'font-medium text-slate-400'
+                              }
+                            >
+                              {app.fitScore}
+                            </span>
+                          ) : (
+                            <span className="text-slate-300">—</span>
+                          )}
+                        </td>
                         <td className="px-4 py-3">
                           <StatusBadge status={app.status} />
                         </td>
