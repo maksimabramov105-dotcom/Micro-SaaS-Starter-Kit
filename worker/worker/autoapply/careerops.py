@@ -1703,12 +1703,21 @@ class CareerOpsApplicator:
         """
         page = await self.context.new_page()
         try:
-            await page.goto(job_url, timeout=30000)
-            await page.wait_for_load_state("networkidle", timeout=15000)
-            await page.wait_for_timeout(random.randint(1000, 2000))
-
-            await _click_apply_button(page)
-            await page.wait_for_load_state("networkidle", timeout=10000)
+            # Ashby is a client-rendered SPA where "networkidle" often never
+            # settles (it caused timeouts). Go straight to the /application route
+            # and wait for real form inputs to appear instead of network idle.
+            if not job_url.rstrip("/").endswith("/application"):
+                job_url = job_url.rstrip("/") + "/application"
+            await page.goto(job_url, wait_until="domcontentloaded", timeout=30000)
+            try:
+                await page.wait_for_selector("input, textarea", timeout=20000)
+            except Exception:
+                # No form yet — try clicking an Apply button, then wait again.
+                await _click_apply_button(page)
+                try:
+                    await page.wait_for_selector("input, textarea", timeout=15000)
+                except Exception:
+                    pass
             await page.wait_for_timeout(1500)
 
             # Try data-field-id attrs first, fall back to placeholder/type selectors

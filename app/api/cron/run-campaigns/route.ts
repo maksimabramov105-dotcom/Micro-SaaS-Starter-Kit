@@ -907,7 +907,7 @@ async function runCampaigns(
     // CareerOps fills ATS forms (Greenhouse, Lever, Workable, etc.) and cannot work on
     // these aggregator pages — skip them to avoid spending Playwright budget on timeouts.
     // Note: RemoteOK returns "remoteOK.com" (capital letters) so comparison is lowercased.
-    const BOARD_HOSTS = ['remoteok.com', 'themuse.com', 'adzuna.com', 'arbeitnow.com', 'remotive.com']
+    const BOARD_HOSTS = ['remoteok.com', 'themuse.com', 'adzuna.com', 'arbeitnow.com', 'remotive.com', 'himalayas.app', 'weworkremotely.com']
     const isBoardUrl = (url: string): boolean =>
       BOARD_HOSTS.some((host) => url.toLowerCase().includes(host))
 
