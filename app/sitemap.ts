@@ -1,5 +1,6 @@
 import { MetadataRoute } from 'next'
 import seo from '@/lib/seo-data.json'
+import { REMOTE_GUIDES } from '@/lib/remote-guides'
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
@@ -45,6 +46,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
     })),
     ...seo.competitors.map((c) => ({
       url: `${baseUrl}/alternatives/${c.slug}`,
+      lastModified: now,
+      changeFrequency: 'monthly' as const,
+      priority: 0.7,
+    })),
+    // Eligibility/remote-first landing pages (D3 — the wedge).
+    ...REMOTE_GUIDES.map((g) => ({
+      url: `${baseUrl}/remote/${g.slug}`,
       lastModified: now,
       changeFrequency: 'monthly' as const,
       priority: 0.7,
