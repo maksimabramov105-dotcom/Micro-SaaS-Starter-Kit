@@ -114,6 +114,19 @@ export default async function DashboardPage() {
         </div>
       )}
 
+      {/* Chrome extension install CTA — shown only once the extension is published
+          and NEXT_PUBLIC_CHROME_EXTENSION_URL is set (no dead link before then). */}
+      {process.env.NEXT_PUBLIC_CHROME_EXTENSION_URL && (
+        <div className="mb-8 flex flex-col gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm font-medium text-emerald-900">
+            🧩 Autofill any application in one click — get the ResumeAI Chrome extension.
+          </p>
+          <a href={process.env.NEXT_PUBLIC_CHROME_EXTENSION_URL} target="_blank" rel="noopener noreferrer">
+            <Button size="sm" className="whitespace-nowrap">Install extension</Button>
+          </a>
+        </div>
+      )}
+
       {/* KPI strip */}
       <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <Card>
