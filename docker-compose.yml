@@ -77,6 +77,10 @@ services:
       WORKER_URL: http://worker:8000
       WORKER_SECRET: ${WORKER_SECRET}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      # Bounded apply concurrency (C1). 1 = sequential. Raise (e.g. 3) only on a
+      # box with RAM headroom — each concurrent browser is gated by the worker
+      # MIN_APPLY_MEMORY_MB guard. See docs/SCALING.md.
+      APPLY_CONCURRENCY: ${APPLY_CONCURRENCY:-1}
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://resumeai-bot.ru}
       NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
       SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
@@ -121,6 +125,9 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://resumeai:resumeai@postgres:5432/resumeai
       WORKER_SECRET: ${WORKER_SECRET}
+      # Refuse to launch a browser below this MemAvailable (MB) — protects the
+      # box from OOM and gates bounded apply concurrency. Raise after a resize.
+      MIN_APPLY_MEMORY_MB: ${MIN_APPLY_MEMORY_MB:-300}
       # Full-access Resend key so the CareerOps applicator can read the
       # Greenhouse email-verification code from the inbound mailbox and
       # complete applications (P19 email-code step).
