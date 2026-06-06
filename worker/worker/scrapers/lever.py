@@ -20,10 +20,13 @@ logger = structlog.get_logger(__name__)
 
 _HEADERS = {"User-Agent": "ResumeAI-Worker/1.0 (support@example.com)", "Accept": "application/json"}
 
-# Curated companies verified to use Lever's public postings API.
+# Companies verified live on Lever's public postings API. Mix of remote-friendly
+# global employers (toptal all-remote; whoop/ro/spotify hire cross-function) with
+# high posting volume so any-role keyword matching has depth.
 _COMPANIES: list[str] = [
-    "gopuff", "ro", "whoop", "veeva", "matchgroup", "spotify", "plaid",
+    "toptal", "whoop", "ro", "veeva", "gopuff", "spotify", "plaid",
     "attentive", "netflix", "kayak", "brevo", "nerdwallet", "leadgenius",
+    "matchgroup",
 ]
 
 

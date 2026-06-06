@@ -20,10 +20,13 @@ logger = structlog.get_logger(__name__)
 
 _HEADERS = {"User-Agent": "ResumeAI-Worker/1.0 (support@example.com)", "Accept": "application/json"}
 
-# Curated companies verified to expose an Ashby public job board.
+# Remote-first / globally-hiring companies on Ashby, verified live and
+# cross-functional (deel/oyster/andela/zapier are global all-functions employers;
+# notion 147, ramp 111 carry heavy non-eng volume). Role-agnostic by design.
 _COMPANIES: list[str] = [
-    "ramp", "linear", "vercel", "replit", "runway", "hex", "posthog",
-    "browserbase", "clerk", "supabase", "render", "deno", "mux", "modal",
+    "deel", "andela", "oyster", "1password", "close", "zapier", "float",
+    "notion", "ramp", "linear", "supabase", "posthog", "render", "modal",
+    "replit", "benchling", "sentry", "mux", "helpscout", "gitbook", "buffer",
 ]
 
 
