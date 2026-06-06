@@ -140,6 +140,15 @@
       "whySwitch":["Weekly pricing ($12-23/week) adds up fast","No free trial","Less emphasis on multi-country coverage"],
       "ourEdge":["Predictable monthly/annual pricing instead of weekly","Real free tier","50+ country coverage and per-role AI resumes"],
       "theirPrice":"~$12-23/week"
+    },
+    {
+      "slug":"simplify",
+      "name":"Simplify",
+      "status":"active",
+      "summary":"Simplify is a popular free browser extension that autofills job application forms across thousands of sites. It is an autofill helper, not a hands-off auto-apply agent, and it does not track or surface employer replies.",
+      "whySwitch":["It autofills forms but you still click apply on every job — not true hands-off auto-apply","No work-eligibility logic: it doesn't filter to roles you can actually work (remote / authorized countries / sponsorship)","No reply loop — replies scatter across your email, not one tracked inbox","US / on-site biased like most US-built tools"],
+      "ourEdge":["Fully hands-off auto-apply, not just autofill","Eligibility-aware: only applies where you can actually work, and answers screening questions honestly","Captures employer replies in one inbox and confirms each submission via the ATS","Remote-first across 50+ countries with a per-role AI resume"],
+      "theirPrice":"Free (autofill only)"
     }
   ]
 }

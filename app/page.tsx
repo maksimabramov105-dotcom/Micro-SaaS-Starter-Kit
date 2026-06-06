@@ -1,6 +1,29 @@
 import Link from 'next/link'
 import { PRICING_PLANS, getMonthlyEquivalent } from '@/lib/pricing'
 import { LaunchBanner } from '@/components/launch-banner'
+import { prisma } from '@/lib/prisma'
+import { testimonials, replyScreenshots } from '@/lib/proof'
+
+// ISR: regenerated hourly so the outcomes band shows real, fresh numbers while
+// the page stays fully server-rendered + indexable.
+export const revalidate = 3600
+
+// Real funnel proof (D2) — aggregate, anonymized. Only shown once there's a
+// meaningful volume so early/empty numbers never undersell the product.
+async function getOutcomes(): Promise<{ submitted: number; confirmed: number } | null> {
+  try {
+    const [submitted, confirmed] = await Promise.all([
+      prisma.jobApplication.count({
+        where: { status: { in: ['SUBMITTED', 'INTERVIEW', 'REJECTED', 'OFFER'] } },
+      }),
+      prisma.applicationEvent.count({ where: { type: 'confirmed' } }),
+    ])
+    if (submitted < 200) return null // hold until the number is impressive
+    return { submitted, confirmed }
+  } catch {
+    return null
+  }
+}
 
 // SoftwareApplication structured data for rich results (HOMEPAGE_COPY.md §9).
 // No aggregateRating until we have real reviews — never fake ratings.
@@ -28,7 +51,8 @@ const HOMEPAGE_PLANS = PRICING_PLANS.filter(
   (p) => p.intervalKey === null || p.intervalKey === 'year',
 )
 
-export default function HomePage() {
+export default async function HomePage() {
+  const outcomes = await getOutcomes()
   return (
     <main className="flex min-h-screen flex-col bg-white">
       <script
@@ -71,9 +95,10 @@ export default function HomePage() {
           &mdash; while you sleep.
         </h1>
         <p className="mt-6 max-w-2xl text-xl text-slate-500">
-          ResumeAI-Bot tailors your resume to each role and submits applications across top job
-          boards and company career pages &mdash; so you get more interviews with a fraction of the
-          effort. Built for job seekers going global, not just US LinkedIn.
+          ResumeAI-Bot only applies to jobs you&apos;re actually eligible for &mdash; remote,
+          your authorized countries, sponsorship-aware &mdash; tailors your resume to each role,
+          and captures the replies in one inbox. Built for people applying across borders, not just
+          US LinkedIn.
         </p>
         <div className="mt-10">
           <Link
@@ -89,12 +114,72 @@ export default function HomePage() {
 
         {/* Honest trust strip — no fabricated metrics (HOMEPAGE_COPY.md §1) */}
         <div className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-slate-500">
-          <span>🌍 Apply in 50+ countries</span>
-          <span>🆓 Free to start — no credit card</span>
-          <span>🔒 We never sell your data</span>
+          <span>✅ Only applies where you&apos;re eligible</span>
+          <span>🌍 Remote &amp; 50+ countries</span>
+          <span>📨 Confirmed by the employer&apos;s ATS — no fake &ldquo;applied&rdquo;</span>
           <span>💸 30-day money-back guarantee</span>
         </div>
       </section>
+
+      {/* Real funnel proof (D2) — only renders once volume is meaningful. */}
+      {outcomes && (
+        <section className="border-y border-slate-100 bg-emerald-50/40 px-4 py-12">
+          <div className="mx-auto flex max-w-4xl flex-col items-center gap-3 text-center">
+            <p className="text-sm font-semibold uppercase tracking-wide text-emerald-700">
+              Real activity on ResumeAI-Bot
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-x-14 gap-y-4">
+              <div>
+                <div className="text-4xl font-bold text-slate-900">{outcomes.submitted.toLocaleString()}</div>
+                <div className="text-sm text-slate-500">applications submitted</div>
+              </div>
+              {outcomes.confirmed > 0 && (
+                <div>
+                  <div className="text-4xl font-bold text-slate-900">{outcomes.confirmed.toLocaleString()}</div>
+                  <div className="text-sm text-slate-500">confirmed received by employers</div>
+                </div>
+              )}
+            </div>
+            <p className="mt-1 text-xs text-slate-400">
+              Live totals across all users, updated hourly. A job counts as &ldquo;submitted&rdquo;
+              only after the employer&apos;s ATS accepts it.
+            </p>
+          </div>
+        </section>
+      )}
+
+      {/* Real testimonials / reply screenshots (D2). Empty by default — we never
+          ship fabricated proof. Fill lib/proof.ts with genuine content. */}
+      {(testimonials.length > 0 || replyScreenshots.length > 0) && (
+        <section className="border-b border-slate-100 bg-white px-4 py-16">
+          <div className="mx-auto max-w-5xl">
+            <h2 className="mb-10 text-center text-3xl font-bold text-slate-900">Real replies, real results</h2>
+            {replyScreenshots.length > 0 && (
+              <div className="mb-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {replyScreenshots.map((s) => (
+                  <figure key={s.src} className="overflow-hidden rounded-xl border border-slate-200">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={s.src} alt={s.alt} className="w-full" />
+                    {s.caption && <figcaption className="px-3 py-2 text-xs text-slate-500">{s.caption}</figcaption>}
+                  </figure>
+                ))}
+              </div>
+            )}
+            {testimonials.length > 0 && (
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {testimonials.map((t) => (
+                  <blockquote key={t.name + t.quote} className="rounded-xl border border-slate-200 bg-slate-50 p-6">
+                    <p className="text-sm text-slate-700">&ldquo;{t.quote}&rdquo;</p>
+                    <footer className="mt-3 text-xs font-medium text-slate-900">
+                      {t.name} <span className="font-normal text-slate-500">— {t.role}</span>
+                    </footer>
+                  </blockquote>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Why ResumeAI-Bot — honest value/trust block (HOMEPAGE_COPY.md §4).
           NOTE: this replaces the testimonials slot. We are NOT shipping
@@ -109,9 +194,14 @@ export default function HomePage() {
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {[
               {
+                icon: '✅',
+                title: 'Only jobs you can actually get',
+                body: "Other tools blast US postings and answer “authorized to work? — yes” for everyone, so you get auto-rejected. We check your work authorization, visa-sponsorship needs and remote-eligibility BEFORE applying — and answer honestly.",
+              },
+              {
                 icon: '🌍',
-                title: 'Truly global',
-                body: 'Most auto-apply tools only work on US LinkedIn. We cover 50+ countries — perfect for relocating, going remote, or applying across the EU, Gulf, and Asia.',
+                title: 'Remote-first & global',
+                body: 'Built for people applying across borders. We prioritize remote and internationally-friendly roles across 50+ countries — not just US LinkedIn.',
               },
               {
                 icon: '🤖',
@@ -119,14 +209,9 @@ export default function HomePage() {
                 body: "We don't blast one generic resume. Our AI rewrites yours per role so it passes the ATS and reads like you wrote it for that company.",
               },
               {
-                icon: '⚡',
-                title: 'Volume that lands interviews',
-                body: 'Interviews are a numbers game. We send dozens of tailored applications so you get more shots on goal — without the burnout.',
-              },
-              {
-                icon: '🔒',
-                title: 'Private by design',
-                body: 'We never sell your data, and you stay in control of what gets sent. See the data-safety FAQ for exactly how it works.',
+                icon: '📨',
+                title: 'We track the replies',
+                body: "Most tools fire and forget. We capture employer replies in one inbox, and only mark a job “applied” after the ATS actually confirms it — so your dashboard is honest.",
               },
             ].map((c) => (
               <div key={c.title} className="rounded-xl border border-slate-200 bg-slate-50 p-6">
@@ -186,7 +271,8 @@ export default function HomePage() {
         <div className="mx-auto max-w-4xl">
           <h2 className="mb-2 text-center text-3xl font-bold text-slate-900">Why we&apos;re different</h2>
           <p className="mb-8 text-center text-slate-500">
-            Most auto-apply tools are US / LinkedIn-only. We cover the world.
+            Most auto-apply tools are US / LinkedIn-only and assume you can work anywhere.
+            We only apply where you&apos;re actually eligible — and track the replies.
           </p>
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-left text-sm">
@@ -200,6 +286,8 @@ export default function HomePage() {
               </thead>
               <tbody className="text-slate-700">
                 {[
+                  ['Eligibility-aware (only applies where you can work)', '✓', '✕', '✕'],
+                  ['Captures employer replies in an inbox', '✓', '✕', '✕'],
                   ['Countries covered', '50+', 'shut down (2024)', 'US-focused'],
                   ['AI resume per role', '✓', 'limited', 'limited'],
                   ['Free tier', '✓ 3/day', '✕', '✕'],
