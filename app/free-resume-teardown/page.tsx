@@ -3,14 +3,14 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import seo from '@/lib/seo-data.json'
-import { LeadForm } from '@/components/lead-form'
+import { TeardownForm } from '@/components/teardown-form'
 
 const SITE = seo._meta.site
 
 export const metadata: Metadata = {
-  title: 'Free AI Resume Teardown — Get Expert Feedback in 24h | ResumeAI-Bot',
+  title: 'Free AI Resume Teardown — Instant ATS Score + Fixes | ResumeAI-Bot',
   description:
-    'Get a free, AI-powered teardown of your resume: ATS score, missing keywords, and fixes to land more interviews. Then auto-apply to jobs in 50+ countries.',
+    'Paste your resume and get an instant, free AI teardown: ATS score, missing keywords, and 3 concrete fixes. Then auto-apply to eligible jobs in 50+ countries.',
   alternates: { canonical: `${SITE}/free-resume-teardown` },
   openGraph: {
     title: 'Free AI Resume Teardown — ResumeAI-Bot',
@@ -27,17 +27,13 @@ export default function FreeResumeTeardownPage() {
     <article style={{ maxWidth: 720, margin: '0 auto', padding: '2rem 1rem', lineHeight: 1.7 }}>
       <h1>Free AI Resume Teardown</h1>
       <p>
-        Most resumes get rejected by an ATS before a human ever reads them. Send us your resume and
-        our AI will give you a free teardown — your ATS score, the keywords you&apos;re missing for
-        your target role, and the specific fixes that get you more interviews.
+        Most resumes get rejected by an ATS before a human ever reads them. Paste your resume below
+        and our AI gives you an <strong>instant</strong> teardown — your ATS score, the keywords
+        you&apos;re missing for your target role, and 3 specific fixes that get you more interviews.
       </p>
 
       <div style={{ margin: '1.5rem 0', padding: '1.25rem', border: '1px solid #e2e8f0', borderRadius: 12, background: '#f8fafc' }}>
-        <strong>Enter your email to start — it&apos;s free.</strong>
-        <LeadForm source="free-resume-teardown" />
-        <p style={{ fontSize: 13, color: '#64748b', marginTop: 8 }}>
-          No spam. We use your email only to send your teardown. We never sell your data.
-        </p>
+        <TeardownForm />
       </div>
 
       <h2>What you get</h2>
