@@ -74,8 +74,31 @@ export async function POST(req: Request) {
 
   const rawFrom: string = String(data.from ?? '')
   const subject: string = String(data.subject ?? '(no subject)')
-  const bodyText: string = String(data.text ?? data.plain_text ?? '')
-  const bodyHtml: string | null = data.html ? String(data.html) : null
+  let bodyText: string = String(data.text ?? data.plain_text ?? '')
+  let bodyHtml: string | null = data.html ? String(data.html) : null
+
+  // Resend's inbound *webhook* payload omits the body (only id/from/subject…).
+  // Without the body the classifier sees the subject only — so every email was
+  // mislabeled AUTOMATED and the inbox detail pane was empty. Fetch the full
+  // message from the Resend API by id so we can read + classify it correctly.
+  const resendId = String(data.id ?? data.email_id ?? data.inbound_id ?? '')
+  if (!bodyText && !bodyHtml && resendId && process.env.RESEND_API_KEY) {
+    try {
+      const r = await fetch(`https://api.resend.com/emails/inbound/${resendId}`, {
+        headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}` },
+        signal: AbortSignal.timeout(8000),
+      })
+      if (r.ok) {
+        const full = (await r.json()) as { text?: string; html?: string }
+        if (full.text) bodyText = full.text
+        if (full.html) bodyHtml = full.html
+      } else {
+        console.warn('[inbox/inbound] body fetch failed', r.status)
+      }
+    } catch (err) {
+      console.warn('[inbox/inbound] body fetch error', err)
+    }
+  }
 
   // ── 3. Extract handle + applicationId ──────────────────────────────────
   const parsed = parseToAddress(rawTo, INBOX_DOMAIN)
