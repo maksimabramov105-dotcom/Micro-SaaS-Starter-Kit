@@ -172,7 +172,11 @@ function keywordMatches(title: string, keywords: string): boolean {
   if (!keywords) return true
   const words = keywords.toLowerCase().split(/[\s,/\-]+/).filter(Boolean)
   const titleLower = title.toLowerCase()
-  return words.some((w) => titleLower.includes(w))
+  // Require ALL query words to appear (AND), not any (OR). Previously "customer
+  // support" matched "Premium Support Engineer" / "Customer Solution Architect"
+  // (engineering roles) because they contained one word — pulling roles the
+  // candidate is wrong for. AND keeps it to genuine "customer support" titles.
+  return words.every((w) => titleLower.includes(w))
 }
 
 // ── Scraper call ──────────────────────────────────────────────────────────────
