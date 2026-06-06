@@ -86,18 +86,17 @@ export default async function InboxPage({
     ? `${user.inboxHandle}@${inboxDomain}`
     : null
 
-  // Counts per filter tab (computed from the full unfiltered set)
-  const allMessages = classFilter
-    ? await prisma.inboxMessage.findMany({
-        where: { userId },
-        select: { classification: true },
-      })
-    : messages
-
+  // Counts per filter tab — always the TRUE totals (the message list above is
+  // paginated to `take`, so counting that list would undercount "All").
+  const grouped = await prisma.inboxMessage.groupBy({
+    by: ['classification'],
+    where: { userId },
+    _count: { _all: true },
+  })
   const counts: Record<string, number> = { ALL: 0 }
-  for (const m of allMessages) {
-    counts['ALL'] = (counts['ALL'] ?? 0) + 1
-    counts[m.classification] = (counts[m.classification] ?? 0) + 1
+  for (const g of grouped) {
+    counts['ALL'] += g._count._all
+    counts[g.classification] = (counts[g.classification] ?? 0) + g._count._all
   }
 
   return (
