@@ -73,6 +73,12 @@ export default async function DashboardPage() {
     where: { userId, status: 'INTERVIEW' },
   })
 
+  // Actual human replies (not automated ATS mail) — honest count for the
+  // "Inbox messages" card subtitle.
+  const humanReplies = await prisma.inboxMessage.count({
+    where: { userId, classification: { in: ['INTERVIEW_REQUEST', 'REJECTION', 'QUESTION'] } },
+  })
+
   // Honest per-stage status: which recent applications have a CONFIRMED signal
   // (an ATS confirmation email matched to the application).
   const recentIds = recentApplications.map((a) => a.id)
@@ -155,10 +161,13 @@ export default async function DashboardPage() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500">Recruiter Replies</CardTitle>
+            <CardTitle className="text-sm font-medium text-slate-500">Inbox messages</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{replyCount}</div>
+            <p className="text-xs text-slate-400">
+              {humanReplies > 0 ? `${humanReplies} from a person` : 'mostly automated ATS confirmations'}
+            </p>
             <Link href="/dashboard/inbox" className="text-xs text-emerald-600 hover:underline">
               Open inbox →
             </Link>
