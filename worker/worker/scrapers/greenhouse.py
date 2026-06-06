@@ -56,7 +56,7 @@ def _keyword_matches(title: str, keywords: str) -> bool:
         return True
     words = re.split(r"[\s,/\-]+", keywords.lower())
     title_lower = title.lower()
-    return any(w for w in words if w and w in title_lower)
+    return all(w in title_lower for w in words if w)  # AND match
 
 
 async def _fetch_company(

@@ -38,7 +38,7 @@ def _matches(title: str, query: str) -> bool:
         return True
     words = [w for w in re.split(r"[\s,/\-]+", query.lower()) if w]
     t = title.lower()
-    return any(w in t for w in words)
+    return all(w in t for w in words)  # AND: all query words must match the title
 
 
 async def _fetch_company(client: httpx.AsyncClient, company: str) -> list[dict]:
