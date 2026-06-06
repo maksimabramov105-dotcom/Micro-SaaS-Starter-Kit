@@ -24,29 +24,43 @@ logger = structlog.get_logger(__name__)
 
 _HEADERS = {"User-Agent": "ResumeAI-Worker/1.0 (support@example.com)"}
 
-# Tech companies that use the standard job-boards.greenhouse.io format.
-# All have been verified to return correct greenhouse.io absolute_url values.
+# Remote-first / globally-hiring companies on Greenhouse, verified live and
+# (critically) cross-functional: each posts substantial NON-engineering volume
+# (support, success, sales, marketing, ops, people, finance) so AND-keyword
+# matching surfaces *whatever role* a given user is searching for — not just eng.
+# Verified counts at curation time, e.g. gitlab 147 (52 non-eng), elastic 160
+# (95), mongodb 429 (155), twilio 147 (72), intercom 153 (50), notion-tier.
 _COMPANIES: list[str] = [
-    "cloudflare",
+    "gitlab",
+    "elastic",
+    "mongodb",
     "twilio",
-    "robinhood",
-    "postman",
+    "intercom",
+    "cloudflare",
+    "dropbox",
     "gusto",
+    "contentful",
+    "algolia",
+    "customerio",
+    "mattermost",
+    "webflow",
+    "calendly",
+    "airtable",
+    "postman",
+    "fivetran",
+    "hightouch",
+    "huntress",
     "mercury",
     "checkr",
-    "mixpanel",
-    "intercom",
-    "rippling",
-    "braintrust",
-    "deel",
+    "monzo",
+    "n26",
+    "brex",
     "figma",
-    "miro",
-    "zapier",
-    "hims",
-    "chime",
-    "benchling",
-    "anduril",
-    "scale",
+    "vercel",
+    "turing",
+    "circleci",
+    "gemini",
+    "robinhood",
 ]
 
 
