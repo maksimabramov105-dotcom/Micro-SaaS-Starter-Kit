@@ -168,6 +168,7 @@ class ScrapeRequest(BaseModel):
     keywords: str
     location: str = ""
     since: str | None = None  # reserved for future filtering
+    limit: int | None = None  # override the scraper's default result cap
 
 
 class TailorRequest(BaseModel):
@@ -531,10 +532,10 @@ async def scrape_board(board: str, body: ScrapeRequest) -> dict:
     job = await _new_job()
     logger.info("job.scrape.started", job_id=job.job_id, board=board, keywords=body.keywords)
     try:
-        results = await _SCRAPER_MAP[board](
-            query=body.keywords,
-            location=body.location,
-        )
+        scrape_kwargs: dict[str, Any] = {"query": body.keywords, "location": body.location}
+        if body.limit:
+            scrape_kwargs["limit"] = body.limit
+        results = await _SCRAPER_MAP[board](**scrape_kwargs)
         _finish(job, {"jobs": results, "count": len(results)})
         logger.info("job.scrape.done", job_id=job.job_id, count=len(results))
     except Exception as exc:
