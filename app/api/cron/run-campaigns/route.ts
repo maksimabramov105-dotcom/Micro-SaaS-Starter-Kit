@@ -1061,7 +1061,12 @@ async function runCampaigns(
       // reason WITHOUT creating a JobApplication — so quota is never burned on
       // applications that would claim false authorization.
       const jobLoc = inferJobLocation(job.location ?? '', job.title)
-      const knockout = eligibilityKnockout(eligibility, jobLoc)
+      // Trust the source's explicit remote flag (Ashby isRemote, Lever
+      // workplaceType, Himalayas/WWR, etc.) over text-only inference — many
+      // genuinely-remote roles list an HQ city as their "location", which would
+      // otherwise be wrongly skipped under a remote-only profile.
+      const isRemote = (job as { remote?: boolean }).remote === true || jobLoc.isRemote
+      const knockout = eligibilityKnockout(eligibility, { country: jobLoc.country, isRemote })
       if (knockout) {
         campaignLog.skipped++
         console.log('[run-campaigns] eligibility skip', {
@@ -1070,7 +1075,7 @@ async function runCampaigns(
           title: job.title,
           location: job.location,
           jobCountry: jobLoc.country,
-          isRemote: jobLoc.isRemote,
+          isRemote,
           reason: knockout,
         })
         return 'next'

@@ -72,7 +72,9 @@ export function inferJobLocation(
 ): { country: string | null; isRemote: boolean } {
   const loc = (location || '').trim()
   const hay = `${loc} ${title}`.toLowerCase()
-  const isRemote = /\bremote\b/.test(hay) && !/\bhybrid\b/.test(hay)
+  // Recognise the common ways a remote role is described — not just "remote".
+  const REMOTE_SIGNALS = /\b(remote|anywhere|worldwide|world ?wide|distributed|wfh|work from home|fully ?remote|remote[- ]first|home[- ]based|global)\b/
+  const isRemote = REMOTE_SIGNALS.test(hay) && !/\bhybrid\b/.test(hay)
 
   let country: string | null = null
   if (looksUS(loc)) {
