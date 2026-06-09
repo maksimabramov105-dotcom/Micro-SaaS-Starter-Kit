@@ -1056,7 +1056,7 @@ def _extract_security_code(text: str) -> Optional[str]:
 
 async def _poll_greenhouse_code(
     email: str, company: str, resend_key: str, since_iso: str,
-    attempts: int = 10, delay: float = 4.0,
+    attempts: int = 14, delay: float = 4.0,
 ) -> Optional[str]:
     """
     Poll the Resend inbound mailbox for Greenhouse's "Security code for your
@@ -1074,7 +1074,7 @@ async def _poll_greenhouse_code(
         for _ in range(attempts):
             await asyncio.sleep(delay)
             try:
-                r = await client.get("https://api.resend.com/emails/inbound")
+                r = await client.get("https://api.resend.com/emails/inbound", params={"limit": 50})
                 rows = r.json().get("data", []) if r.status_code == 200 else []
             except Exception:
                 continue
@@ -1093,7 +1093,18 @@ async def _poll_greenhouse_code(
                 created = m.get("created_at", "")
                 if email.lower() not in to:
                     continue
-                if "greenhouse" not in frm or "security code" not in subj:
+                # Match the security-code email by SUBJECT + recipient + recency.
+                # We no longer require "greenhouse" in the From address: Greenhouse
+                # sends these codes from varying/branded sender domains (a real
+                # false-miss source). The subject is the stable signal, and code
+                # extraction below validates an actual code token is present, so a
+                # stray non-code email won't be mistaken for one.
+                is_code_subject = (
+                    "security code" in subj
+                    or "verification code" in subj
+                    or ("code" in subj and "application" in subj)
+                )
+                if not is_code_subject:
                     continue
                 if since_iso and created < since_iso:
                     continue  # stale (from a previous attempt)
