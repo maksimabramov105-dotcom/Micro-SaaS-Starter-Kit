@@ -27,6 +27,8 @@ _COMPANIES: list[str] = [
     "toptal", "whoop", "ro", "veeva", "gopuff", "spotify", "plaid",
     "attentive", "netflix", "kayak", "brevo", "nerdwallet", "leadgenius",
     "matchgroup",
+    # Phase A expansion — CX-tooling + fintech + HR-tech (cross-function depth).
+    "pipedrive", "aircall", "outreach", "qonto", "lyrahealth", "15five",
 ]
 
 
