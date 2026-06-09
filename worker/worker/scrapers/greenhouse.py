@@ -61,6 +61,24 @@ _COMPANIES: list[str] = [
     "circleci",
     "gemini",
     "robinhood",
+    # Phase A expansion — support/CX, fintech, HR-tech, health, marketing heavy
+    # (all verified live; deepens the fillable pool for non-engineering roles).
+    "cockroachlabs",
+    "typeform",
+    "dialpad",
+    "lattice",
+    "cultureamp",
+    "justworks",
+    "payoneer",
+    "gocardless",
+    "truelayer",
+    "modernhealth",
+    "reddit",
+    "discord",
+    "later",
+    "hootsuite",
+    "klaviyo",
+    "nubank",
 ]
 
 

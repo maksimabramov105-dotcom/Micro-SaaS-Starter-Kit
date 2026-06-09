@@ -27,6 +27,9 @@ _COMPANIES: list[str] = [
     "deel", "andela", "oyster", "1password", "close", "zapier", "float",
     "notion", "ramp", "linear", "supabase", "posthog", "render", "modal",
     "replit", "benchling", "sentry", "mux", "helpscout", "gitbook", "buffer",
+    # Phase A expansion — CX-tooling (gorgias/kustomer), fintech, health, media.
+    "gorgias", "kustomer", "pinecone", "temporal", "airbyte", "wealthsimple",
+    "pleo", "patreon", "substack", "quora", "maven",
 ]
 
 
