@@ -188,6 +188,7 @@ async function scrapeBoard(
   keywords: string,
   location: string,
   timeoutMs = 12_000,
+  limit?: number,
 ): Promise<ScrapedJob[]> {
   try {
     const res = await fetch(`${workerUrl}/jobs/scrape/${board}`, {
@@ -196,7 +197,7 @@ async function scrapeBoard(
         'Content-Type': 'application/json',
         Authorization: `Bearer ${workerSecret}`,
       },
-      body: JSON.stringify({ keywords, location }),
+      body: JSON.stringify({ keywords, location, ...(limit ? { limit } : {}) }),
       signal: AbortSignal.timeout(timeoutMs),
     })
     if (!res.ok) {
@@ -459,7 +460,12 @@ async function runCampaigns(
   if (careerOpsCampaigns.length > 0) {
     // 20 s timeout — the Greenhouse pre-scrape queries 20 companies in parallel
     // and needs slightly more headroom than the per-campaign board scrapers.
-    const rawGreenhouse = await scrapeBoard(workerUrl, workerSecret, 'greenhouse', '', '', 20_000)
+    // limit=5000 (vs the scraper's default 200): the cache is fetched UNFILTERED
+    // and each campaign filters it client-side by keyword, so a small cap silently
+    // truncated whole role families (e.g. all customer-support roles) before the
+    // filter ever saw them. 5000 effectively returns every open role across the
+    // curated boards; payload is small (no descriptions on the greenhouse shape).
+    const rawGreenhouse = await scrapeBoard(workerUrl, workerSecret, 'greenhouse', '', '', 25_000, 5000)
     runGreenhouseCache = rawGreenhouse.map((j) => ({ ...j, board: 'greenhouse' }))
     console.log('[run-campaigns] greenhouse pre-scrape', { total: runGreenhouseCache.length })
   }
