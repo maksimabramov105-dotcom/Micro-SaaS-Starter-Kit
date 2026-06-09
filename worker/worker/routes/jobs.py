@@ -35,6 +35,7 @@ from worker.scrapers import (
     adzuna, arbeitnow, greenhouse, remoteok, themuse,
     himalayas, wwr, lever, ashby, recruitee, personio,
 )
+from worker.scrapers.resolve import resolve_many
 
 logger = structlog.get_logger(__name__)
 router = APIRouter()
@@ -499,6 +500,24 @@ _SCRAPER_MAP = {
     "recruitee": recruitee.search,
     "personio": personio.search,
 }
+
+
+class ResolveRequest(BaseModel):
+    urls: list[str]
+
+
+@router.post("/resolve-apply", dependencies=[Depends(verify_bearer)])
+async def resolve_apply(body: ResolveRequest) -> dict:
+    """Resolve board-listing URLs to fillable ATS apply URLs.
+
+    Returns {"resolved": {url: fillable_url_or_null}}. Capped at 40 URLs/call to
+    bound latency; callers should only send board URLs that survived filtering.
+    """
+    urls = [u for u in (body.urls or []) if u][:40]
+    resolved = await resolve_many(urls)
+    hits = sum(1 for v in resolved.values() if v)
+    logger.info("job.resolve_apply.done", requested=len(urls), resolved=hits)
+    return {"resolved": resolved, "count": hits}
 
 
 @router.post("/scrape/{board}", dependencies=[Depends(verify_bearer)])

@@ -213,6 +213,36 @@ async function scrapeBoard(
   }
 }
 
+// ── Board-listing → fillable-ATS URL resolver ──────────────────────────────────
+// Aggregator boards (RemoteOK/WWR/Himalayas/…) carry huge remote volume but their
+// apply_url is an unfillable listing page. Ask the worker to resolve each to a
+// real ATS apply URL (follow redirects + scan listing HTML) so CareerOps can fill.
+async function resolveBoardUrls(
+  workerUrl: string,
+  workerSecret: string,
+  urls: string[],
+  timeoutMs = 20_000,
+): Promise<Record<string, string | null>> {
+  if (urls.length === 0) return {}
+  try {
+    const res = await fetch(`${workerUrl}/jobs/resolve-apply`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${workerSecret}` },
+      body: JSON.stringify({ urls }),
+      signal: AbortSignal.timeout(timeoutMs),
+    })
+    if (!res.ok) {
+      console.warn(`[run-campaigns] resolve-apply returned ${res.status}`)
+      return {}
+    }
+    const data = (await res.json()) as { resolved?: Record<string, string | null> }
+    return data.resolved ?? {}
+  } catch (err) {
+    console.warn('[run-campaigns] resolve-apply error:', err)
+    return {}
+  }
+}
+
 // ── CareerOps apply call ───────────────────────────────────────────────────────
 
 async function careeropsApply(
@@ -965,6 +995,35 @@ async function runCampaigns(
     ]
     const isBoardUrl = (url: string): boolean =>
       BOARD_HOSTS.some((host) => url.toLowerCase().includes(host))
+
+    // ── Board-redirect resolution (Phase B) ──────────────────────────────
+    // Before the apply loop, try to turn unfillable board listings into real
+    // ATS apply URLs so CareerOps can submit them — this unlocks the large
+    // remote volume on RemoteOK/WWR/Himalayas. Resolved URLs are written back
+    // onto the job so the existing isBoardUrl skip naturally lets them through.
+    // Bounded (top 40 fresh board jobs) and best-effort; failures just skip as before.
+    if (process.env.RESOLVE_BOARD_URLS !== '0') {
+      const boardJobs = scrapedJobs.filter((j) => isBoardUrl(j.apply_url || j.url || ''))
+      const toResolve = boardJobs.slice(0, 40).map((j) => j.apply_url || j.url || '')
+      if (toResolve.length > 0) {
+        const resolved = await resolveBoardUrls(workerUrl, workerSecret, toResolve)
+        let rewrote = 0
+        for (const j of boardJobs) {
+          const key = j.apply_url || j.url || ''
+          const fillable = resolved[key]
+          if (fillable && !isBoardUrl(fillable)) {
+            j.apply_url = fillable
+            rewrote++
+          }
+        }
+        console.log('[run-campaigns] board-url resolution', {
+          campaign: campaign.id,
+          boardJobs: boardJobs.length,
+          attempted: toResolve.length,
+          rewrote,
+        })
+      }
+    }
 
     // ── Apply dispatch (bounded concurrency, C1) ──────────────────────────
     // APPLY_CONCURRENCY workers pull from scrapedJobs. At the default of 1 this
