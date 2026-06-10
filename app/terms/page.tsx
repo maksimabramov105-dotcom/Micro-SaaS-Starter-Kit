@@ -38,6 +38,20 @@ export default function TermsPage() {
             </section>
 
             <section className="mt-8">
+              <h2 className="text-2xl font-semibold mb-4">2a. Automated Application Submission</h2>
+              <p>
+                ResumeAI applies to jobs automatically on your behalf. By creating an auto-apply
+                campaign you authorize us to submit applications to third-party employers using the
+                resume, contact details, and answers you provide, and to transmit that information to
+                those employers and their applicant-tracking systems. You are solely responsible for
+                the accuracy and honesty of the information you provide (including work-authorization
+                and screening answers). We do not guarantee any interview, response, or job offer,
+                and we are not responsible for the hiring decisions of employers. You may pause or
+                delete any campaign at any time to stop further submissions.
+              </p>
+            </section>
+
+            <section className="mt-8">
               <h2 className="text-2xl font-semibold mb-4">3. Disclaimer</h2>
               <p>
                 The materials on our service are provided on an &apos;as is&apos; basis. We make no

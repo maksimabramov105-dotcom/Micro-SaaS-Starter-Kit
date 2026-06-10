@@ -238,6 +238,41 @@ export const getExitReasonHistogram = unstable_cache(
   { revalidate: 900 }
 )
 
+// ── ACQUISITION → REVENUE FUNNEL (last 30 days) ────────────────────────────
+// One row answering the marketing-launch funnel: signup → activated (resume) →
+// created campaign → applications SUBMITTED (honest _verify_submitted gate) →
+// human replies → active paying subscriber. Same numbers as scripts/funnel_report.ts.
+export const getFunnelReport = unstable_cache(
+  async () => {
+    const since = daysAgo(30)
+    const now = new Date()
+    const [signups, resumeUsers, campaignUsers, submitted, replyGroups, activeSubs] =
+      await Promise.all([
+        prisma.user.count({ where: { createdAt: { gte: since } } }),
+        prisma.resume
+          .findMany({ where: { createdAt: { gte: since } }, select: { userId: true }, distinct: ['userId'] })
+          .then((r) => r.length),
+        prisma.autoApplyCampaign
+          .findMany({ where: { createdAt: { gte: since } }, select: { userId: true }, distinct: ['userId'] })
+          .then((r) => r.length),
+        prisma.jobApplication.count({ where: { status: 'SUBMITTED', createdAt: { gte: since } } }),
+        prisma.inboxMessage.groupBy({
+          by: ['classification'],
+          where: { receivedAt: { gte: since } },
+          _count: { _all: true },
+        }),
+        prisma.user.count({
+          where: { stripeSubscriptionId: { not: null }, stripeCurrentPeriodEnd: { gt: now } },
+        }),
+      ])
+    const c = (k: string) => replyGroups.find((g) => g.classification === k)?._count._all ?? 0
+    const humanReplies = c('INTERVIEW_REQUEST') + c('REJECTION') + c('QUESTION')
+    return { signups, resumeUsers, campaignUsers, submitted, humanReplies, activeSubs }
+  },
+  ['pmf-funnel-report'],
+  { revalidate: 900 }
+)
+
 // ── LAST UPDATED TIMESTAMP ─────────────────────────────────────────────────
 // Not cached — always reflects actual render time
 export function getLastUpdated(): Date {

@@ -28,13 +28,18 @@ export async function POST(req: Request) {
 
   // ── Idempotency guard (RED-1 audit fix) ───────────────────────────────────
   // Stripe may retry delivery; skip double-processing by recording the event ID.
+  // IMPORTANT: the event is recorded as processed only AFTER the handler below
+  // succeeds (see the end of this function). Recording it up-front meant a
+  // transient error mid-handler (e.g. subscriptions.retrieve / user.update) left
+  // the event marked done, so Stripe's retry was skipped and a paying user's
+  // subscription was never recorded. Now a failed handler throws/returns non-200,
+  // no row is written, and Stripe's retry reprocesses it.
   const alreadyProcessed = await prisma.stripeEvent.findUnique({
     where: { id: event.id },
   })
   if (alreadyProcessed) {
     return new NextResponse(null, { status: 200 })
   }
-  await prisma.stripeEvent.create({ data: { id: event.id } })
 
   const session = event.data.object as Stripe.Checkout.Session
   const subscription = event.data.object as Stripe.Subscription
@@ -203,6 +208,15 @@ export async function POST(req: Request) {
 
     default:
       console.log(`Unhandled event type: ${event.type}`)
+  }
+
+  // Handler succeeded — now record the event so retries are idempotent. Wrapped
+  // because a rare concurrent double-delivery could race here; the unique PK
+  // makes the second insert throw, but processing was idempotent so we ignore it.
+  try {
+    await prisma.stripeEvent.create({ data: { id: event.id } })
+  } catch {
+    /* already recorded by a concurrent delivery — safe to ignore */
   }
 
   return new NextResponse(null, { status: 200 })
