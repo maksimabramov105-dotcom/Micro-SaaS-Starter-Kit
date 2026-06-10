@@ -50,8 +50,13 @@ jobs:
       NEXTAUTH_URL: http://localhost:3000
       NEXTAUTH_SECRET: ci-secret-not-real
       NEXT_PUBLIC_APP_URL: http://localhost:3000
-      STRIPE_SECRET_KEY: sk_test_ci
+      # Real Stripe TEST key for test-mode checkout; falls back to a dummy if the
+      # secret isn't set (the test self-skips). Webhook secret stays a fixed CI
+      # value so the signed-event test can sign + verify consistently.
+      STRIPE_SECRET_KEY: ${{ secrets.STRIPE || 'sk_test_ci' }}
       STRIPE_WEBHOOK_SECRET: whsec_ci
+      # Resend inbound signing secret (whsec_…) for the signed inbound test.
+      RESEND_WEBHOOK_SECRET: ${{ secrets.REBOUND }}
       WORKER_URL: http://localhost:8000
       WORKER_SECRET: ci-worker-secret
       ENCRYPTION_KEY: bV4UmliwP4xFApJTnq5O5XxJ4mltOC4bjrQQ7EdCUtc=
@@ -79,7 +84,7 @@ jobs:
           npm start &
           timeout 90 bash -c 'until curl -sf http://localhost:3000 >/dev/null; do sleep 2; done'
       - name: Run journey + sign-in regression specs
-        run: npx playwright test --project=chromium e2e/journey.spec.ts e2e/journey-authed.spec.ts e2e/auth-signin-retry.spec.ts e2e/example.spec.ts
+        run: npx playwright test --project=chromium e2e/journey.spec.ts e2e/journey-authed.spec.ts e2e/journey-payment-inbox.spec.ts e2e/auth-signin-retry.spec.ts e2e/example.spec.ts
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

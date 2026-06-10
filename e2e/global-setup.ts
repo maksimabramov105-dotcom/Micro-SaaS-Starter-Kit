@@ -19,6 +19,8 @@ import { encode } from 'next-auth/jwt'
 export const TEST_USER = {
   email: 'e2e-journey@test.local',
   name: 'E2E Tester',
+  // Fixed inbox handle so the inbound-webhook spec can address this user.
+  inboxHandle: 'e2etester0001',
 }
 
 async function globalSetup() {
@@ -29,8 +31,8 @@ async function globalSetup() {
   try {
     const user = await prisma.user.upsert({
       where: { email: TEST_USER.email },
-      update: { name: TEST_USER.name },
-      create: { email: TEST_USER.email, name: TEST_USER.name },
+      update: { name: TEST_USER.name, inboxHandle: TEST_USER.inboxHandle },
+      create: { email: TEST_USER.email, name: TEST_USER.name, inboxHandle: TEST_USER.inboxHandle },
     })
 
     // Seed a resume so /dashboard/resumes and campaign creation have something
