@@ -107,6 +107,43 @@ async def _fill(page: Page, selector: str, value: str) -> bool:
     return False
 
 
+async def _fill_phone(page: Page, value: str) -> bool:
+    """
+    Enter a phone number by TYPING it char-by-char so intl-tel-input widgets
+    (used by Greenhouse) detect the country from the leading "+<code>" and
+    validate correctly.  A direct .fill() sets the value without triggering the
+    widget's country detection, so an international number (e.g. +61…) is
+    validated against the default US format and rejected as "too short" — the
+    dominant cause of unconfirmed Greenhouse submissions.
+    """
+    if not value:
+        return False
+    for sel in ['#phone', 'input[type="tel"]', 'input[autocomplete="tel"]',
+                'input[name*="phone" i]', 'input[id*="phone" i]']:
+        try:
+            loc = page.locator(sel).first
+            if await loc.count() == 0 or not await loc.is_visible():
+                continue
+            await loc.click()
+            await page.wait_for_timeout(120)
+            # Clear any existing / auto-prefilled value first.
+            try:
+                await loc.press("ControlOrMeta+a")
+                await loc.press("Backspace")
+            except Exception:
+                try:
+                    await loc.fill("")
+                except Exception:
+                    pass
+            for ch in value:  # keystroke events drive intl-tel-input country detection
+                await page.keyboard.type(ch, delay=random.randint(30, 70))
+            await page.wait_for_timeout(200)
+            return True
+        except Exception:
+            continue
+    return False
+
+
 def _render_resume_pdf(resume_text: str) -> str:
     """
     Render resume_text to a real PDF and return the temp file path.
@@ -1312,7 +1349,8 @@ class CareerOpsApplicator:
                 await _fill(page, 'input[autocomplete="family-name"]', last)
             if not await _fill(page, "#email", user_data.get("email", "")):
                 await _fill(page, 'input[autocomplete="email"]', user_data.get("email", ""))
-            await _fill(page, "#phone", user_data.get("phone", ""))
+            if not await _fill_phone(page, user_data.get("phone", "")):
+                await _fill(page, "#phone", user_data.get("phone", ""))
             # Preferred First Name is a standard #preferred_name input (not a
             # question_* id) and is required on many boards — fill it directly.
             await _fill(page, "#preferred_name", first)
