@@ -8,6 +8,7 @@ import {
   getCohortRetention,
   getReferralMetrics,
   getExitReasonHistogram,
+  getFunnelReport,
   getLastUpdated,
 } from '@/lib/pmf/queries'
 
@@ -57,6 +58,10 @@ function pctStr(v: number | null): string {
   return v === null ? '—' : `${v}%`
 }
 
+function pctOf(num: number, den: number): number | null {
+  return den === 0 ? null : Math.round((num / den) * 100)
+}
+
 function centsStr(cents: number): string {
   const sign = cents >= 0 ? '+' : '-'
   const abs = Math.abs(cents)
@@ -72,12 +77,13 @@ export default async function PmfDashboardPage() {
     redirect('/dashboard')
   }
 
-  const [today, last30, cohort, referral, exitReasons] = await Promise.all([
+  const [today, last30, cohort, referral, exitReasons, funnel] = await Promise.all([
     getTodayMetrics(),
     getLast30DaysMetrics(),
     getCohortRetention(),
     getReferralMetrics(),
     getExitReasonHistogram(),
+    getFunnelReport(),
   ])
 
   const updatedAt = getLastUpdated()
@@ -115,6 +121,37 @@ export default async function PmfDashboardPage() {
       </header>
 
       <main className="mx-auto max-w-6xl px-6 py-8">
+        {/* ACQUISITION → REVENUE FUNNEL */}
+        <Section title="Funnel (last 30 days)">
+          <Tile title="Signups" value={funnel.signups} />
+          <Tile
+            title="Created a resume"
+            value={funnel.resumeUsers}
+            sub={`${pctStr(pctOf(funnel.resumeUsers, funnel.signups))} of signups`}
+          />
+          <Tile
+            title="Created a campaign"
+            value={funnel.campaignUsers}
+            sub={`${pctStr(pctOf(funnel.campaignUsers, funnel.signups))} of signups`}
+          />
+          <Tile
+            title="Applications submitted"
+            value={funnel.submitted}
+            sub="honest _verify_submitted gate"
+          />
+          <Tile
+            title="Human replies"
+            value={funnel.humanReplies}
+            sub="interview · question · rejection"
+            accent={funnel.humanReplies > 0 ? 'green' : undefined}
+          />
+          <Tile
+            title="Active paying subscribers"
+            value={funnel.activeSubs}
+            accent={funnel.activeSubs > 0 ? 'green' : undefined}
+          />
+        </Section>
+
         {/* TODAY */}
         <Section title="Today">
           <Tile title="New free signups" value={today.newFreeSignups} />

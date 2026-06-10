@@ -430,9 +430,9 @@ export default async function HomePage() {
             <Link href="/privacy" className="hover:text-slate-900">
               Privacy
             </Link>
-            <a href="mailto:support@resumeai-bot.ru" className="hover:text-slate-900">
+            <Link href="/contact" className="hover:text-slate-900">
               Contact
-            </a>
+            </Link>
           </div>
         </div>
       </footer>

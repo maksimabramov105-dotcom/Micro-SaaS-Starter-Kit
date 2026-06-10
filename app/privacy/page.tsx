@@ -26,7 +26,11 @@ export default function PrivacyPage() {
               <p>
                 We collect information you provide directly to us when you create an account,
                 including your name, email address, and payment information through our payment
-                processor Stripe.
+                processor Stripe. To operate the service we also store the <strong>resume content,
+                contact details (phone, location, links), and screening answers</strong> you enter,
+                your <strong>job-application history</strong>, and the <strong>recruiter and employer
+                emails</strong> sent to your dedicated inbox address so we can show them to you and
+                classify them (e.g. interview request, rejection).
               </p>
             </section>
 
@@ -49,9 +53,26 @@ export default function PrivacyPage() {
               </p>
               <ul className="list-disc pl-6 space-y-2">
                 <li>Service providers who perform services on our behalf (e.g., Stripe for payment processing)</li>
+                <li>
+                  <strong>Employers and their applicant-tracking systems</strong> (e.g. Greenhouse,
+                  Lever, Workable): when you run an auto-apply campaign, we submit applications{' '}
+                  <strong>on your behalf</strong> and transmit your resume, contact details, and
+                  screening answers to the companies you apply to
+                </li>
                 <li>Law enforcement when required by law</li>
                 <li>Other parties with your consent</li>
               </ul>
+            </section>
+
+            <section className="mt-8">
+              <h2 className="text-2xl font-semibold mb-4">3a. Automated Application Submission</h2>
+              <p>
+                ResumeAI submits job applications to third-party employers automatically on your
+                behalf, using the resume and answers you provide. You authorize this when you create
+                a campaign, you remain responsible for the accuracy of the information submitted, and
+                we do not guarantee any interview or offer. You can pause or delete a campaign at any
+                time to stop further submissions.
+              </p>
             </section>
 
             <section className="mt-8">
@@ -65,8 +86,15 @@ export default function PrivacyPage() {
             <section className="mt-8">
               <h2 className="text-2xl font-semibold mb-4">5. Your Rights</h2>
               <p>
-                You have the right to access, update, or delete your personal information at any
-                time through your account settings. You may also contact us to exercise these rights.
+                Under GDPR, the UK GDPR, and the CCPA you have the right to access, export, correct,
+                or delete your personal information. You can delete your account and all associated
+                data (resumes, application history, and stored recruiter emails) yourself from your
+                account settings, or email{' '}
+                <a href="mailto:support@resumeai-bot.ru" className="underline">
+                  support@resumeai-bot.ru
+                </a>{' '}
+                and we will erase it within 30 days. Deleting your account immediately stops all
+                automated application activity.
               </p>
             </section>
 
