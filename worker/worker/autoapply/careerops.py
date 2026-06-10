@@ -1475,7 +1475,37 @@ class CareerOpsApplicator:
                     await _check_required_boxes(page)
                     await page.wait_for_timeout(1500)
 
-                logger.warning("careerops.greenhouse.submit_unconfirmed", url=job_url)
+                # Diagnostics: capture WHY this didn't confirm so the failure mode
+                # is actionable (which required field is stuck / what the page shows
+                # post-submit) instead of an opaque "not confirmed".
+                try:
+                    stuck = await _collect_unanswered_required(page)
+                    stuck_desc = [f"{f.get('kind')}:{(f.get('label') or '')[:40]}" for f in stuck][:8]
+                except Exception:
+                    stuck_desc = []
+                try:
+                    diag = await page.evaluate(r"""() => {
+                        const sb = document.querySelector('input[type=submit], button[type=submit]');
+                        const body = (document.body.innerText || '').toLowerCase();
+                        const errEls = Array.from(document.querySelectorAll(
+                            '[aria-invalid=true], .error, [class*=error i], [role=alert]'))
+                            .map(e => (e.innerText||'').replace(/\s+/g,' ').trim()).filter(Boolean).slice(0, 6);
+                        return {
+                            submitVisible: !!(sb && sb.offsetParent !== null),
+                            bodyTail: body.slice(-260),
+                            errors: errEls,
+                        };
+                    }""")
+                except Exception:
+                    diag = {}
+                logger.warning(
+                    "careerops.greenhouse.submit_unconfirmed",
+                    url=job_url,
+                    stuck_required=stuck_desc,
+                    submit_visible=diag.get("submitVisible"),
+                    page_errors=diag.get("errors"),
+                    body_tail=(diag.get("bodyTail") or "")[:260],
+                )
                 return {"status": "error", "url": job_url, "ats": "greenhouse",
                         "error": "submission not confirmed (required fields or email code incomplete)"}
 
