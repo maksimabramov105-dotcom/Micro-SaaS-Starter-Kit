@@ -30,6 +30,9 @@ _COMPANIES: list[str] = [
     # Phase A expansion — CX-tooling (gorgias/kustomer), fintech, health, media.
     "gorgias", "kustomer", "pinecone", "temporal", "airbyte", "wealthsimple",
     "pleo", "patreon", "substack", "quora", "maven",
+    # Global-remote + ANZ/APAC (Airwallex AU, Xero/Auror NZ) — eligible pool for
+    # non-US candidates; Docker/Confluent/Prefect hire globally remote.
+    "airwallex", "xero", "auror", "confluent", "docker", "easygenerator", "prefect",
 ]
 
 
