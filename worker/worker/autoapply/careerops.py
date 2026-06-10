@@ -1528,6 +1528,14 @@ class CareerOpsApplicator:
                 await page.wait_for_timeout(250)
             except Exception:
                 pass
+            # Re-fill the phone LAST, right before submit. The phone is set early
+            # (with the correct country), but the React form re-renders during the
+            # later field-fill / LLM passes and REVERTS the intl-tel-input widget to
+            # its US default (+1) — so by submit time an international number reads
+            # as a too-short US number. Re-applying it here (after all other fills)
+            # leaves no re-render between setting the phone and clicking submit.
+            await _fill_phone(page, user_data.get("phone", ""))
+            await page.wait_for_timeout(200)
             submit = page.locator('input[type="submit"], button[type="submit"]').first
             if await submit.count() > 0:
                 company = (user_data.get("_company") or "").strip()
@@ -1575,6 +1583,7 @@ class CareerOpsApplicator:
                     if not still_there:
                         break
                     await _check_required_boxes(page)
+                    await _fill_phone(page, user_data.get("phone", ""))  # may have reverted again
                     await page.wait_for_timeout(1500)
 
                 # Diagnostics: capture WHY this didn't confirm so the failure mode
