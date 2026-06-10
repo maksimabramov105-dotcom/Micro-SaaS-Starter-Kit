@@ -42,13 +42,21 @@ function LoginButtons() {
   return (
     <div className="space-y-3">
       {errorMessage && (
-        <div className="rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
-          {errorMessage}
+        <div
+          role="alert"
+          data-testid="signin-error"
+          className="rounded-md bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800"
+        >
+          <p className="font-medium">{errorMessage}</p>
+          <p className="mt-1 text-amber-700">
+            This usually works on the second try — just click your provider again below.
+          </p>
         </div>
       )}
       <Button
         variant="outline"
         className="w-full"
+        data-testid="signin-google"
         onClick={() => signIn('google', { callbackUrl })}
       >
         <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
@@ -74,6 +82,7 @@ function LoginButtons() {
       <Button
         variant="outline"
         className="w-full"
+        data-testid="signin-github"
         onClick={() => signIn('github', { callbackUrl })}
       >
         <svg className="mr-2 h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
@@ -90,9 +99,9 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">Welcome back</CardTitle>
+          <CardTitle className="text-2xl font-bold text-center">Sign in or create your account</CardTitle>
           <CardDescription className="text-center">
-            Sign in to your account to continue
+            New here? Continuing with Google or GitHub creates your account instantly.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
