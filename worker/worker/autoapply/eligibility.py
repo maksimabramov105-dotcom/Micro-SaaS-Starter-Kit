@@ -30,6 +30,8 @@ _COUNTRY_ALIASES = {
     "america": "united states",
     "uk": "united kingdom",
     "u.k.": "united kingdom",
+    "nz": "new zealand",
+    "aus": "australia",
     "great britain": "united kingdom",
     "england": "united kingdom",
     "uae": "united arab emirates",
@@ -106,7 +108,7 @@ def detect_hiring_region(text: str):
     rg = re.search(r"\b(emea|europe|eu|latam|apac|anz)\b", t)
     if rg and re.search(r"\b(remote|hire|based|located|within|only|region)\b", t):
         return {"countries": _REGION_GROUPS[rg.group(1)]}
-    ch = re.search(r"\bremote[, (–-]+(canada|united kingdom|uk|germany|australia|india|ireland|france|netherlands|spain|brazil|mexico|singapore)\b", t)
+    ch = re.search(r"\bremote[, (–-]+(canada|united kingdom|uk|germany|australia|new zealand|nz|india|ireland|france|netherlands|spain|brazil|mexico|singapore)\b", t)
     if ch:
         return {"countries": [normalize_country(ch.group(1))]}
     if re.search(r"\b(est|edt|pst|pdt|cst|cdt|mst|mdt|us timezone|north american (time|hours)|pacific time|eastern time)\b", t):
@@ -150,6 +152,7 @@ def knockout_reason(
     """
     relocate_escape = willing_to_relocate(eligibility) and not requires_sponsorship(eligibility)
     authorized = {normalize_country(c) for c in (eligibility or {}).get("authorized_countries", [])}
+    unknown_auth = len(authorized) == 0  # no profile data → never skip on auth grounds
 
     if targeting_v2 and profile_seniority is not None and job_text:
         jl = extract_seniority(job_text)
@@ -162,8 +165,10 @@ def knockout_reason(
         region = detect_hiring_region(job_text)
         if region is None or region.get("global"):
             return None
+        if unknown_auth or relocate_escape:
+            return None  # unknown auth → don't skip
         overlap = any(normalize_country(c) in authorized for c in region.get("countries", []))
-        if overlap or relocate_escape:
+        if overlap:
             return None
         return "remote_region"
 
@@ -172,6 +177,8 @@ def knockout_reason(
     jc = normalize_country(job_country)
     if not jc:
         return None  # unknown on-site location — don't skip on uncertainty
+    if unknown_auth:
+        return None  # unknown auth → don't skip on-site either
     if jc in authorized:
         return None
     if relocate_escape:
