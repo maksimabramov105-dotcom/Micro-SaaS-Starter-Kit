@@ -1597,11 +1597,20 @@ class CareerOpsApplicator:
                                 if (iti && iti.getSelectedCountryData)
                                     phoneCountry = (iti.getSelectedCountryData() || {}).iso2 || '';
                             } catch (e) {}
-                            // Outer HTML of the phone widget container — lets us write
-                            // a precise country-dropdown selector instead of guessing.
-                            const wrap = ph.closest('.iti, .react-tel-input, [class*=phone i], [class*=tel i]')
-                                || ph.parentElement || ph;
-                            phoneHtml = (wrap.outerHTML || '').replace(/\s+/g, ' ').slice(0, 700);
+                            // Capture the WRAPPER + flag button + a sample country
+                            // <li> so we can write a precise country-dropdown selector.
+                            const wrap = ph.closest('.iti') || ph.parentElement;
+                            const flag = wrap && wrap.querySelector(
+                                '.iti__selected-flag, .iti__selected-country, [class*=selected-flag i], [role=combobox]');
+                            const liAu = document.querySelector(
+                                'li[data-country-code=au], li[data-dial-code="61"], .iti__country[data-country-code=au]');
+                            const anyLi = document.querySelector('.iti__country, li[data-dial-code]');
+                            phoneHtml = [
+                                'wrapCls=' + (wrap ? wrap.className : 'NONE'),
+                                'flag=' + (flag ? flag.outerHTML.slice(0, 180) : 'NONE'),
+                                'auLi=' + (liAu ? liAu.outerHTML.slice(0, 160) : 'NONE'),
+                                'anyLi=' + (anyLi ? anyLi.outerHTML.slice(0, 160) : 'NONE'),
+                            ].join(' || ').replace(/\s+/g, ' ').slice(0, 760);
                         }
                         return {
                             submitVisible: !!(sb && sb.offsetParent !== null),
