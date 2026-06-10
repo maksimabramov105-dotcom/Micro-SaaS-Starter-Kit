@@ -94,6 +94,23 @@ export const authOptions: NextAuthOptions = {
   session: {
     strategy: 'jwt',
   },
+  // Behind the Caddy TLS proxy the app receives HTTP internally but is served
+  // over HTTPS. Pin secure cookies in prod so the OAuth state/PKCE/CSRF cookies
+  // get the correct Secure + __Host-/__Secure- treatment and survive the
+  // provider round-trip (a documented cause of first-attempt sign-in flakes).
+  useSecureCookies: process.env.NODE_ENV === 'production',
+  // Surface NextAuth failures into the container logs with their error code so
+  // an intermittent sign-in failure is actually diagnosable when it recurs
+  // (previously these were swallowed — zero auth errors were ever captured).
+  logger: {
+    error(code, metadata) {
+      console.error('[next-auth][error]', code, JSON.stringify(metadata))
+    },
+    warn(code) {
+      console.warn('[next-auth][warn]', code)
+    },
+    debug() {},
+  },
   secret: process.env.NEXTAUTH_SECRET,
   events: {
     /**
