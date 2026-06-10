@@ -185,8 +185,25 @@ async def _fill_phone(page: Page, value: str) -> bool:
             for ch in to_type:
                 await page.keyboard.type(ch, delay=random.randint(30, 70))
             await page.wait_for_timeout(250)
+            try:
+                post = await loc.evaluate(
+                    """(el) => {
+                        const wrap = el.closest('.iti');
+                        const f = wrap && wrap.querySelector('.iti__selected-country, .iti__selected-flag');
+                        const aria = f ? (f.getAttribute('aria-label') || f.title || '') : '';
+                        const flagDiv = wrap && wrap.querySelector('.iti__selected-country .iti__flag, .iti__selected-flag .iti__flag');
+                        return { val: el.value || '', aria, flagCls: flagDiv ? flagDiv.className : '' };
+                    }""")
+            except Exception:
+                post = {}
+            logger.info(
+                "careerops.phone_fill", selector=sel, dial=selected_dial,
+                typed=to_type, post_val=post.get("val"), post_country=post.get("aria"),
+                flag_cls=post.get("flagCls"),
+            )
             return True
-        except Exception:
+        except Exception as exc:
+            logger.warning("careerops.phone_fill_error", selector=sel, error=str(exc)[:160])
             continue
     return False
 
