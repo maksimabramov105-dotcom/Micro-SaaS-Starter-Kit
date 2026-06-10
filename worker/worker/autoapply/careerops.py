@@ -109,85 +109,73 @@ async def _fill(page: Page, selector: str, value: str) -> bool:
 
 async def _fill_phone(page: Page, value: str) -> bool:
     """
-    Enter a phone number into a Greenhouse phone field (an intl-tel-input widget).
+    Enter an international phone number into a Greenhouse phone field
+    (intl-tel-input v18). Worldwide-correct: the widget defaults to US (+1) and
+    a foreign number (e.g. +61…) validates as a too-short US number, so we must
+    SELECT the right country first. We do this generically from the dial-code so
+    it works for ANY country, then type the national digits.
 
-    A direct .fill() — and even char-by-char typing — leaves the widget on its
-    DEFAULT country (US), so an international number (e.g. +61…) is validated as a
-    US number and rejected as "too short" (the dominant unconfirmed-submit cause).
-
-    Preferred path: drive the widget's own JS API — setNumber() with an E.164
-    string sets BOTH the country flag and the national number correctly — then
-    fire input/change/blur so React + the widget's validation update. Falls back
-    to typing, then .fill().
+    Mechanism (the reliable one): open the country dropdown via a REAL Playwright
+    click on the `iti__selected-country` button (v18 listens for real pointer
+    events, not JS .click()), find the country whose data-dial-code is the
+    longest prefix of the number, REAL-click that `<li>`, then type the national
+    part. Falls back to typing the full E.164, then .fill().
     """
     if not value:
         return False
-    for sel in ['#phone', 'input[type="tel"]', 'input[autocomplete="tel"]',
-                'input[name*="phone" i]', 'input[id*="phone" i]']:
+    digits = re.sub(r"[^0-9]", "", value)
+    for sel in ['#phone', 'input[type="tel"].iti__tel-input', 'input[type="tel"]',
+                'input[autocomplete="tel"]', 'input[name*="phone" i]', 'input[id*="phone" i]']:
         try:
             loc = page.locator(sel).first
             if await loc.count() == 0 or not await loc.is_visible():
                 continue
-            # 1) Old intl-tel-input (exposes intlTelInputGlobals): setNumber() sets
-            #    country + national number atomically. Only claim success if a real
-            #    instance was found (otherwise fall through to typing — a stray
-            #    value-set is reverted by React back to its default "+1").
-            via_api = await loc.evaluate(
-                """(el, num) => {
-                    try {
-                        const g = window.intlTelInputGlobals;
-                        const iti = g && g.getInstance ? g.getInstance(el) : null;
-                        if (iti && typeof iti.setNumber === 'function') {
-                            iti.setNumber(num);
-                            for (const t of ['input', 'change', 'blur'])
-                                el.dispatchEvent(new Event(t, { bubbles: true }));
-                            return true;
-                        }
-                    } catch (e) {}
-                    return false;
-                }""",
-                value,
-            )
-            if via_api:
-                await page.wait_for_timeout(200)
-                return True
-            # 2) intl-tel-input with separateDialCode (the default): the widget
-            #    shows a country flag + "+<code>" SEPARATELY and the input holds
-            #    only the national part. Typing a full +61… number leaves the flag
-            #    on the default US (+1), so the digits validate as a US number and
-            #    are rejected as "too short". Fix: open the country dropdown and
-            #    pick the country whose dial-code is the longest prefix of the
-            #    number, THEN type the national digits.
-            dial = await loc.evaluate(
-                """(el, num) => {
-                    const digits = (num || '').replace(/[^0-9]/g, '');
-                    const root = el.closest('.iti, .react-tel-input, [class*=intl-tel]') || el.parentElement || document;
-                    const btn = root.querySelector(
-                        'button.iti__selected-country, .iti__selected-flag, .iti__selected-country-primary, .selected-flag');
-                    if (btn) { btn.click(); } else { return ''; }
-                    const items = Array.from(document.querySelectorAll(
-                        '.iti__country[data-dial-code], li[data-dial-code], .iti__country[data-country-code]'));
-                    let best = null, bestLen = 0;
-                    for (const it of items) {
-                        const dc = it.getAttribute('data-dial-code') || '';
-                        if (dc && digits.startsWith(dc) && dc.length > bestLen) { best = it; bestLen = dc.length; }
-                    }
-                    if (best) { best.click(); return best.getAttribute('data-dial-code') || ''; }
-                    if (btn) btn.click();  // close the menu we opened
-                    return '';
-                }""",
-                value,
-            )
-            await page.wait_for_timeout(200)
-            digits = re.sub(r"[^0-9]", "", value)
-            national = digits[len(dial):] if dial and digits.startswith(dial) else digits
-            to_type = national if dial else value  # full E.164 only if no dropdown
+
+            # 1) Select the country in the intl-tel-input dropdown (real clicks).
+            selected_dial = ""
+            try:
+                btn = page.locator(
+                    'button.iti__selected-country, .iti__selected-flag, [class*="selected-country" i]'
+                ).first
+                if await btn.count() > 0 and await btn.is_visible():
+                    await btn.click()  # real click → opens the v18 dialog
+                    await page.wait_for_timeout(300)
+                    # Pick the <li> whose dial-code is the longest prefix of digits.
+                    pick = await page.evaluate(
+                        """(digits) => {
+                            const items = Array.from(document.querySelectorAll(
+                                '.iti__country[data-dial-code], li[data-dial-code]'));
+                            let best=null,bestLen=0;
+                            for (const it of items){
+                                const dc=it.getAttribute('data-dial-code')||'';
+                                if(dc && digits.startsWith(dc) && dc.length>bestLen){best=it;bestLen=dc.length;}
+                            }
+                            return best ? {id: best.id, dial: best.getAttribute('data-dial-code')||''} : null;
+                        }""",
+                        digits,
+                    )
+                    if pick and pick.get("id"):
+                        item = page.locator(f'#{pick["id"]}').first
+                        await item.scroll_into_view_if_needed(timeout=2000)
+                        await item.click()  # real click → v18 selects the country
+                        selected_dial = pick.get("dial") or ""
+                        await page.wait_for_timeout(250)
+                    else:
+                        await page.keyboard.press("Escape")  # close if no match
+            except Exception:
+                selected_dial = ""
+
+            # 2) Type the number into the input. If a country was selected, type
+            #    only the NATIONAL part (the dial code is shown separately);
+            #    otherwise type the full E.164 so the widget can infer it.
+            national = digits[len(selected_dial):] if selected_dial and digits.startswith(selected_dial) else digits
+            to_type = national if selected_dial else value
             await loc.click()
             await page.wait_for_timeout(120)
             try:
                 await loc.press("ControlOrMeta+a")
                 await loc.press("Delete")
-                for _ in range(8):  # clear any seeded national digits / "+1"
+                for _ in range(8):
                     await loc.press("Backspace")
             except Exception:
                 try:
