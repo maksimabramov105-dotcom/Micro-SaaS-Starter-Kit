@@ -101,6 +101,22 @@ export default async function DashboardPage() {
         <p className="text-slate-500">Welcome back, {session.user.name ?? session.user.email}!</p>
       </div>
 
+      {/* The product's "aha" moment — celebrate interview requests loudly. */}
+      {interviews > 0 && (
+        <div className="mb-8 rounded-lg border border-emerald-300 bg-emerald-50 p-4">
+          <p className="text-sm font-medium text-emerald-900">
+            🎉 You have {interviews} interview {interviews === 1 ? 'request' : 'requests'}!
+          </p>
+          <p className="text-xs text-emerald-700">
+            A recruiter wants to talk. Open your{' '}
+            <Link href="/dashboard/inbox" className="underline underline-offset-2">
+              inbox
+            </Link>{' '}
+            to reply — fast replies win interviews.
+          </p>
+        </div>
+      )}
+
       {/* Telegram onboarding gap: without a linked chat, notifications are
           silently dropped by the notifier. Make that explicit + actionable. */}
       {!telegramChat && (
