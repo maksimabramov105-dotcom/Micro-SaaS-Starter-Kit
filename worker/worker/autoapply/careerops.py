@@ -128,34 +128,39 @@ async def _fill_phone(page: Page, value: str) -> bool:
             loc = page.locator(sel).first
             if await loc.count() == 0 or not await loc.is_visible():
                 continue
-            ok = await loc.evaluate(
+            # 1) Old intl-tel-input (exposes intlTelInputGlobals): setNumber() sets
+            #    country + national number atomically. Only claim success if a real
+            #    instance was found (otherwise fall through to typing — a stray
+            #    value-set is reverted by React back to its default "+1").
+            via_api = await loc.evaluate(
                 """(el, num) => {
                     try {
                         const g = window.intlTelInputGlobals;
                         const iti = g && g.getInstance ? g.getInstance(el) : null;
                         if (iti && typeof iti.setNumber === 'function') {
                             iti.setNumber(num);
-                        } else {
-                            const setter = Object.getOwnPropertyDescriptor(
-                                window.HTMLInputElement.prototype, 'value').set;
-                            setter.call(el, num);
+                            for (const t of ['input', 'change', 'blur'])
+                                el.dispatchEvent(new Event(t, { bubbles: true }));
+                            return true;
                         }
-                        for (const t of ['input', 'change', 'blur'])
-                            el.dispatchEvent(new Event(t, { bubbles: true }));
-                        return el.value || num;
-                    } catch (e) { return ''; }
+                    } catch (e) {}
+                    return false;
                 }""",
                 value,
             )
-            if ok:
+            if via_api:
                 await page.wait_for_timeout(200)
                 return True
-            # Fallback: type char-by-char so the widget at least sees the prefix.
+            # 2) React / v18 widget: TYPE it. Clear thoroughly first (the field
+            #    often pre-seeds "+1"), then type the full E.164 so the widget's
+            #    keydown handler detects the country from the "+<code>" prefix.
             await loc.click()
             await page.wait_for_timeout(120)
             try:
                 await loc.press("ControlOrMeta+a")
-                await loc.press("Backspace")
+                await loc.press("Delete")
+                for _ in range(6):  # belt-and-suspenders clear of any seeded "+1"
+                    await loc.press("Backspace")
             except Exception:
                 try:
                     await loc.fill("")
@@ -163,7 +168,7 @@ async def _fill_phone(page: Page, value: str) -> bool:
                     pass
             for ch in value:
                 await page.keyboard.type(ch, delay=random.randint(30, 70))
-            await page.wait_for_timeout(200)
+            await page.wait_for_timeout(250)
             return True
         except Exception:
             continue
