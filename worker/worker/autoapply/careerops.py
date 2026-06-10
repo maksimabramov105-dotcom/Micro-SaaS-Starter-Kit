@@ -109,12 +109,16 @@ async def _fill(page: Page, selector: str, value: str) -> bool:
 
 async def _fill_phone(page: Page, value: str) -> bool:
     """
-    Enter a phone number by TYPING it char-by-char so intl-tel-input widgets
-    (used by Greenhouse) detect the country from the leading "+<code>" and
-    validate correctly.  A direct .fill() sets the value without triggering the
-    widget's country detection, so an international number (e.g. +61…) is
-    validated against the default US format and rejected as "too short" — the
-    dominant cause of unconfirmed Greenhouse submissions.
+    Enter a phone number into a Greenhouse phone field (an intl-tel-input widget).
+
+    A direct .fill() — and even char-by-char typing — leaves the widget on its
+    DEFAULT country (US), so an international number (e.g. +61…) is validated as a
+    US number and rejected as "too short" (the dominant unconfirmed-submit cause).
+
+    Preferred path: drive the widget's own JS API — setNumber() with an E.164
+    string sets BOTH the country flag and the national number correctly — then
+    fire input/change/blur so React + the widget's validation update. Falls back
+    to typing, then .fill().
     """
     if not value:
         return False
@@ -124,9 +128,31 @@ async def _fill_phone(page: Page, value: str) -> bool:
             loc = page.locator(sel).first
             if await loc.count() == 0 or not await loc.is_visible():
                 continue
+            ok = await loc.evaluate(
+                """(el, num) => {
+                    try {
+                        const g = window.intlTelInputGlobals;
+                        const iti = g && g.getInstance ? g.getInstance(el) : null;
+                        if (iti && typeof iti.setNumber === 'function') {
+                            iti.setNumber(num);
+                        } else {
+                            const setter = Object.getOwnPropertyDescriptor(
+                                window.HTMLInputElement.prototype, 'value').set;
+                            setter.call(el, num);
+                        }
+                        for (const t of ['input', 'change', 'blur'])
+                            el.dispatchEvent(new Event(t, { bubbles: true }));
+                        return el.value || num;
+                    } catch (e) { return ''; }
+                }""",
+                value,
+            )
+            if ok:
+                await page.wait_for_timeout(200)
+                return True
+            # Fallback: type char-by-char so the widget at least sees the prefix.
             await loc.click()
             await page.wait_for_timeout(120)
-            # Clear any existing / auto-prefilled value first.
             try:
                 await loc.press("ControlOrMeta+a")
                 await loc.press("Backspace")
@@ -135,7 +161,7 @@ async def _fill_phone(page: Page, value: str) -> bool:
                     await loc.fill("")
                 except Exception:
                     pass
-            for ch in value:  # keystroke events drive intl-tel-input country detection
+            for ch in value:
                 await page.keyboard.type(ch, delay=random.randint(30, 70))
             await page.wait_for_timeout(200)
             return True
@@ -1528,10 +1554,22 @@ class CareerOpsApplicator:
                         const errEls = Array.from(document.querySelectorAll(
                             '[aria-invalid=true], .error, [class*=error i], [role=alert]'))
                             .map(e => (e.innerText||'').replace(/\s+/g,' ').trim()).filter(Boolean).slice(0, 6);
+                        const ph = document.querySelector('#phone, input[type=tel]');
+                        let phoneVal = '', phoneCountry = '';
+                        if (ph) {
+                            phoneVal = ph.value || '';
+                            try {
+                                const g = window.intlTelInputGlobals;
+                                const iti = g && g.getInstance ? g.getInstance(ph) : null;
+                                if (iti && iti.getSelectedCountryData)
+                                    phoneCountry = (iti.getSelectedCountryData() || {}).iso2 || '';
+                            } catch (e) {}
+                        }
                         return {
                             submitVisible: !!(sb && sb.offsetParent !== null),
                             bodyTail: body.slice(-260),
                             errors: errEls,
+                            phoneVal, phoneCountry,
                         };
                     }""")
                 except Exception:
@@ -1542,6 +1580,8 @@ class CareerOpsApplicator:
                     stuck_required=stuck_desc,
                     submit_visible=diag.get("submitVisible"),
                     page_errors=diag.get("errors"),
+                    phone_val=diag.get("phoneVal"),
+                    phone_country=diag.get("phoneCountry"),
                     body_tail=(diag.get("bodyTail") or "")[:260],
                 )
                 return {"status": "error", "url": job_url, "ats": "greenhouse",
