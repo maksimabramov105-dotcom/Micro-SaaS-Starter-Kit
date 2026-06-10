@@ -409,7 +409,7 @@ async function runCampaigns(
         select: { id: true, name: true, email: true, dailyApplicationLimit: true, inboxHandle: true },
       },
       resume: {
-        select: { id: true, generated: true, title: true },
+        select: { id: true, generated: true, input: true, title: true },
       },
     },
   })
@@ -717,22 +717,31 @@ async function runCampaigns(
     // Use inbox email (handle@inbox.resumeai-bot.ru) as the application email
     // so company replies flow through the dashboard inbox system.
     // Fall back to the user's personal email if inbox isn't configured yet.
-    const { first_name, last_name } = splitName(user.name)
+    // Real contact details live in the resume's raw form input (phone, LinkedIn,
+    // location, name). These were previously hardcoded empty, which caused the
+    // ATS filler to leave the REQUIRED phone field junk/blank → Greenhouse
+    // rejected the submit with "Phone number is too short" (the dominant apply
+    // failure). Pull them through so required contact fields validate.
+    const resumeInput = (resume.input ?? {}) as Record<string, unknown>
+    const inputStr = (k: string): string =>
+      typeof resumeInput[k] === 'string' ? (resumeInput[k] as string).trim() : ''
+
+    const { first_name, last_name } = splitName(user.name || inputStr('fullName'))
     const inboxDomain = process.env.INBOX_DOMAIN ?? 'inbox.resumeai-bot.ru'
     const applicationEmail = user.inboxHandle
       ? `${user.inboxHandle}@${inboxDomain}`
-      : (user.email ?? '')
+      : (user.email ?? inputStr('email'))
     const userData: Record<string, string> = {
       first_name,
       last_name,
       email: applicationEmail,
-      phone: '',
-      linkedin_url: '',
+      phone: inputStr('phone'),
+      linkedin_url: inputStr('linkedin') || inputStr('linkedinUrl'),
       resume_text: resumeText,
       cover_letter: '',
-      current_company: '',
-      portfolio_url: '',
-      location: campaign.locations[0] ?? '',
+      current_company: inputStr('currentCompany') || inputStr('current_company'),
+      portfolio_url: inputStr('website') || inputStr('portfolio') || inputStr('portfolioUrl'),
+      location: campaign.locations[0] || inputStr('location'),
     }
 
     // Eligibility profile (Phase 1) — used both for the pre-apply knockout filter
