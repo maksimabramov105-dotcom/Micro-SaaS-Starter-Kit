@@ -29,6 +29,8 @@ _COMPANIES: list[str] = [
     "matchgroup",
     # Phase A expansion — CX-tooling + fintech + HR-tech (cross-function depth).
     "pipedrive", "aircall", "outreach", "qonto", "lyrahealth", "15five",
+    # ANZ/APAC employers (eligible pool for NZ/AU-resident candidates).
+    "deputy", "immutable",
 ]
 
 

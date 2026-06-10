@@ -79,6 +79,17 @@ _COMPANIES: list[str] = [
     "hootsuite",
     "klaviyo",
     "nubank",
+    # Global-remote-first (hire from anywhere incl APAC/NZ) + ANZ/APAC employers —
+    # gives non-US-authorized candidates a genuinely eligible fillable pool.
+    "canonical",
+    "remotecom",
+    "grafanalabs",
+    "databricks",
+    "cargurus",
+    "pushpay",
+    "fingerprint",
+    "planetscale",
+    "octopusdeploy",
 ]
 
 
