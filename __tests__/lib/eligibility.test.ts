@@ -198,4 +198,35 @@ describe('eligibilityKnockout — targeting_v2', () => {
   it('no profileSeniority → seniority check skipped', () => {
     expect(v2('Director, Support — work from anywhere', AU, true, null)).toBeNull()
   })
+
+  // NZ-resident / AU-phone candidate (real profile): apply to NZ/AU + APAC + global,
+  // skip US-only / EU-only.
+  const NZAU: EligibilityProfile = {
+    authorizedCountries: ['New Zealand', 'Australia'], needsVisaSponsorship: true,
+    willingToRelocate: false, remoteOnly: false, languages: ['English'],
+  }
+  it('NZ/AU candidate: APAC-remote passes', () => {
+    expect(v2('Support — Remote (APAC)', NZAU)).toBeNull()
+  })
+  it('NZ/AU candidate: Remote - New Zealand passes', () => {
+    expect(v2('Support — Remote, New Zealand', NZAU)).toBeNull()
+  })
+  it('NZ/AU candidate: US-only remote knocked out', () => {
+    expect(v2('Support — Remote (US only)', NZAU)).toBe('remote_region')
+  })
+  it('NZ/AU candidate: EMEA-only remote knocked out', () => {
+    expect(v2('Support — Remote (EMEA)', NZAU)).toBe('remote_region')
+  })
+
+  // Unknown authorization (empty profile) → never skip on auth grounds (apply broadly).
+  const UNKNOWN: EligibilityProfile = {
+    authorizedCountries: [], needsVisaSponsorship: true,
+    willingToRelocate: false, remoteOnly: false, languages: [],
+  }
+  it('unknown auth: US-only remote NOT skipped', () => {
+    expect(v2('Remote (US only)', UNKNOWN)).toBeNull()
+  })
+  it('unknown auth: on-site US NOT skipped', () => {
+    expect(eligibilityKnockout(UNKNOWN, { country: 'united states', isRemote: false }, { targetingV2: true })).toBeNull()
+  })
 })

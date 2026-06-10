@@ -33,6 +33,8 @@ const COUNTRY_ALIASES: Record<string, string> = {
   america: 'united states',
   uk: 'united kingdom',
   'u.k.': 'united kingdom',
+  nz: 'new zealand',
+  aus: 'australia',
   'great britain': 'united kingdom',
   england: 'united kingdom',
   uae: 'united arab emirates',
@@ -131,7 +133,7 @@ export function detectHiringRegion(text: string): HiringRegion {
   if (regionHit && /\b(remote|hire|based|located|within|only|region)\b/.test(t)) {
     return { countries: REGION_GROUPS[regionHit[1]] }
   }
-  const countryHit = t.match(/\bremote[, (–-]+(canada|united kingdom|uk|germany|australia|india|ireland|france|netherlands|spain|brazil|mexico|singapore)\b/)
+  const countryHit = t.match(/\bremote[, (–-]+(canada|united kingdom|uk|germany|australia|new zealand|nz|india|ireland|france|netherlands|spain|brazil|mexico|singapore)\b/)
   if (countryHit) return { countries: [normalizeCountry(countryHit[1])] }
 
   // 4. US timezone constraints imply US/Americas hiring.
@@ -171,6 +173,10 @@ export function eligibilityKnockout(
   const v2 = opts?.targetingV2 === true
   const authorized = new Set(profile.authorizedCountries.map(normalizeCountry))
   const relocateEscape = profile.willingToRelocate && !profile.needsVisaSponsorship
+  // No authorized countries on file = we don't know where the candidate can work.
+  // Never skip on authorization grounds under uncertainty (the principle: apply
+  // wherever the resume might be accepted; only skip when we KNOW it can't be).
+  const unknownAuth = authorized.size === 0
 
   // Seniority distance (both remote + on-site). Skip roles ≥2 levels away.
   if (v2 && opts?.profileSeniority != null && opts?.text) {
@@ -185,14 +191,16 @@ export function eligibilityKnockout(
     const region = detectHiringRegion(opts?.text ?? '')
     if (region === null) return null // no hiring-region signal — don't skip
     if ('global' in region) return null // hires anywhere
+    if (unknownAuth || relocateEscape) return null // unknown auth → don't skip
     const overlap = region.countries.some((c) => authorized.has(normalizeCountry(c)))
-    if (overlap || relocateEscape) return null
+    if (overlap) return null
     return 'remote_region'
   }
 
   if (profile.remoteOnly) return 'remote_only'
   const jc = normalizeCountry(job.country ?? '')
   if (!jc) return null // unknown on-site location — don't skip on uncertainty
+  if (unknownAuth) return null // unknown auth → don't skip on-site either
   if (authorized.has(jc)) return null
   // Relocating still requires the right to work; only eligible if willing to
   // relocate AND no sponsorship needed (e.g. qualifying citizenship).

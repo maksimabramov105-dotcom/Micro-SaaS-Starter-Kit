@@ -754,8 +754,17 @@ async function runCampaigns(
 
     // Eligibility profile (Phase 1) — used both for the pre-apply knockout filter
     // below and threaded to the worker so screening answers are honest.
+    // Default authorized countries from the candidate's residency when the
+    // campaign hasn't set them, so every user targets their own country + region
+    // by default (you can almost always work where you reside). Unknown → left
+    // empty, and the gate then never skips on authorization (apply broadly).
+    let authorizedCountries = campaign.authorizedCountries
+    if (authorizedCountries.length === 0) {
+      const residency = inferJobLocation(inputStr('location') || inputStr('country')).country
+      if (residency) authorizedCountries = [residency]
+    }
     const eligibility: EligibilityProfile = {
-      authorizedCountries: campaign.authorizedCountries,
+      authorizedCountries,
       needsVisaSponsorship: campaign.needsVisaSponsorship,
       willingToRelocate: campaign.willingToRelocate,
       remoteOnly: campaign.remoteOnly,
