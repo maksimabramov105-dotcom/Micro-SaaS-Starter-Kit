@@ -1381,10 +1381,31 @@ class CareerOpsApplicator:
             # Broadened fill: every still-empty required field (native selects,
             # radios, broader text/textarea, dates, autocompletes) — heuristics
             # for compliance-safe standards, one batched LLM call for the rest.
-            fill_stats = await _fill_unanswered_required(page, user_data, screening_answers)
-            # Re-tick any consent boxes revealed while filling.
-            await _check_required_boxes(page)
-            required_empty = await _count_required_empty(page)
+            #
+            # Retried (≤3 passes): the LLM tier is non-deterministic and some
+            # required fields only render after earlier ones are answered, so a
+            # SINGLE pass frequently left exactly one straggler empty — the
+            # dominant cause of "submission not confirmed (required fields)".
+            # We re-run the fill+checkbox pass while required fields remain AND
+            # each pass keeps resolving at least one (stop on no-progress so we
+            # never loop on a field that genuinely can't be answered).
+            fill_stats = {"heuristic": 0, "llm": 0, "asked": 0, "passes": 0}
+            required_empty = -1
+            for _pass in range(3):
+                stats = await _fill_unanswered_required(page, user_data, screening_answers)
+                await _check_required_boxes(page)  # re-tick consent boxes revealed while filling
+                for k in ("heuristic", "llm", "asked"):
+                    fill_stats[k] += stats.get(k, 0)
+                fill_stats["passes"] += 1
+                new_empty = await _count_required_empty(page)
+                if new_empty == 0:
+                    required_empty = 0
+                    break
+                # Stop once a pass stops making progress (or the count errored).
+                if required_empty >= 0 and (new_empty < 0 or new_empty >= required_empty):
+                    required_empty = new_empty
+                    break
+                required_empty = new_empty
             logger.info(
                 "careerops.greenhouse.filled",
                 url=job_url,
@@ -1392,6 +1413,7 @@ class CareerOpsApplicator:
                 heuristic_filled=fill_stats.get("heuristic", 0),
                 llm_filled=fill_stats.get("llm", 0),
                 llm_asked=fill_stats.get("asked", 0),
+                fill_passes=fill_stats.get("passes", 1),
                 required_empty_before_submit=required_empty,
             )
 
@@ -1406,30 +1428,52 @@ class CareerOpsApplicator:
                 pass
             submit = page.locator('input[type="submit"], button[type="submit"]').first
             if await submit.count() > 0:
-                try:
-                    await submit.scroll_into_view_if_needed(timeout=3000)
-                except Exception:
-                    pass
-                await submit.click()
-                try:
-                    await page.wait_for_load_state("networkidle", timeout=12000)
-                except Exception:
-                    pass
-                if await _verify_submitted(page):
-                    logger.info("careerops.greenhouse.submitted", url=job_url)
-                    return {"status": "submitted", "url": job_url, "ats": "greenhouse",
-                            "answers": screening_answers}
-
-                # Greenhouse email-verification step: a security-code field
-                # appears and a code is emailed to the applicant. Fetch it from
-                # the inbox, enter it, and resubmit to finalize the application.
                 company = (user_data.get("_company") or "").strip()
-                if await _complete_greenhouse_verification(
-                    page, user_data.get("email", ""), company,
-                ):
-                    logger.info("careerops.greenhouse.submitted_after_code", url=job_url)
-                    return {"status": "submitted", "url": job_url, "ats": "greenhouse",
-                            "answers": screening_answers}
+                # Submit with a guarded single retry. On the modern embedded React
+                # form the first click sometimes no-ops (a late re-render or an
+                # overlay swallows it) → "submission not confirmed" with the form
+                # still fully filled (required_empty=0). We retry ONLY while the
+                # submit control is still present/visible, which proves the form
+                # was NOT consumed — so there is no double-submit risk.
+                for _attempt in range(2):
+                    try:
+                        await submit.scroll_into_view_if_needed(timeout=3000)
+                    except Exception:
+                        pass
+                    try:
+                        await submit.click()
+                    except Exception:
+                        break
+                    try:
+                        await page.wait_for_load_state("networkidle", timeout=12000)
+                    except Exception:
+                        pass
+                    if await _verify_submitted(page):
+                        logger.info("careerops.greenhouse.submitted", url=job_url)
+                        return {"status": "submitted", "url": job_url, "ats": "greenhouse",
+                                "answers": screening_answers}
+
+                    # Greenhouse email-verification step: a security-code field
+                    # appears and a code is emailed to the applicant. Fetch it from
+                    # the inbox, enter it, and resubmit to finalize the application.
+                    if await _complete_greenhouse_verification(
+                        page, user_data.get("email", ""), company,
+                    ):
+                        logger.info("careerops.greenhouse.submitted_after_code", url=job_url)
+                        return {"status": "submitted", "url": job_url, "ats": "greenhouse",
+                                "answers": screening_answers}
+
+                    # Not confirmed. If the submit control is gone the form was
+                    # consumed (don't re-click); otherwise the click was likely a
+                    # no-op — re-tick boxes and retry once.
+                    try:
+                        still_there = await submit.count() > 0 and await submit.is_visible()
+                    except Exception:
+                        still_there = False
+                    if not still_there:
+                        break
+                    await _check_required_boxes(page)
+                    await page.wait_for_timeout(1500)
 
                 logger.warning("careerops.greenhouse.submit_unconfirmed", url=job_url)
                 return {"status": "error", "url": job_url, "ats": "greenhouse",
