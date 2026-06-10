@@ -151,22 +151,50 @@ async def _fill_phone(page: Page, value: str) -> bool:
             if via_api:
                 await page.wait_for_timeout(200)
                 return True
-            # 2) React / v18 widget: TYPE it. Clear thoroughly first (the field
-            #    often pre-seeds "+1"), then type the full E.164 so the widget's
-            #    keydown handler detects the country from the "+<code>" prefix.
+            # 2) intl-tel-input with separateDialCode (the default): the widget
+            #    shows a country flag + "+<code>" SEPARATELY and the input holds
+            #    only the national part. Typing a full +61… number leaves the flag
+            #    on the default US (+1), so the digits validate as a US number and
+            #    are rejected as "too short". Fix: open the country dropdown and
+            #    pick the country whose dial-code is the longest prefix of the
+            #    number, THEN type the national digits.
+            dial = await loc.evaluate(
+                """(el, num) => {
+                    const digits = (num || '').replace(/[^0-9]/g, '');
+                    const root = el.closest('.iti, .react-tel-input, [class*=intl-tel]') || el.parentElement || document;
+                    const btn = root.querySelector(
+                        'button.iti__selected-country, .iti__selected-flag, .iti__selected-country-primary, .selected-flag');
+                    if (btn) { btn.click(); } else { return ''; }
+                    const items = Array.from(document.querySelectorAll(
+                        '.iti__country[data-dial-code], li[data-dial-code], .iti__country[data-country-code]'));
+                    let best = null, bestLen = 0;
+                    for (const it of items) {
+                        const dc = it.getAttribute('data-dial-code') || '';
+                        if (dc && digits.startsWith(dc) && dc.length > bestLen) { best = it; bestLen = dc.length; }
+                    }
+                    if (best) { best.click(); return best.getAttribute('data-dial-code') || ''; }
+                    if (btn) btn.click();  // close the menu we opened
+                    return '';
+                }""",
+                value,
+            )
+            await page.wait_for_timeout(200)
+            digits = re.sub(r"[^0-9]", "", value)
+            national = digits[len(dial):] if dial and digits.startswith(dial) else digits
+            to_type = national if dial else value  # full E.164 only if no dropdown
             await loc.click()
             await page.wait_for_timeout(120)
             try:
                 await loc.press("ControlOrMeta+a")
                 await loc.press("Delete")
-                for _ in range(6):  # belt-and-suspenders clear of any seeded "+1"
+                for _ in range(8):  # clear any seeded national digits / "+1"
                     await loc.press("Backspace")
             except Exception:
                 try:
                     await loc.fill("")
                 except Exception:
                     pass
-            for ch in value:
+            for ch in to_type:
                 await page.keyboard.type(ch, delay=random.randint(30, 70))
             await page.wait_for_timeout(250)
             return True
