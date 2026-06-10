@@ -95,10 +95,12 @@ export const authOptions: NextAuthOptions = {
     strategy: 'jwt',
   },
   // Behind the Caddy TLS proxy the app receives HTTP internally but is served
-  // over HTTPS. Pin secure cookies in prod so the OAuth state/PKCE/CSRF cookies
-  // get the correct Secure + __Host-/__Secure- treatment and survive the
-  // provider round-trip (a documented cause of first-attempt sign-in flakes).
-  useSecureCookies: process.env.NODE_ENV === 'production',
+  // over HTTPS. Derive secure cookies from the PUBLIC scheme (NEXTAUTH_URL), not
+  // NODE_ENV — so prod (https) gets Secure + __Host-/__Secure- cookies (fixing
+  // first-attempt OAuth flakes), while an http origin (local/CI `next start`,
+  // which still runs NODE_ENV=production) uses non-secure cookies that actually
+  // work over http. This matches getToken's own cookie-name detection.
+  useSecureCookies: (process.env.NEXTAUTH_URL ?? '').startsWith('https://'),
   // Surface NextAuth failures into the container logs with their error code so
   // an intermittent sign-in failure is actually diagnosable when it recurs
   // (previously these were swallowed — zero auth errors were ever captured).

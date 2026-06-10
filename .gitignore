@@ -45,3 +45,6 @@ __pycache__/
 *.pyc
 .coverage
 *.egg-info/
+
+# Playwright test-auth minted session (do not commit)
+e2e/.auth/
