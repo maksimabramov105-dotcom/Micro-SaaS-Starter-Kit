@@ -36,7 +36,7 @@ Legend: ✅ pass · ⚠️ needs attention / manual · ❌ fail · ⏳ needs pro
 
 | # | Check | Status | Detail |
 |---|-------|--------|--------|
-| C | Single-query funnel (signups → resume → campaign → SUBMITTED → replies-by-class → subscribers → MRR) | ✅ built | Added `scripts/funnel_report.ts` (run `npx tsx scripts/funnel_report.ts`) + `getFunnelReport()` in [lib/pmf/queries.ts](../../lib/pmf/queries.ts) + a "Funnel (last 30 days)" row on [app/admin/pmf/page.tsx](../../app/admin/pmf/page.tsx). Run against prod via SSH to populate numbers |
+| C | Single-query funnel (signups → resume → campaign → SUBMITTED → replies-by-class → subscribers → MRR) | ✅ verified | `getFunnelReport()` in [lib/pmf/queries.ts](../../lib/pmf/queries.ts) powers both the `/admin/pmf` "Funnel (last 30 days)" row (prod-visible) and `scripts/funnel_report.ts` (local/dev, run `DATABASE_URL=… npx tsx scripts/funnel_report.ts` — the standalone prod image doesn't ship the TS source tree, so query prod via `/admin/pmf` or an inline `@prisma/client` call). **Verified prod numbers 2026-06-10 →** 30d: signups 4 · resume 2 · campaign 2 · SUBMITTED 227 · replies INTERVIEW 0 / QUESTION 1 / REJECTION 19 / AUTOMATED 292 · subscribers 0. All-time SUBMITTED 227 / FAILED 141 / REJECTED 7 |
 
 ## D. Money path
 

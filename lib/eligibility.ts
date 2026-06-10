@@ -17,7 +17,11 @@ export interface EligibilityProfile {
   languages: string[]
 }
 
-export type KnockoutReason = 'remote_only' | 'work_auth'
+export type KnockoutReason =
+  | 'remote_only'
+  | 'work_auth'
+  | 'remote_region'
+  | 'seniority_mismatch'
 
 // Common spellings/abbreviations → a normalized comparison key.
 const COUNTRY_ALIASES: Record<string, string> = {
@@ -87,22 +91,111 @@ export function inferJobLocation(
   return { country, isRemote }
 }
 
+// ── Hiring-region detection (Phase 2 / targeting_v2) ────────────────────────
+// Most "remote" roles at US/EU companies only employ in specific countries
+// (payroll/legal), so "remote" ≠ "eligible". We parse the job text for the
+// region the company can actually hire in.
+//
+// Returns:
+//   { global: true }                — hires anywhere (no restriction)
+//   { countries: [...normalized] }  — restricted to these countries
+//   null                            — NO region signal found (caller: don't skip)
+export type HiringRegion = { global: true } | { countries: string[] } | null
+
+const REGION_GROUPS: Record<string, string[]> = {
+  emea: ['united kingdom', 'germany', 'france', 'spain', 'portugal', 'netherlands', 'ireland', 'poland', 'romania'],
+  europe: ['united kingdom', 'germany', 'france', 'spain', 'portugal', 'netherlands', 'ireland', 'poland', 'romania'],
+  eu: ['germany', 'france', 'spain', 'portugal', 'netherlands', 'ireland', 'poland', 'romania'],
+  latam: ['brazil', 'mexico', 'argentina'],
+  apac: ['australia', 'singapore', 'india', 'new zealand'],
+  anz: ['australia', 'new zealand'],
+}
+
+export function detectHiringRegion(text: string): HiringRegion {
+  const t = (text || '').toLowerCase().replace(/\s+/g, ' ')
+  if (!t) return null
+
+  // 1. Global / anywhere — no restriction.
+  if (/\b(work from anywhere|anywhere in the world|worldwide|fully (global|distributed)|globally remote|remote[- ]?global|no location requirement)\b/.test(t)) {
+    return { global: true }
+  }
+
+  // 2. Explicit US-only / US-authorization signals.
+  if (/\b(us only|u\.s\. only|usa only|united states only|us[- ]based only|must be (located|based) in the (us|united states)|authorized to work in the (us|united states|u\.s\.?)|us work authorization|remote[, (–-]+(us|usa|united states)\b|\(us\b|\bus[- ]remote\b|remote within the (us|united states))\b/.test(t)) {
+    return { countries: ['united states'] }
+  }
+
+  // 3. Country/region phrases like "remote (EMEA)", "Europe only", "remote - UK",
+  //    "remote in Canada", "based in Germany".
+  const regionHit = t.match(/\b(emea|europe|eu|latam|apac|anz)\b/)
+  if (regionHit && /\b(remote|hire|based|located|within|only|region)\b/.test(t)) {
+    return { countries: REGION_GROUPS[regionHit[1]] }
+  }
+  const countryHit = t.match(/\bremote[, (–-]+(canada|united kingdom|uk|germany|australia|india|ireland|france|netherlands|spain|brazil|mexico|singapore)\b/)
+  if (countryHit) return { countries: [normalizeCountry(countryHit[1])] }
+
+  // 4. US timezone constraints imply US/Americas hiring.
+  if (/\b(est|edt|pst|pdt|cst|cdt|mst|mdt|et\b|pt\b|us timezone|north american (time|hours)|pacific time|eastern time)\b/.test(t)) {
+    return { countries: ['united states', 'canada'] }
+  }
+
+  return null // no region signal — caller must not skip on uncertainty
+}
+
+// ── Seniority extraction (Phase 2 / targeting_v2) ───────────────────────────
+// Numeric ladder so we can skip roles ≥2 levels from the candidate.
+//   0 intern · 1 junior · 2 mid · 3 senior · 4 staff/lead/principal · 5 manager/director · 6 VP+
+export function extractSeniority(title: string): number | null {
+  const t = (title || '').toLowerCase()
+  if (/\b(vp|vice president|head of|chief|c[teio]o)\b/.test(t)) return 6
+  if (/\b(director|manager|mgr)\b/.test(t)) return 5
+  if (/\b(staff|principal|lead|architect)\b/.test(t)) return 4
+  if (/\b(senior|sr\.?|sr )\b/.test(t)) return 3
+  if (/\b(junior|jr\.?|jr |entry[- ]level|associate i\b|associate\b)\b/.test(t)) return 1
+  if (/\b(intern|internship|trainee|graduate|new grad)\b/.test(t)) return 0
+  return 2 // default: mid-level when no explicit marker
+}
+
 /**
- * Pre-apply gate. Returns a reason to SKIP (and log), or null when the apply is
- * worth attempting. Remote roles always pass the work-auth gate.
+ * Pre-apply gate. Returns a reason to SKIP (and log), or null when worth applying.
+ *
+ * Legacy behavior (targetingV2 off): remote roles always pass the work-auth gate.
+ * targeting_v2 adds, for REMOTE roles, a hiring-region check (remote_region) and,
+ * for ALL roles, a seniority distance check (seniority_mismatch).
  */
 export function eligibilityKnockout(
   profile: EligibilityProfile,
   job: { country: string | null; isRemote: boolean },
+  opts?: { text?: string; targetingV2?: boolean; profileSeniority?: number | null },
 ): KnockoutReason | null {
-  if (job.isRemote) return null
+  const v2 = opts?.targetingV2 === true
+  const authorized = new Set(profile.authorizedCountries.map(normalizeCountry))
+  const relocateEscape = profile.willingToRelocate && !profile.needsVisaSponsorship
+
+  // Seniority distance (both remote + on-site). Skip roles ≥2 levels away.
+  if (v2 && opts?.profileSeniority != null && opts?.text) {
+    const jobLevel = extractSeniority(opts.text)
+    if (jobLevel != null && Math.abs(jobLevel - opts.profileSeniority) >= 2) {
+      return 'seniority_mismatch'
+    }
+  }
+
+  if (job.isRemote) {
+    if (!v2) return null // legacy: any remote role passes
+    const region = detectHiringRegion(opts?.text ?? '')
+    if (region === null) return null // no hiring-region signal — don't skip
+    if ('global' in region) return null // hires anywhere
+    const overlap = region.countries.some((c) => authorized.has(normalizeCountry(c)))
+    if (overlap || relocateEscape) return null
+    return 'remote_region'
+  }
+
   if (profile.remoteOnly) return 'remote_only'
   const jc = normalizeCountry(job.country ?? '')
   if (!jc) return null // unknown on-site location — don't skip on uncertainty
-  const authorized = new Set(profile.authorizedCountries.map(normalizeCountry))
   if (authorized.has(jc)) return null
   // Relocating still requires the right to work; only eligible if willing to
   // relocate AND no sponsorship needed (e.g. qualifying citizenship).
-  if (profile.willingToRelocate && !profile.needsVisaSponsorship) return null
+  if (relocateEscape) return null
   return 'work_auth'
 }

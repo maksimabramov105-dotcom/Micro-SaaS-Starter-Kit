@@ -35,7 +35,7 @@ import {
   tryAcquireLock, releaseLock, resetStaleQueued, saveRunSummary,
   type RunSummary,
 } from '@/lib/run-campaigns-ops'
-import { inferJobLocation, eligibilityKnockout, type EligibilityProfile } from '@/lib/eligibility'
+import { inferJobLocation, eligibilityKnockout, extractSeniority, type EligibilityProfile } from '@/lib/eligibility'
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -494,6 +494,14 @@ async function runCampaigns(
   const fitThreshold = fitFlag?.rolloutPct ?? 45
   console.log('[run-campaigns] jobfit gate', { fitGateEnabled, fitThreshold })
 
+  // ── Phase 2: targeting_v2 (region + seniority knockouts) ──────────────────
+  // When enabled, the eligibility gate additionally skips remote roles whose
+  // hiring region excludes the candidate (remote_region) and roles ≥2 seniority
+  // levels away (seniority_mismatch). Flag off → legacy behavior (any remote passes).
+  const targetingFlag = await prisma.featureFlag.findUnique({ where: { key: 'targeting_v2' } })
+  const targetingV2 = targetingFlag?.enabled ?? false
+  console.log('[run-campaigns] targeting gate', { targetingV2 })
+
   const summary: Array<{
     campaignId: string
     campaignName: string
@@ -753,6 +761,16 @@ async function runCampaigns(
       remoteOnly: campaign.remoteOnly,
       languages: campaign.languages,
     }
+
+    // Phase 2: infer the candidate's seniority level from the resume (years of
+    // experience first, then an explicit title marker). Null = couldn't tell →
+    // the seniority knockout is skipped for safety (never skip on uncertainty).
+    const yrsMatch = inputStr('yearsExp').match(/\d+/)
+    const yrs = yrsMatch ? Number(yrsMatch[0]) : NaN
+    const titleLevel = extractSeniority(inputStr('targetRole') || campaign.keywords[0] || '')
+    const profileSeniority: number | null = !Number.isNaN(yrs)
+      ? yrs < 1 ? 1 : yrs <= 4 ? 2 : yrs <= 8 ? 3 : yrs <= 12 ? 4 : 5
+      : titleLevel === 2 ? null : titleLevel
 
     // How many more can we send today?
     const today = new Date()
@@ -1140,7 +1158,14 @@ async function runCampaigns(
       // genuinely-remote roles list an HQ city as their "location", which would
       // otherwise be wrongly skipped under a remote-only profile.
       const isRemote = (job as { remote?: boolean }).remote === true || jobLoc.isRemote
-      const knockout = eligibilityKnockout(eligibility, { country: jobLoc.country, isRemote })
+      // Phase 2: pass the job text (location + title + description excerpt) so the
+      // gate can detect the hiring region and seniority. targeting_v2-flagged.
+      const jobText = `${job.location ?? ''} ${job.title} ${(job.description ?? '').slice(0, 1500)}`
+      const knockout = eligibilityKnockout(
+        eligibility,
+        { country: jobLoc.country, isRemote },
+        { text: jobText, targetingV2, profileSeniority },
+      )
       if (knockout) {
         campaignLog.skipped++
         console.log('[run-campaigns] eligibility skip', {
