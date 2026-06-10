@@ -31,10 +31,10 @@ test('2b. dashboard has a clear next step, and first campaign is ≤5 clicks awa
   expect(clicks, `clicks-to-first-campaign was ${clicks}`).toBeLessThanOrEqual(5)
 })
 
-test('3. resume list page renders for a signed-in user', async ({ page }) => {
-  const res = await page.goto('/dashboard/resumes')
-  expect(res?.status()).toBeLessThan(400)
+test('3. resume creation page renders for a signed-in user', async ({ page }) => {
+  await page.goto('/dashboard/resumes/new')
   await expect(page).not.toHaveURL(/\/login/)
+  await expect(page.locator('form, input, select, textarea').first()).toBeVisible()
 })
 
 test('4. campaign creation page renders a form', async ({ page }) => {
