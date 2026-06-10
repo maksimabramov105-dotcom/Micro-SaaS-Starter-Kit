@@ -1588,7 +1588,7 @@ class CareerOpsApplicator:
                             '[aria-invalid=true], .error, [class*=error i], [role=alert]'))
                             .map(e => (e.innerText||'').replace(/\s+/g,' ').trim()).filter(Boolean).slice(0, 6);
                         const ph = document.querySelector('#phone, input[type=tel]');
-                        let phoneVal = '', phoneCountry = '';
+                        let phoneVal = '', phoneCountry = '', phoneHtml = '';
                         if (ph) {
                             phoneVal = ph.value || '';
                             try {
@@ -1597,12 +1597,17 @@ class CareerOpsApplicator:
                                 if (iti && iti.getSelectedCountryData)
                                     phoneCountry = (iti.getSelectedCountryData() || {}).iso2 || '';
                             } catch (e) {}
+                            // Outer HTML of the phone widget container — lets us write
+                            // a precise country-dropdown selector instead of guessing.
+                            const wrap = ph.closest('.iti, .react-tel-input, [class*=phone i], [class*=tel i]')
+                                || ph.parentElement || ph;
+                            phoneHtml = (wrap.outerHTML || '').replace(/\s+/g, ' ').slice(0, 700);
                         }
                         return {
                             submitVisible: !!(sb && sb.offsetParent !== null),
                             bodyTail: body.slice(-260),
                             errors: errEls,
-                            phoneVal, phoneCountry,
+                            phoneVal, phoneCountry, phoneHtml,
                         };
                     }""")
                 except Exception:
@@ -1615,7 +1620,8 @@ class CareerOpsApplicator:
                     page_errors=diag.get("errors"),
                     phone_val=diag.get("phoneVal"),
                     phone_country=diag.get("phoneCountry"),
-                    body_tail=(diag.get("bodyTail") or "")[:260],
+                    phone_html=(diag.get("phoneHtml") or "")[:700],
+                    body_tail=(diag.get("bodyTail") or "")[:200],
                 )
                 return {"status": "error", "url": job_url, "ats": "greenhouse",
                         "error": "submission not confirmed (required fields or email code incomplete)"}
