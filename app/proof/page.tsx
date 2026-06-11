@@ -1,11 +1,14 @@
 import Link from 'next/link'
+import { unstable_cache } from 'next/cache'
 import { Navbar } from '@/components/navbar'
 import { prisma } from '@/lib/prisma'
 
 const SITE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
 
-// Cache 1h — fresh enough to feel live, cheap enough to share widely.
-export const revalidate = 3600
+// Render at runtime (the DB isn't available during the CI build, so static
+// generation would cache empty numbers). The DB query itself is cached 1h via
+// unstable_cache — so the first real request shows live data and it stays cheap.
+export const dynamic = 'force-dynamic'
 
 export const metadata = {
   title: 'Live proof — real applications & replies | ResumeAI',
@@ -26,8 +29,8 @@ function median(nums: number[]): number | null {
   return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2
 }
 
-async function getProof() {
-  try {
+const getProof = unstable_cache(
+  async () => {
     const SENT = ['SUBMITTED', 'INTERVIEW', 'REJECTED', 'OFFER'] as const
     const [submitted, confirmed, replyGroups, replied] = await Promise.all([
       prisma.jobApplication.count({ where: { status: { in: [...SENT] } } }),
@@ -51,10 +54,10 @@ async function getProof() {
       interviews: c('INTERVIEW_REQUEST'),
       medianReplyDays: medianDays,
     }
-  } catch {
-    return null
-  }
-}
+  },
+  ['proof-stats-v1'],
+  { revalidate: 3600 },
+)
 
 function Stat({ value, label, sub, accent }: { value: string; label: string; sub?: string; accent?: boolean }) {
   return (
@@ -67,7 +70,12 @@ function Stat({ value, label, sub, accent }: { value: string; label: string; sub
 }
 
 export default async function ProofPage() {
-  const p = await getProof()
+  let p: Awaited<ReturnType<typeof getProof>> | null = null
+  try {
+    p = await getProof()
+  } catch {
+    p = null
+  }
   return (
     <div className="flex min-h-screen flex-col">
       <Navbar />
