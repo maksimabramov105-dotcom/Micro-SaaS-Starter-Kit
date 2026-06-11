@@ -19,6 +19,13 @@ const config = {
     },
     extend: {
       colors: {
+        // Brand hierarchy (P1): emerald is the action/brand color ("go / money /
+        // safe"). brand-deep for hover/headers; brand-soft for icon chips/surfaces.
+        brand: {
+          DEFAULT: '#059669', // emerald-600
+          deep: '#065f46',    // emerald-800
+          soft: '#d1fae5',    // emerald-100
+        },
         primary: {
           DEFAULT: '#059669', // emerald-600
           hover: '#047857',   // emerald-700

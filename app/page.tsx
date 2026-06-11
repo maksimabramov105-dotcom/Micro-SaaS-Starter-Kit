@@ -1,6 +1,8 @@
 import Link from 'next/link'
+import { CheckCircle2, Globe, Inbox, ShieldCheck, FileCheck2 } from 'lucide-react'
 import { PRICING_PLANS, getMonthlyEquivalent } from '@/lib/pricing'
 import { LaunchBanner } from '@/components/launch-banner'
+import { Logo } from '@/components/logo'
 import { prisma } from '@/lib/prisma'
 import { testimonials, replyScreenshots } from '@/lib/proof'
 
@@ -74,8 +76,8 @@ export default async function HomePage() {
       {/* Navbar */}
       <nav className="sticky top-0 z-50 border-b border-slate-100 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
-          <Link href="/" className="text-xl font-bold text-emerald-600">
-            ResumeAI
+          <Link href="/" aria-label="ResumeAI home">
+            <Logo />
           </Link>
           <div className="flex items-center gap-6">
             <Link href="#how" className="hidden text-sm text-slate-600 hover:text-slate-900 sm:block">
@@ -103,7 +105,7 @@ export default async function HomePage() {
           Land a job abroad. Our AI writes your resume and auto-applies to jobs in 50+ countries
           &mdash; while you sleep.
         </h1>
-        <p className="mt-6 max-w-2xl text-xl text-slate-500">
+        <p className="mt-6 max-w-2xl text-xl text-slate-600">
           ResumeAI-Bot only applies to jobs you&apos;re actually eligible for &mdash; remote,
           your authorized countries, sponsorship-aware &mdash; tailors your resume to each role,
           and captures the replies in one inbox. Built for people applying across borders, not just
@@ -116,17 +118,25 @@ export default async function HomePage() {
           >
             Start free &mdash; 3 applications/day &rarr;
           </Link>
-          <p className="mt-3 text-sm text-slate-500">
+          <p className="mt-3 text-sm text-slate-600">
             No credit card · 30-day money-back guarantee on paid plans
           </p>
         </div>
 
         {/* Honest trust strip — no fabricated metrics (HOMEPAGE_COPY.md §1) */}
-        <div className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-slate-500">
-          <span>✅ Only applies where you&apos;re eligible</span>
-          <span>🌍 Remote &amp; 50+ countries</span>
-          <span>📨 Confirmed by the employer&apos;s ATS — no fake &ldquo;applied&rdquo;</span>
-          <span>💸 30-day money-back guarantee</span>
+        <div className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-slate-600">
+          <span className="inline-flex items-center gap-1.5">
+            <CheckCircle2 className="h-4 w-4 text-brand" aria-hidden="true" /> Only applies where you&apos;re eligible
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <Globe className="h-4 w-4 text-brand" aria-hidden="true" /> Remote &amp; 50+ countries
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <Inbox className="h-4 w-4 text-brand" aria-hidden="true" /> Confirmed by the employer&apos;s ATS — no fake &ldquo;applied&rdquo;
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <ShieldCheck className="h-4 w-4 text-brand" aria-hidden="true" /> 30-day money-back guarantee
+          </span>
         </div>
       </section>
 
@@ -154,7 +164,7 @@ export default async function HomePage() {
                 </div>
               )}
             </div>
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-slate-600">
               Live totals across all users, updated hourly. &ldquo;Sent&rdquo; means our system
               completed the application; &ldquo;confirmed&rdquo; means the employer&apos;s ATS
               acknowledged receipt.
@@ -175,7 +185,7 @@ export default async function HomePage() {
                   <figure key={s.src} className="overflow-hidden rounded-xl border border-slate-200">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={s.src} alt={s.alt} className="w-full" />
-                    {s.caption && <figcaption className="px-3 py-2 text-xs text-slate-500">{s.caption}</figcaption>}
+                    {s.caption && <figcaption className="px-3 py-2 text-xs text-slate-600">{s.caption}</figcaption>}
                   </figure>
                 ))}
               </div>
@@ -186,7 +196,7 @@ export default async function HomePage() {
                   <blockquote key={t.name + t.quote} className="rounded-xl border border-slate-200 bg-slate-50 p-6">
                     <p className="text-sm text-slate-700">&ldquo;{t.quote}&rdquo;</p>
                     <footer className="mt-3 text-xs font-medium text-slate-900">
-                      {t.name} <span className="font-normal text-slate-500">— {t.role}</span>
+                      {t.name} <span className="font-normal text-slate-600">— {t.role}</span>
                     </footer>
                   </blockquote>
                 ))}
@@ -209,30 +219,32 @@ export default async function HomePage() {
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {[
               {
-                icon: '✅',
+                Icon: ShieldCheck,
                 title: 'Only jobs you can actually get',
                 body: "Other tools blast US postings and answer “authorized to work? — yes” for everyone, so you get auto-rejected. We check your work authorization, visa-sponsorship needs and remote-eligibility BEFORE applying — and answer honestly.",
               },
               {
-                icon: '🌍',
+                Icon: Globe,
                 title: 'Remote-first & global',
                 body: 'Built for people applying across borders. We prioritize remote and internationally-friendly roles across 50+ countries — not just US LinkedIn.',
               },
               {
-                icon: '🤖',
+                Icon: FileCheck2,
                 title: 'A resume tuned to every job',
                 body: "We don't blast one generic resume. Our AI rewrites yours per role so it passes the ATS and reads like you wrote it for that company.",
               },
               {
-                icon: '📨',
+                Icon: Inbox,
                 title: 'We track the replies',
                 body: "Most tools fire and forget. We capture employer replies in one inbox, and only mark a job “applied” after the ATS actually confirms it — so your dashboard is honest.",
               },
             ].map((c) => (
               <div key={c.title} className="rounded-xl border border-slate-200 bg-slate-50 p-6">
-                <div className="mb-3 text-2xl">{c.icon}</div>
+                <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand-soft">
+                  <c.Icon className="h-5 w-5 text-brand-deep" aria-hidden="true" />
+                </div>
                 <h3 className="mb-2 text-base font-semibold text-slate-900">{c.title}</h3>
-                <p className="text-sm text-slate-500">{c.body}</p>
+                <p className="text-sm text-slate-600">{c.body}</p>
               </div>
             ))}
           </div>
@@ -272,7 +284,7 @@ export default async function HomePage() {
                   {step}
                 </div>
                 <h3 className="mb-2 text-lg font-semibold text-slate-900">{title}</h3>
-                <p className="text-sm text-slate-500">{description}</p>
+                <p className="text-sm text-slate-600">{description}</p>
               </div>
             ))}
           </div>
@@ -285,14 +297,14 @@ export default async function HomePage() {
       <section className="px-4 py-20">
         <div className="mx-auto max-w-4xl">
           <h2 className="mb-2 text-center text-3xl font-bold text-slate-900">Why we&apos;re different</h2>
-          <p className="mb-8 text-center text-slate-500">
+          <p className="mb-8 text-center text-slate-600">
             Most auto-apply tools are US / LinkedIn-only and assume you can work anywhere.
             We only apply where you&apos;re actually eligible — and track the replies.
           </p>
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-left text-sm">
               <thead>
-                <tr className="border-b border-slate-200 text-slate-500">
+                <tr className="border-b border-slate-200 text-slate-600">
                   <th className="py-3 pr-4 font-medium"></th>
                   <th className="py-3 px-4 font-bold text-emerald-700">ResumeAI-Bot</th>
                   <th className="py-3 px-4 font-medium">Sonara</th>
@@ -324,7 +336,7 @@ export default async function HomePage() {
               </tbody>
             </table>
           </div>
-          <p className="mt-4 text-center text-sm text-slate-500">
+          <p className="mt-4 text-center text-sm text-slate-600">
             Sonara shut down in 2024 — ResumeAI-Bot is a still-running alternative that covers more
             countries.
           </p>
@@ -337,7 +349,7 @@ export default async function HomePage() {
           <h2 className="mb-4 text-center text-3xl font-bold text-slate-900">
             Simple, transparent pricing
           </h2>
-          <p className="mb-12 text-center text-slate-500">
+          <p className="mb-12 text-center text-slate-600">
             Start for free. Upgrade when you need more power — 30-day money-back guarantee on every
             paid plan.
           </p>
@@ -366,11 +378,11 @@ export default async function HomePage() {
                       {plan.price === 0 ? 'Free' : `$${plan.price}`}
                     </span>
                     {plan.period && (
-                      <span className="mb-1 text-sm text-slate-500">/ {plan.period}</span>
+                      <span className="mb-1 text-sm text-slate-600">/ {plan.period}</span>
                     )}
                   </div>
                   {monthlyEquiv && (
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className="mt-1 text-xs text-slate-600">
                       ≈ ${monthlyEquiv.toFixed(2)}/mo, billed annually
                     </p>
                   )}
@@ -396,7 +408,7 @@ export default async function HomePage() {
               )
             })}
           </div>
-          <p className="mt-6 text-center text-sm text-slate-500">
+          <p className="mt-6 text-center text-sm text-slate-600">
             See monthly pricing on the{' '}
             <Link href="/pricing" className="text-emerald-600 underline underline-offset-2">
               full pricing page
@@ -422,7 +434,7 @@ export default async function HomePage() {
           >
             Start applying free &rarr;
           </Link>
-          <p className="mt-3 text-sm text-slate-500">
+          <p className="mt-3 text-sm text-slate-600">
             30-day money-back guarantee on all paid plans.
           </p>
         </div>
@@ -430,7 +442,7 @@ export default async function HomePage() {
 
       {/* Footer */}
       <footer className="border-t border-slate-100 bg-slate-50 px-4 py-8">
-        <div className="mx-auto flex max-w-5xl flex-col items-center gap-4 text-sm text-slate-500 sm:flex-row sm:justify-between">
+        <div className="mx-auto flex max-w-5xl flex-col items-center gap-4 text-sm text-slate-600 sm:flex-row sm:justify-between">
           <span>&copy; {new Date().getFullYear()} ResumeAI. All rights reserved.</span>
           <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">
             <Link href="/faq" className="hover:text-slate-900">
