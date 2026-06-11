@@ -17,6 +17,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${baseUrl}/refund-policy`, lastModified: now, changeFrequency: 'yearly', priority: 0.3 },
     { url: `${baseUrl}/contact`, lastModified: now, changeFrequency: 'yearly', priority: 0.3 },
     { url: `${baseUrl}/changelog`, lastModified: now, changeFrequency: 'monthly', priority: 0.5 },
+    { url: `${baseUrl}/proof`, lastModified: now, changeFrequency: 'daily', priority: 0.8 },
+    { url: `${baseUrl}/ats-check`, lastModified: now, changeFrequency: 'monthly', priority: 0.8 },
   ]
 
   // ── Marketing landers added with the SEO bundle ──────────────────────────

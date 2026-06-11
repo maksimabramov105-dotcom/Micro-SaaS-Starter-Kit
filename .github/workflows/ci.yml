@@ -83,6 +83,8 @@ jobs:
         run: |
           npm start &
           timeout 90 bash -c 'until curl -sf http://localhost:3000 >/dev/null; do sleep 2; done'
+      - name: SEO health check
+        run: BASE_URL=http://localhost:3000 npx tsx scripts/seo_health.ts
       - name: Run journey + sign-in regression specs
         run: npx playwright test --project=chromium e2e/journey.spec.ts e2e/journey-authed.spec.ts e2e/journey-payment-inbox.spec.ts e2e/auth-signin-retry.spec.ts e2e/example.spec.ts
       - uses: actions/upload-artifact@v4

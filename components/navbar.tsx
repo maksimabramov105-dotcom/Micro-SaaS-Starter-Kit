@@ -35,6 +35,12 @@ export function Navbar() {
                 >
                   Pricing
                 </Link>
+                <Link
+                  href="/proof"
+                  className="rounded-md px-3 py-2 text-sm font-medium hover:bg-accent"
+                >
+                  Proof
+                </Link>
                 {session && (
                   <Link
                     href="/dashboard"
@@ -113,6 +119,13 @@ export function Navbar() {
               onClick={() => setMobileMenuOpen(false)}
             >
               Pricing
+            </Link>
+            <Link
+              href="/proof"
+              className="block rounded-md px-3 py-2 text-base font-medium hover:bg-accent"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Proof
             </Link>
             {session ? (
               <>

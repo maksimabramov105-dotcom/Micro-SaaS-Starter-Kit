@@ -14,141 +14,1351 @@
       "/compare"
     ]
   },
-
   "countries": [
-    {"slug":"germany","name":"Germany","region":"Europe","sectors":["engineering","IT/software","healthcare","skilled trades","automotive"],"boards":["StepStone","Indeed.de","XING","LinkedIn","Adzuna"],"resumeNotes":"German CVs (Lebenslauf) are factual and structured; photo and date of birth still common but optional and declining. 1-2 pages. A short cover letter (Anschreiben) is often expected.","visa":"EU Blue Card for skilled workers above the salary threshold; the Opportunity Card (Chancenkarte) lets qualified people enter to job-hunt.","language":"Many tech/engineering roles are English-first; German strongly helps elsewhere.","englishFriendly":true},
-    {"slug":"netherlands","name":"the Netherlands","region":"Europe","sectors":["IT/software","logistics","finance","agritech","engineering"],"boards":["LinkedIn","Indeed.nl","Nationale Vacaturebank","Adzuna","RemoteOK"],"resumeNotes":"Dutch CVs are concise (max 2 pages), no photo needed, focus on results. Cover letter (motivatiebrief) common.","visa":"Highly Skilled Migrant permit (sponsored employer) and the orientation year (zoekjaar) visa for recent graduates.","language":"English is widely accepted in tech and international companies.","englishFriendly":true},
-    {"slug":"united-kingdom","name":"the United Kingdom","region":"Europe","sectors":["finance","IT/software","healthcare (NHS)","creative","consulting"],"boards":["LinkedIn","Indeed.co.uk","Reed","Totaljobs","CV-Library"],"resumeNotes":"UK CVs are 2 pages, no photo, no date of birth. Strong personal statement at top.","visa":"Skilled Worker visa requires a licensed sponsor; Global Talent and High Potential Individual routes exist.","language":"English only.","englishFriendly":true},
-    {"slug":"ireland","name":"Ireland","region":"Europe","sectors":["IT/software","pharma","finance","medtech"],"boards":["LinkedIn","IrishJobs.ie","Indeed.ie","Jobs.ie"],"resumeNotes":"2-page CV, no photo. Highlight EU work rights status clearly.","visa":"Critical Skills Employment Permit for in-demand roles; General Employment Permit otherwise.","language":"English only.","englishFriendly":true},
-    {"slug":"canada","name":"Canada","region":"North America","sectors":["IT/software","healthcare","skilled trades","finance"],"boards":["LinkedIn","Indeed.ca","Job Bank","Glassdoor"],"resumeNotes":"1-2 page resume, no photo, no personal details. Tailor to each posting; quantify achievements.","visa":"Express Entry points system rewards skills, English/French, and experience; Provincial Nominee Programs add routes.","language":"English (French in Quebec).","englishFriendly":true},
-    {"slug":"united-states","name":"the United States","region":"North America","sectors":["IT/software","finance","healthcare","sales"],"boards":["LinkedIn","Indeed","Glassdoor","ZipRecruiter"],"resumeNotes":"1 page (early career) to 2 pages, no photo, no personal data. Heavy keyword/ATS optimization.","visa":"H-1B (lottery), O-1 for extraordinary ability, L-1 intra-company transfers. Sponsorship is competitive.","language":"English only.","englishFriendly":true},
-    {"slug":"australia","name":"Australia","region":"Oceania","sectors":["mining/resources","healthcare","IT/software","construction"],"boards":["SEEK","LinkedIn","Indeed.com.au","Jora"],"resumeNotes":"Resume can run 2-4 pages; include a skills summary. No photo. Address selection criteria where listed.","visa":"Skilled Independent (subclass 189) and Skilled Nominated (190) points-based; Employer Sponsored (482/186).","language":"English only.","englishFriendly":true},
-    {"slug":"new-zealand","name":"New Zealand","region":"Oceania","sectors":["agritech","IT/software","healthcare","construction"],"boards":["Seek.co.nz","Trade Me Jobs","LinkedIn","Indeed"],"resumeNotes":"2-3 page CV, no photo. Mention visa/work status up front.","visa":"Skilled Migrant Category (points-based); Accredited Employer Work Visa.","language":"English only.","englishFriendly":true},
-    {"slug":"united-arab-emirates","name":"the United Arab Emirates","region":"Middle East","sectors":["finance","construction","hospitality","IT/software","logistics"],"boards":["Bayt","LinkedIn","Naukrigulf","GulfTalent","Indeed"],"resumeNotes":"Photo and nationality are commonly included in the Gulf. Keep it to 2 pages. Hiring is fast and volume-driven.","visa":"Employer-sponsored work visa is standard; the Green Visa and Golden Visa offer longer-term options.","language":"English is the business language.","englishFriendly":true},
-    {"slug":"saudi-arabia","name":"Saudi Arabia","region":"Middle East","sectors":["energy","construction","healthcare","IT/software"],"boards":["Bayt","LinkedIn","Naukrigulf","GulfTalent"],"resumeNotes":"Include photo and personal details (Gulf norm). 2 pages. Highlight relevant regional experience.","visa":"Employer-sponsored work visa (Iqama); Premium Residency for some.","language":"English common in multinationals; Arabic helps.","englishFriendly":true},
-    {"slug":"singapore","name":"Singapore","region":"Asia","sectors":["finance","IT/software","biotech","logistics"],"boards":["LinkedIn","JobStreet","MyCareersFuture","Indeed.sg"],"resumeNotes":"1-2 page resume; including a photo and nationality is common in Asia. Quantify results.","visa":"Employment Pass for professionals above the salary threshold; Tech.Pass for tech leaders.","language":"English is the working language.","englishFriendly":true},
-    {"slug":"switzerland","name":"Switzerland","region":"Europe","sectors":["finance","pharma","IT/software","engineering"],"boards":["jobs.ch","LinkedIn","Indeed.ch","jobup.ch"],"resumeNotes":"CVs often include a photo and date of birth. 2-3 pages. Note language skills (DE/FR/IT/EN).","visa":"Permits are quota-limited for non-EU nationals; EU/EFTA citizens have easier access.","language":"German, French, Italian, plus strong English in multinationals.","englishFriendly":true},
-    {"slug":"sweden","name":"Sweden","region":"Europe","sectors":["IT/software","gaming","cleantech","engineering"],"boards":["LinkedIn","Platsbanken","Indeed.se","TheLocal Jobs"],"resumeNotes":"Concise 1-2 page CV, no photo needed. Personal cover letter valued.","visa":"Work permit requires a job offer; EU Blue Card available.","language":"English is widely spoken and accepted in tech.","englishFriendly":true},
-    {"slug":"norway","name":"Norway","region":"Europe","sectors":["energy","maritime","IT/software","engineering"],"boards":["finn.no","LinkedIn","NAV","Indeed"],"resumeNotes":"2-page CV, no photo necessary. References valued.","visa":"Skilled Worker permit with a job offer; job-seeker visa for skilled professionals.","language":"English common in tech and energy.","englishFriendly":true},
-    {"slug":"denmark","name":"Denmark","region":"Europe","sectors":["IT/software","pharma","cleantech","design"],"boards":["LinkedIn","Jobindex","WorkInDenmark","Indeed"],"resumeNotes":"Concise CV with a personal cover letter. No photo required.","visa":"Pay Limit Scheme and Positive List fast-track in-demand roles.","language":"English widely accepted in international firms.","englishFriendly":true},
-    {"slug":"france","name":"France","region":"Europe","sectors":["luxury/retail","IT/software","aerospace","tourism"],"boards":["LinkedIn","Indeed.fr","APEC","Welcome to the Jungle"],"resumeNotes":"French CV is 1 page, photo optional. Lettre de motivation often expected.","visa":"Talent Passport (Passeport Talent) for skilled workers and tech.","language":"French strongly preferred; English roles exist in tech/startups.","englishFriendly":false},
-    {"slug":"spain","name":"Spain","region":"Europe","sectors":["tourism","IT/software","renewables","customer service"],"boards":["InfoJobs","LinkedIn","Indeed.es","Tecnoempleo"],"resumeNotes":"CV can include a photo (common). 1-2 pages.","visa":"Highly Qualified Professional visa; the Digital Nomad visa for remote workers.","language":"Spanish preferred; English roles in tech and tourism.","englishFriendly":false},
-    {"slug":"portugal","name":"Portugal","region":"Europe","sectors":["IT/software","tourism","customer service","startups"],"boards":["LinkedIn","Net-Empregos","Indeed.pt","Sapo Emprego"],"resumeNotes":"1-2 page CV, photo common. Highlight language skills.","visa":"Tech Visa and the D8 Digital Nomad visa make Portugal popular with remote workers.","language":"Portuguese preferred; English common in tech and tourism.","englishFriendly":false},
-    {"slug":"poland","name":"Poland","region":"Europe","sectors":["IT/software","BPO/shared services","manufacturing","logistics"],"boards":["Pracuj.pl","LinkedIn","NoFluffJobs","Indeed.pl"],"resumeNotes":"1-2 page CV. NoFluffJobs is the go-to for transparent IT salaries.","visa":"Work permit (Type A) with a job offer; EU Blue Card.","language":"Polish for most roles; English strong in IT and BPO.","englishFriendly":true},
-    {"slug":"czech-republic","name":"the Czech Republic","region":"Europe","sectors":["IT/software","manufacturing","BPO","automotive"],"boards":["Jobs.cz","LinkedIn","StartupJobs","Indeed"],"resumeNotes":"Concise CV, photo optional. English CVs accepted in IT.","visa":"Employee Card combines work and residence permit.","language":"Czech for most; English strong in IT/shared services.","englishFriendly":true},
-    {"slug":"italy","name":"Italy","region":"Europe","sectors":["fashion/design","manufacturing","tourism","IT/software"],"boards":["LinkedIn","InfoJobs.it","Indeed.it","Subito Lavoro"],"resumeNotes":"European-format CV, photo common. Note EU work rights.","visa":"EU Blue Card; Decreto Flussi quotas for some roles.","language":"Italian preferred; English roles in multinationals.","englishFriendly":false},
-    {"slug":"belgium","name":"Belgium","region":"Europe","sectors":["EU institutions","logistics","IT/software","pharma"],"boards":["LinkedIn","VDAB","StepStone.be","Indeed.be"],"resumeNotes":"Concise CV; note language abilities (NL/FR/EN).","visa":"Single Permit for work + residence; EU Blue Card.","language":"Dutch and French; English in EU bodies and multinationals.","englishFriendly":true},
-    {"slug":"austria","name":"Austria","region":"Europe","sectors":["engineering","tourism","IT/software","finance"],"boards":["karriere.at","LinkedIn","StepStone.at","Indeed.at"],"resumeNotes":"German-style CV with photo common. 1-2 pages.","visa":"Red-White-Red Card (points-based) for skilled workers.","language":"German preferred; English in tech/tourism.","englishFriendly":false},
-    {"slug":"finland","name":"Finland","region":"Europe","sectors":["IT/software","gaming","cleantech","engineering"],"boards":["LinkedIn","Duunitori","Oikotie","TE-palvelut"],"resumeNotes":"Concise CV, no photo necessary. English CVs fine in tech.","visa":"Specialist residence permit; fast-track for certain roles.","language":"English widely spoken, especially in tech and gaming.","englishFriendly":true},
-    {"slug":"japan","name":"Japan","region":"Asia","sectors":["IT/software","manufacturing","gaming","finance"],"boards":["LinkedIn","Daijob","GaijinPot","Wantedly"],"resumeNotes":"Japanese employers may request a rirekisho (standard form) plus a Western CV. Photo common.","visa":"Engineer/Specialist in Humanities visa; Highly Skilled Professional points system.","language":"Japanese expected for most; English roles in global tech.","englishFriendly":false},
-    {"slug":"south-korea","name":"South Korea","region":"Asia","sectors":["IT/software","electronics","gaming","education"],"boards":["LinkedIn","JobKorea","Saramin","Wanted"],"resumeNotes":"Resume with photo common. English-teaching and tech roles open to foreigners.","visa":"E-7 (specially designated activities) for professionals; E-2 for English teachers.","language":"Korean preferred; English in education and global tech.","englishFriendly":false},
-    {"slug":"hong-kong","name":"Hong Kong","region":"Asia","sectors":["finance","trade","IT/software","logistics"],"boards":["LinkedIn","JobsDB","Indeed.hk","eFinancialCareers"],"resumeNotes":"1-2 page CV, photo optional. Finance roles dominate.","visa":"General Employment Policy; Top Talent Pass Scheme.","language":"English is a working language in business.","englishFriendly":true},
-    {"slug":"india","name":"India","region":"Asia","sectors":["IT/software","BPO","finance","startups"],"boards":["Naukri","LinkedIn","Indeed.co.in","Instahyre"],"resumeNotes":"1-2 page resume; Naukri is dominant. Strong keyword optimization.","visa":"Employment Visa for foreign professionals (salary threshold applies).","language":"English is widely used in business and IT.","englishFriendly":true},
-    {"slug":"china","name":"China","region":"Asia","sectors":["manufacturing","IT/software","education","trade"],"boards":["LinkedIn","Zhaopin","51job","Liepin"],"resumeNotes":"Bilingual (EN/CN) resume helps. Photo common.","visa":"Z visa for work; foreigner work permit classified A/B/C.","language":"Mandarin preferred; English in education and multinationals.","englishFriendly":false},
-    {"slug":"brazil","name":"Brazil","region":"South America","sectors":["agribusiness","IT/software","finance","energy"],"boards":["LinkedIn","Catho","Vagas.com","Indeed.com.br"],"resumeNotes":"1-2 page CV, photo common. Portuguese resume preferred.","visa":"Temporary work visa (VITEM) sponsored by employer.","language":"Portuguese preferred; English in tech/multinationals.","englishFriendly":false},
-    {"slug":"mexico","name":"Mexico","region":"North America","sectors":["manufacturing","IT/software","tourism","automotive"],"boards":["OCC Mundial","LinkedIn","Indeed.com.mx","Computrabajo"],"resumeNotes":"CV with photo common. Spanish resume preferred.","visa":"Temporary Resident visa with work permission.","language":"Spanish preferred; English in tech and nearshoring.","englishFriendly":false},
-    {"slug":"argentina","name":"Argentina","region":"South America","sectors":["IT/software","agribusiness","energy","startups"],"boards":["LinkedIn","Bumeran","Computrabajo","ZonaJobs"],"resumeNotes":"1-2 page CV, photo common. Spanish resume preferred.","visa":"Work visa sponsored by employer; growing remote-work options.","language":"Spanish preferred; English in tech.","englishFriendly":false},
-    {"slug":"south-africa","name":"South Africa","region":"Africa","sectors":["finance","mining","IT/software","tourism"],"boards":["LinkedIn","PNet","Careers24","Indeed.co.za"],"resumeNotes":"2-3 page CV. Note work eligibility clearly.","visa":"Critical Skills Work Visa for in-demand occupations.","language":"English is widely used in business.","englishFriendly":true},
-    {"slug":"israel","name":"Israel","region":"Middle East","sectors":["IT/software","cybersecurity","biotech","defense tech"],"boards":["LinkedIn","AllJobs","Drushim","Indeed"],"resumeNotes":"1-2 page CV. Strong tech sector; English CVs accepted.","visa":"B-1 work visa sponsored by employer.","language":"Hebrew preferred; English strong in tech.","englishFriendly":true},
-    {"slug":"turkey","name":"Turkey","region":"Europe/Asia","sectors":["manufacturing","tourism","IT/software","trade"],"boards":["Kariyer.net","LinkedIn","Indeed.com.tr","Secretcv"],"resumeNotes":"CV with photo common. Turkish resume preferred.","visa":"Work permit applied for by employer.","language":"Turkish preferred; English in multinationals.","englishFriendly":false},
-    {"slug":"qatar","name":"Qatar","region":"Middle East","sectors":["energy","construction","hospitality","finance"],"boards":["Bayt","LinkedIn","Naukrigulf","GulfTalent"],"resumeNotes":"Gulf format with photo and personal details. 2 pages.","visa":"Employer-sponsored work visa standard.","language":"English is the business language.","englishFriendly":true},
-    {"slug":"luxembourg","name":"Luxembourg","region":"Europe","sectors":["finance","EU institutions","IT/software"],"boards":["LinkedIn","Moovijob","Jobs.lu","Indeed"],"resumeNotes":"Multilingual CV valued (EN/FR/DE). Concise.","visa":"EU Blue Card; salaried worker permit.","language":"French, German, English all used in business.","englishFriendly":true},
-    {"slug":"estonia","name":"Estonia","region":"Europe","sectors":["IT/software","fintech","startups","cybersecurity"],"boards":["LinkedIn","CV Keskus","CV.ee","Work in Estonia"],"resumeNotes":"Concise English CV fine in tech. Digital-first hiring.","visa":"Startup Visa and Digital Nomad Visa pioneered here.","language":"English widely accepted in the startup scene.","englishFriendly":true},
-    {"slug":"remote","name":"Remote (Global Companies)","region":"Remote","sectors":["IT/software","customer support","marketing","design","sales"],"boards":["RemoteOK","We Work Remotely","LinkedIn","Adzuna","Wellfound"],"resumeNotes":"Lead with timezone overlap and async-work strengths. Quantify remote impact. ATS-optimized.","visa":"No visa needed when hired as a contractor or through an Employer of Record (EOR).","language":"English is standard for global remote roles.","englishFriendly":true}
+    {
+      "slug": "germany",
+      "name": "Germany",
+      "region": "Europe",
+      "sectors": [
+        "engineering",
+        "IT/software",
+        "healthcare",
+        "skilled trades",
+        "automotive"
+      ],
+      "boards": [
+        "StepStone",
+        "Indeed.de",
+        "XING",
+        "LinkedIn",
+        "Adzuna"
+      ],
+      "resumeNotes": "German CVs (Lebenslauf) are factual and structured; photo and date of birth still common but optional and declining. 1-2 pages. A short cover letter (Anschreiben) is often expected.",
+      "visa": "EU Blue Card for skilled workers above the salary threshold; the Opportunity Card (Chancenkarte) lets qualified people enter to job-hunt.",
+      "language": "Many tech/engineering roles are English-first; German strongly helps elsewhere.",
+      "englishFriendly": true
+    },
+    {
+      "slug": "netherlands",
+      "name": "the Netherlands",
+      "region": "Europe",
+      "sectors": [
+        "IT/software",
+        "logistics",
+        "finance",
+        "agritech",
+        "engineering"
+      ],
+      "boards": [
+        "LinkedIn",
+        "Indeed.nl",
+        "Nationale Vacaturebank",
+        "Adzuna",
+        "RemoteOK"
+      ],
+      "resumeNotes": "Dutch CVs are concise (max 2 pages), no photo needed, focus on results. Cover letter (motivatiebrief) common.",
+      "visa": "Highly Skilled Migrant permit (sponsored employer) and the orientation year (zoekjaar) visa for recent graduates.",
+      "language": "English is widely accepted in tech and international companies.",
+      "englishFriendly": true
+    },
+    {
+      "slug": "united-kingdom",
+      "name": "the United Kingdom",
+      "region": "Europe",
+      "sectors": [
+        "finance",
+        "IT/software",
+        "healthcare (NHS)",
+        "creative",
+        "consulting"
+      ],
+      "boards": [
+        "LinkedIn",
+        "Indeed.co.uk",
+        "Reed",
+        "Totaljobs",
+        "CV-Library"
+      ],
+      "resumeNotes": "UK CVs are 2 pages, no photo, no date of birth. Strong personal statement at top.",
+      "visa": "Skilled Worker visa requires a licensed sponsor; Global Talent and High Potential Individual routes exist.",
+      "language": "English only.",
+      "englishFriendly": true
+    },
+    {
+      "slug": "ireland",
+      "name": "Ireland",
+      "region": "Europe",
+      "sectors": [
+        "IT/software",
+        "pharma",
+        "finance",
+        "medtech"
+      ],
+      "boards": [
+        "LinkedIn",
+        "IrishJobs.ie",
+        "Indeed.ie",
+        "Jobs.ie"
+      ],
+      "resumeNotes": "2-page CV, no photo. Highlight EU work rights status clearly.",
+      "visa": "Critical Skills Employment Permit for in-demand roles; General Employment Permit otherwise.",
+      "language": "English only.",
+      "englishFriendly": true
+    },
+    {
+      "slug": "canada",
+      "name": "Canada",
+      "region": "North America",
+      "sectors": [
+        "IT/software",
+        "healthcare",
+        "skilled trades",
+        "finance"
+      ],
+      "boards": [
+        "LinkedIn",
+        "Indeed.ca",
+        "Job Bank",
+        "Glassdoor"
+      ],
+      "resumeNotes": "1-2 page resume, no photo, no personal details. Tailor to each posting; quantify achievements.",
+      "visa": "Express Entry points system rewards skills, English/French, and experience; Provincial Nominee Programs add routes.",
+      "language": "English (French in Quebec).",
+      "englishFriendly": true
+    },
+    {
+      "slug": "united-states",
+      "name": "the United States",
+      "region": "North America",
+      "sectors": [
+        "IT/software",
+        "finance",
+        "healthcare",
+        "sales"
+      ],
+      "boards": [
+        "LinkedIn",
+        "Indeed",
+        "Glassdoor",
+        "ZipRecruiter"
+      ],
+      "resumeNotes": "1 page (early career) to 2 pages, no photo, no personal data. Heavy keyword/ATS optimization.",
+      "visa": "H-1B (lottery), O-1 for extraordinary ability, L-1 intra-company transfers. Sponsorship is competitive.",
+      "language": "English only.",
+      "englishFriendly": true
+    },
+    {
+      "slug": "australia",
+      "name": "Australia",
+      "region": "Oceania",
+      "sectors": [
+        "mining/resources",
+        "healthcare",
+        "IT/software",
+        "construction"
+      ],
+      "boards": [
+        "SEEK",
+        "LinkedIn",
+        "Indeed.com.au",
+        "Jora"
+      ],
+      "resumeNotes": "Resume can run 2-4 pages; include a skills summary. No photo. Address selection criteria where listed.",
+      "visa": "Skilled Independent (subclass 189) and Skilled Nominated (190) points-based; Employer Sponsored (482/186).",
+      "language": "English only.",
+      "englishFriendly": true
+    },
+    {
+      "slug": "new-zealand",
+      "name": "New Zealand",
+      "region": "Oceania",
+      "sectors": [
+        "agritech",
+        "IT/software",
+        "healthcare",
+        "construction"
+      ],
+      "boards": [
+        "Seek.co.nz",
+        "Trade Me Jobs",
+        "LinkedIn",
+        "Indeed"
+      ],
+      "resumeNotes": "2-3 page CV, no photo. Mention visa/work status up front.",
+      "visa": "Skilled Migrant Category (points-based); Accredited Employer Work Visa.",
+      "language": "English only.",
+      "englishFriendly": true
+    },
+    {
+      "slug": "united-arab-emirates",
+      "name": "the United Arab Emirates",
+      "region": "Middle East",
+      "sectors": [
+        "finance",
+        "construction",
+        "hospitality",
+        "IT/software",
+        "logistics"
+      ],
+      "boards": [
+        "Bayt",
+        "LinkedIn",
+        "Naukrigulf",
+        "GulfTalent",
+        "Indeed"
+      ],
+      "resumeNotes": "Photo and nationality are commonly included in the Gulf. Keep it to 2 pages. Hiring is fast and volume-driven.",
+      "visa": "Employer-sponsored work visa is standard; the Green Visa and Golden Visa offer longer-term options.",
+      "language": "English is the business language.",
+      "englishFriendly": true
+    },
+    {
+      "slug": "saudi-arabia",
+      "name": "Saudi Arabia",
+      "region": "Middle East",
+      "sectors": [
+        "energy",
+        "construction",
+        "healthcare",
+        "IT/software"
+      ],
+      "boards": [
+        "Bayt",
+        "LinkedIn",
+        "Naukrigulf",
+        "GulfTalent"
+      ],
+      "resumeNotes": "Include photo and personal details (Gulf norm). 2 pages. Highlight relevant regional experience.",
+      "visa": "Employer-sponsored work visa (Iqama); Premium Residency for some.",
+      "language": "English common in multinationals; Arabic helps.",
+      "englishFriendly": true
+    },
+    {
+      "slug": "singapore",
+      "name": "Singapore",
+      "region": "Asia",
+      "sectors": [
+        "finance",
+        "IT/software",
+        "biotech",
+        "logistics"
+      ],
+      "boards": [
+        "LinkedIn",
+        "JobStreet",
+        "MyCareersFuture",
+        "Indeed.sg"
+      ],
+      "resumeNotes": "1-2 page resume; including a photo and nationality is common in Asia. Quantify results.",
+      "visa": "Employment Pass for professionals above the salary threshold; Tech.Pass for tech leaders.",
+      "language": "English is the working language.",
+      "englishFriendly": true
+    },
+    {
+      "slug": "switzerland",
+      "name": "Switzerland",
+      "region": "Europe",
+      "sectors": [
+        "finance",
+        "pharma",
+        "IT/software",
+        "engineering"
+      ],
+      "boards": [
+        "jobs.ch",
+        "LinkedIn",
+        "Indeed.ch",
+        "jobup.ch"
+      ],
+      "resumeNotes": "CVs often include a photo and date of birth. 2-3 pages. Note language skills (DE/FR/IT/EN).",
+      "visa": "Permits are quota-limited for non-EU nationals; EU/EFTA citizens have easier access.",
+      "language": "German, French, Italian, plus strong English in multinationals.",
+      "englishFriendly": true
+    },
+    {
+      "slug": "sweden",
+      "name": "Sweden",
+      "region": "Europe",
+      "sectors": [
+        "IT/software",
+        "gaming",
+        "cleantech",
+        "engineering"
+      ],
+      "boards": [
+        "LinkedIn",
+        "Platsbanken",
+        "Indeed.se",
+        "TheLocal Jobs"
+      ],
+      "resumeNotes": "Concise 1-2 page CV, no photo needed. Personal cover letter valued.",
+      "visa": "Work permit requires a job offer; EU Blue Card available.",
+      "language": "English is widely spoken and accepted in tech.",
+      "englishFriendly": true
+    },
+    {
+      "slug": "norway",
+      "name": "Norway",
+      "region": "Europe",
+      "sectors": [
+        "energy",
+        "maritime",
+        "IT/software",
+        "engineering"
+      ],
+      "boards": [
+        "finn.no",
+        "LinkedIn",
+        "NAV",
+        "Indeed"
+      ],
+      "resumeNotes": "2-page CV, no photo necessary. References valued.",
+      "visa": "Skilled Worker permit with a job offer; job-seeker visa for skilled professionals.",
+      "language": "English common in tech and energy.",
+      "englishFriendly": true
+    },
+    {
+      "slug": "denmark",
+      "name": "Denmark",
+      "region": "Europe",
+      "sectors": [
+        "IT/software",
+        "pharma",
+        "cleantech",
+        "design"
+      ],
+      "boards": [
+        "LinkedIn",
+        "Jobindex",
+        "WorkInDenmark",
+        "Indeed"
+      ],
+      "resumeNotes": "Concise CV with a personal cover letter. No photo required.",
+      "visa": "Pay Limit Scheme and Positive List fast-track in-demand roles.",
+      "language": "English widely accepted in international firms.",
+      "englishFriendly": true
+    },
+    {
+      "slug": "france",
+      "name": "France",
+      "region": "Europe",
+      "sectors": [
+        "luxury/retail",
+        "IT/software",
+        "aerospace",
+        "tourism"
+      ],
+      "boards": [
+        "LinkedIn",
+        "Indeed.fr",
+        "APEC",
+        "Welcome to the Jungle"
+      ],
+      "resumeNotes": "French CV is 1 page, photo optional. Lettre de motivation often expected.",
+      "visa": "Talent Passport (Passeport Talent) for skilled workers and tech.",
+      "language": "French strongly preferred; English roles exist in tech/startups.",
+      "englishFriendly": false
+    },
+    {
+      "slug": "spain",
+      "name": "Spain",
+      "region": "Europe",
+      "sectors": [
+        "tourism",
+        "IT/software",
+        "renewables",
+        "customer service"
+      ],
+      "boards": [
+        "InfoJobs",
+        "LinkedIn",
+        "Indeed.es",
+        "Tecnoempleo"
+      ],
+      "resumeNotes": "CV can include a photo (common). 1-2 pages.",
+      "visa": "Highly Qualified Professional visa; the Digital Nomad visa for remote workers.",
+      "language": "Spanish preferred; English roles in tech and tourism.",
+      "englishFriendly": false
+    },
+    {
+      "slug": "portugal",
+      "name": "Portugal",
+      "region": "Europe",
+      "sectors": [
+        "IT/software",
+        "tourism",
+        "customer service",
+        "startups"
+      ],
+      "boards": [
+        "LinkedIn",
+        "Net-Empregos",
+        "Indeed.pt",
+        "Sapo Emprego"
+      ],
+      "resumeNotes": "1-2 page CV, photo common. Highlight language skills.",
+      "visa": "Tech Visa and the D8 Digital Nomad visa make Portugal popular with remote workers.",
+      "language": "Portuguese preferred; English common in tech and tourism.",
+      "englishFriendly": false
+    },
+    {
+      "slug": "poland",
+      "name": "Poland",
+      "region": "Europe",
+      "sectors": [
+        "IT/software",
+        "BPO/shared services",
+        "manufacturing",
+        "logistics"
+      ],
+      "boards": [
+        "Pracuj.pl",
+        "LinkedIn",
+        "NoFluffJobs",
+        "Indeed.pl"
+      ],
+      "resumeNotes": "1-2 page CV. NoFluffJobs is the go-to for transparent IT salaries.",
+      "visa": "Work permit (Type A) with a job offer; EU Blue Card.",
+      "language": "Polish for most roles; English strong in IT and BPO.",
+      "englishFriendly": true
+    },
+    {
+      "slug": "czech-republic",
+      "name": "the Czech Republic",
+      "region": "Europe",
+      "sectors": [
+        "IT/software",
+        "manufacturing",
+        "BPO",
+        "automotive"
+      ],
+      "boards": [
+        "Jobs.cz",
+        "LinkedIn",
+        "StartupJobs",
+        "Indeed"
+      ],
+      "resumeNotes": "Concise CV, photo optional. English CVs accepted in IT.",
+      "visa": "Employee Card combines work and residence permit.",
+      "language": "Czech for most; English strong in IT/shared services.",
+      "englishFriendly": true
+    },
+    {
+      "slug": "italy",
+      "name": "Italy",
+      "region": "Europe",
+      "sectors": [
+        "fashion/design",
+        "manufacturing",
+        "tourism",
+        "IT/software"
+      ],
+      "boards": [
+        "LinkedIn",
+        "InfoJobs.it",
+        "Indeed.it",
+        "Subito Lavoro"
+      ],
+      "resumeNotes": "European-format CV, photo common. Note EU work rights.",
+      "visa": "EU Blue Card; Decreto Flussi quotas for some roles.",
+      "language": "Italian preferred; English roles in multinationals.",
+      "englishFriendly": false
+    },
+    {
+      "slug": "belgium",
+      "name": "Belgium",
+      "region": "Europe",
+      "sectors": [
+        "EU institutions",
+        "logistics",
+        "IT/software",
+        "pharma"
+      ],
+      "boards": [
+        "LinkedIn",
+        "VDAB",
+        "StepStone.be",
+        "Indeed.be"
+      ],
+      "resumeNotes": "Concise CV; note language abilities (NL/FR/EN).",
+      "visa": "Single Permit for work + residence; EU Blue Card.",
+      "language": "Dutch and French; English in EU bodies and multinationals.",
+      "englishFriendly": true
+    },
+    {
+      "slug": "austria",
+      "name": "Austria",
+      "region": "Europe",
+      "sectors": [
+        "engineering",
+        "tourism",
+        "IT/software",
+        "finance"
+      ],
+      "boards": [
+        "karriere.at",
+        "LinkedIn",
+        "StepStone.at",
+        "Indeed.at"
+      ],
+      "resumeNotes": "German-style CV with photo common. 1-2 pages.",
+      "visa": "Red-White-Red Card (points-based) for skilled workers.",
+      "language": "German preferred; English in tech/tourism.",
+      "englishFriendly": false
+    },
+    {
+      "slug": "finland",
+      "name": "Finland",
+      "region": "Europe",
+      "sectors": [
+        "IT/software",
+        "gaming",
+        "cleantech",
+        "engineering"
+      ],
+      "boards": [
+        "LinkedIn",
+        "Duunitori",
+        "Oikotie",
+        "TE-palvelut"
+      ],
+      "resumeNotes": "Concise CV, no photo necessary. English CVs fine in tech.",
+      "visa": "Specialist residence permit; fast-track for certain roles.",
+      "language": "English widely spoken, especially in tech and gaming.",
+      "englishFriendly": true
+    },
+    {
+      "slug": "japan",
+      "name": "Japan",
+      "region": "Asia",
+      "sectors": [
+        "IT/software",
+        "manufacturing",
+        "gaming",
+        "finance"
+      ],
+      "boards": [
+        "LinkedIn",
+        "Daijob",
+        "GaijinPot",
+        "Wantedly"
+      ],
+      "resumeNotes": "Japanese employers may request a rirekisho (standard form) plus a Western CV. Photo common.",
+      "visa": "Engineer/Specialist in Humanities visa; Highly Skilled Professional points system.",
+      "language": "Japanese expected for most; English roles in global tech.",
+      "englishFriendly": false
+    },
+    {
+      "slug": "south-korea",
+      "name": "South Korea",
+      "region": "Asia",
+      "sectors": [
+        "IT/software",
+        "electronics",
+        "gaming",
+        "education"
+      ],
+      "boards": [
+        "LinkedIn",
+        "JobKorea",
+        "Saramin",
+        "Wanted"
+      ],
+      "resumeNotes": "Resume with photo common. English-teaching and tech roles open to foreigners.",
+      "visa": "E-7 (specially designated activities) for professionals; E-2 for English teachers.",
+      "language": "Korean preferred; English in education and global tech.",
+      "englishFriendly": false
+    },
+    {
+      "slug": "hong-kong",
+      "name": "Hong Kong",
+      "region": "Asia",
+      "sectors": [
+        "finance",
+        "trade",
+        "IT/software",
+        "logistics"
+      ],
+      "boards": [
+        "LinkedIn",
+        "JobsDB",
+        "Indeed.hk",
+        "eFinancialCareers"
+      ],
+      "resumeNotes": "1-2 page CV, photo optional. Finance roles dominate.",
+      "visa": "General Employment Policy; Top Talent Pass Scheme.",
+      "language": "English is a working language in business.",
+      "englishFriendly": true
+    },
+    {
+      "slug": "india",
+      "name": "India",
+      "region": "Asia",
+      "sectors": [
+        "IT/software",
+        "BPO",
+        "finance",
+        "startups"
+      ],
+      "boards": [
+        "Naukri",
+        "LinkedIn",
+        "Indeed.co.in",
+        "Instahyre"
+      ],
+      "resumeNotes": "1-2 page resume; Naukri is dominant. Strong keyword optimization.",
+      "visa": "Employment Visa for foreign professionals (salary threshold applies).",
+      "language": "English is widely used in business and IT.",
+      "englishFriendly": true
+    },
+    {
+      "slug": "china",
+      "name": "China",
+      "region": "Asia",
+      "sectors": [
+        "manufacturing",
+        "IT/software",
+        "education",
+        "trade"
+      ],
+      "boards": [
+        "LinkedIn",
+        "Zhaopin",
+        "51job",
+        "Liepin"
+      ],
+      "resumeNotes": "Bilingual (EN/CN) resume helps. Photo common.",
+      "visa": "Z visa for work; foreigner work permit classified A/B/C.",
+      "language": "Mandarin preferred; English in education and multinationals.",
+      "englishFriendly": false
+    },
+    {
+      "slug": "brazil",
+      "name": "Brazil",
+      "region": "South America",
+      "sectors": [
+        "agribusiness",
+        "IT/software",
+        "finance",
+        "energy"
+      ],
+      "boards": [
+        "LinkedIn",
+        "Catho",
+        "Vagas.com",
+        "Indeed.com.br"
+      ],
+      "resumeNotes": "1-2 page CV, photo common. Portuguese resume preferred.",
+      "visa": "Temporary work visa (VITEM) sponsored by employer.",
+      "language": "Portuguese preferred; English in tech/multinationals.",
+      "englishFriendly": false
+    },
+    {
+      "slug": "mexico",
+      "name": "Mexico",
+      "region": "North America",
+      "sectors": [
+        "manufacturing",
+        "IT/software",
+        "tourism",
+        "automotive"
+      ],
+      "boards": [
+        "OCC Mundial",
+        "LinkedIn",
+        "Indeed.com.mx",
+        "Computrabajo"
+      ],
+      "resumeNotes": "CV with photo common. Spanish resume preferred.",
+      "visa": "Temporary Resident visa with work permission.",
+      "language": "Spanish preferred; English in tech and nearshoring.",
+      "englishFriendly": false
+    },
+    {
+      "slug": "argentina",
+      "name": "Argentina",
+      "region": "South America",
+      "sectors": [
+        "IT/software",
+        "agribusiness",
+        "energy",
+        "startups"
+      ],
+      "boards": [
+        "LinkedIn",
+        "Bumeran",
+        "Computrabajo",
+        "ZonaJobs"
+      ],
+      "resumeNotes": "1-2 page CV, photo common. Spanish resume preferred.",
+      "visa": "Work visa sponsored by employer; growing remote-work options.",
+      "language": "Spanish preferred; English in tech.",
+      "englishFriendly": false
+    },
+    {
+      "slug": "south-africa",
+      "name": "South Africa",
+      "region": "Africa",
+      "sectors": [
+        "finance",
+        "mining",
+        "IT/software",
+        "tourism"
+      ],
+      "boards": [
+        "LinkedIn",
+        "PNet",
+        "Careers24",
+        "Indeed.co.za"
+      ],
+      "resumeNotes": "2-3 page CV. Note work eligibility clearly.",
+      "visa": "Critical Skills Work Visa for in-demand occupations.",
+      "language": "English is widely used in business.",
+      "englishFriendly": true
+    },
+    {
+      "slug": "israel",
+      "name": "Israel",
+      "region": "Middle East",
+      "sectors": [
+        "IT/software",
+        "cybersecurity",
+        "biotech",
+        "defense tech"
+      ],
+      "boards": [
+        "LinkedIn",
+        "AllJobs",
+        "Drushim",
+        "Indeed"
+      ],
+      "resumeNotes": "1-2 page CV. Strong tech sector; English CVs accepted.",
+      "visa": "B-1 work visa sponsored by employer.",
+      "language": "Hebrew preferred; English strong in tech.",
+      "englishFriendly": true
+    },
+    {
+      "slug": "turkey",
+      "name": "Turkey",
+      "region": "Europe/Asia",
+      "sectors": [
+        "manufacturing",
+        "tourism",
+        "IT/software",
+        "trade"
+      ],
+      "boards": [
+        "Kariyer.net",
+        "LinkedIn",
+        "Indeed.com.tr",
+        "Secretcv"
+      ],
+      "resumeNotes": "CV with photo common. Turkish resume preferred.",
+      "visa": "Work permit applied for by employer.",
+      "language": "Turkish preferred; English in multinationals.",
+      "englishFriendly": false
+    },
+    {
+      "slug": "qatar",
+      "name": "Qatar",
+      "region": "Middle East",
+      "sectors": [
+        "energy",
+        "construction",
+        "hospitality",
+        "finance"
+      ],
+      "boards": [
+        "Bayt",
+        "LinkedIn",
+        "Naukrigulf",
+        "GulfTalent"
+      ],
+      "resumeNotes": "Gulf format with photo and personal details. 2 pages.",
+      "visa": "Employer-sponsored work visa standard.",
+      "language": "English is the business language.",
+      "englishFriendly": true
+    },
+    {
+      "slug": "luxembourg",
+      "name": "Luxembourg",
+      "region": "Europe",
+      "sectors": [
+        "finance",
+        "EU institutions",
+        "IT/software"
+      ],
+      "boards": [
+        "LinkedIn",
+        "Moovijob",
+        "Jobs.lu",
+        "Indeed"
+      ],
+      "resumeNotes": "Multilingual CV valued (EN/FR/DE). Concise.",
+      "visa": "EU Blue Card; salaried worker permit.",
+      "language": "French, German, English all used in business.",
+      "englishFriendly": true
+    },
+    {
+      "slug": "estonia",
+      "name": "Estonia",
+      "region": "Europe",
+      "sectors": [
+        "IT/software",
+        "fintech",
+        "startups",
+        "cybersecurity"
+      ],
+      "boards": [
+        "LinkedIn",
+        "CV Keskus",
+        "CV.ee",
+        "Work in Estonia"
+      ],
+      "resumeNotes": "Concise English CV fine in tech. Digital-first hiring.",
+      "visa": "Startup Visa and Digital Nomad Visa pioneered here.",
+      "language": "English widely accepted in the startup scene.",
+      "englishFriendly": true
+    },
+    {
+      "slug": "remote",
+      "name": "Remote (Global Companies)",
+      "region": "Remote",
+      "sectors": [
+        "IT/software",
+        "customer support",
+        "marketing",
+        "design",
+        "sales"
+      ],
+      "boards": [
+        "RemoteOK",
+        "We Work Remotely",
+        "LinkedIn",
+        "Adzuna",
+        "Wellfound"
+      ],
+      "resumeNotes": "Lead with timezone overlap and async-work strengths. Quantify remote impact. ATS-optimized.",
+      "visa": "No visa needed when hired as a contractor or through an Employer of Record (EOR).",
+      "language": "English is standard for global remote roles.",
+      "englishFriendly": true
+    }
   ],
-
   "jobBoards": [
-    {"slug":"linkedin","name":"LinkedIn","note":"The largest global professional network. Auto-apply via Easy Apply listings; great for international and remote roles.","tier":"Pro"},
-    {"slug":"indeed","name":"Indeed","note":"The world's biggest job aggregator across nearly every country.","tier":"Pro"},
-    {"slug":"adzuna","name":"Adzuna","note":"Aggregates millions of listings across 20+ countries. Included in the free plan.","tier":"Free"},
-    {"slug":"remoteok","name":"RemoteOK","note":"A top board for remote-first roles at global companies. Included in the free plan.","tier":"Free"},
-    {"slug":"glassdoor","name":"Glassdoor","note":"Listings plus company reviews and salary data.","tier":"Pro"},
-    {"slug":"stepstone","name":"StepStone","note":"A leading board across Germany and parts of Europe.","tier":"Pro"},
-    {"slug":"seek","name":"SEEK","note":"The dominant board in Australia and New Zealand.","tier":"Pro"},
-    {"slug":"we-work-remotely","name":"We Work Remotely","note":"One of the largest remote-work communities.","tier":"Pro"},
-    {"slug":"wellfound","name":"Wellfound","note":"Startup jobs (formerly AngelList Talent).","tier":"Pro"},
-    {"slug":"bayt","name":"Bayt","note":"The leading job site across the Middle East and Gulf.","tier":"Pro"},
-    {"slug":"naukri","name":"Naukri","note":"India's dominant job portal.","tier":"Pro"},
-    {"slug":"jobstreet","name":"JobStreet","note":"A major board across Southeast Asia.","tier":"Pro"}
+    {
+      "slug": "linkedin",
+      "name": "LinkedIn",
+      "note": "The largest global professional network. Auto-apply via Easy Apply listings; great for international and remote roles.",
+      "tier": "Pro"
+    },
+    {
+      "slug": "indeed",
+      "name": "Indeed",
+      "note": "The world's biggest job aggregator across nearly every country.",
+      "tier": "Pro"
+    },
+    {
+      "slug": "adzuna",
+      "name": "Adzuna",
+      "note": "Aggregates millions of listings across 20+ countries. Included in the free plan.",
+      "tier": "Free"
+    },
+    {
+      "slug": "remoteok",
+      "name": "RemoteOK",
+      "note": "A top board for remote-first roles at global companies. Included in the free plan.",
+      "tier": "Free"
+    },
+    {
+      "slug": "glassdoor",
+      "name": "Glassdoor",
+      "note": "Listings plus company reviews and salary data.",
+      "tier": "Pro"
+    },
+    {
+      "slug": "stepstone",
+      "name": "StepStone",
+      "note": "A leading board across Germany and parts of Europe.",
+      "tier": "Pro"
+    },
+    {
+      "slug": "seek",
+      "name": "SEEK",
+      "note": "The dominant board in Australia and New Zealand.",
+      "tier": "Pro"
+    },
+    {
+      "slug": "we-work-remotely",
+      "name": "We Work Remotely",
+      "note": "One of the largest remote-work communities.",
+      "tier": "Pro"
+    },
+    {
+      "slug": "wellfound",
+      "name": "Wellfound",
+      "note": "Startup jobs (formerly AngelList Talent).",
+      "tier": "Pro"
+    },
+    {
+      "slug": "bayt",
+      "name": "Bayt",
+      "note": "The leading job site across the Middle East and Gulf.",
+      "tier": "Pro"
+    },
+    {
+      "slug": "naukri",
+      "name": "Naukri",
+      "note": "India's dominant job portal.",
+      "tier": "Pro"
+    },
+    {
+      "slug": "jobstreet",
+      "name": "JobStreet",
+      "note": "A major board across Southeast Asia.",
+      "tier": "Pro"
+    }
   ],
-
   "professions": [
-    {"slug":"software-engineer","name":"Software Engineer","keywords":["programming languages","system design","CI/CD","cloud"],"note":"Lead with stack, scale, and shipped impact. ATS keyword matching matters most here."},
-    {"slug":"data-analyst","name":"Data Analyst","keywords":["SQL","Python","dashboards","A/B testing"],"note":"Quantify the decisions your analysis drove, not just the tools."},
-    {"slug":"data-scientist","name":"Data Scientist","keywords":["ML","Python","statistics","experimentation"],"note":"Show models in production and business outcomes."},
-    {"slug":"product-manager","name":"Product Manager","keywords":["roadmap","metrics","user research","prioritization"],"note":"Frame achievements as outcomes (growth, retention), not features shipped."},
-    {"slug":"nurse","name":"Nurse","keywords":["licensure","specialties","patient care","EMR"],"note":"List licenses/registrations clearly; many countries require credential recognition."},
-    {"slug":"doctor","name":"Doctor / Physician","keywords":["specialty","board certification","licensure"],"note":"Highlight registration status and language certification for the target country."},
-    {"slug":"accountant","name":"Accountant","keywords":["IFRS/GAAP","reconciliation","ERP","audit"],"note":"Note certifications (ACCA, CPA) and systems experience."},
-    {"slug":"marketing-manager","name":"Marketing Manager","keywords":["growth","SEO/SEM","analytics","campaigns"],"note":"Lead with measurable results (CAC, ROAS, pipeline)."},
-    {"slug":"sales-representative","name":"Sales Representative","keywords":["quota","CRM","pipeline","closing"],"note":"Numbers win: quota attainment, deal size, growth."},
-    {"slug":"ux-designer","name":"UX Designer","keywords":["Figma","user research","prototyping","design systems"],"note":"Link a portfolio; show before/after impact."},
-    {"slug":"project-manager","name":"Project Manager","keywords":["Agile","stakeholders","budgets","delivery"],"note":"Show on-time, on-budget delivery and certifications (PMP)."},
-    {"slug":"devops-engineer","name":"DevOps Engineer","keywords":["Kubernetes","Terraform","AWS/GCP","observability"],"note":"Quantify reliability and deployment-speed gains."},
-    {"slug":"mechanical-engineer","name":"Mechanical Engineer","keywords":["CAD","manufacturing","tolerances","FEA"],"note":"List standards and certifications relevant to the target country."},
-    {"slug":"civil-engineer","name":"Civil Engineer","keywords":["structural","AutoCAD","site management","codes"],"note":"Highlight licensure and major projects."},
-    {"slug":"teacher","name":"Teacher","keywords":["curriculum","classroom management","certification"],"note":"Note teaching license and language proficiency; ESL is a common entry route abroad."},
-    {"slug":"graphic-designer","name":"Graphic Designer","keywords":["Adobe Suite","branding","layout","portfolio"],"note":"Always link a portfolio."},
-    {"slug":"customer-support","name":"Customer Support Specialist","keywords":["CSAT","ticketing","multilingual","SaaS"],"note":"Language skills and CSAT/response metrics stand out, especially for remote roles."},
-    {"slug":"financial-analyst","name":"Financial Analyst","keywords":["modeling","Excel","valuation","forecasting"],"note":"Show models built and decisions influenced."},
-    {"slug":"hr-manager","name":"HR Manager","keywords":["recruiting","employee relations","HRIS","compliance"],"note":"Show scale (headcount, hires) and program outcomes."},
-    {"slug":"business-analyst","name":"Business Analyst","keywords":["requirements","SQL","process mapping","stakeholders"],"note":"Bridge tech and business; quantify process improvements."}
+    {
+      "slug": "software-engineer",
+      "name": "Software Engineer",
+      "keywords": [
+        "programming languages",
+        "system design",
+        "CI/CD",
+        "cloud"
+      ],
+      "note": "Lead with stack, scale, and shipped impact. ATS keyword matching matters most here."
+    },
+    {
+      "slug": "data-analyst",
+      "name": "Data Analyst",
+      "keywords": [
+        "SQL",
+        "Python",
+        "dashboards",
+        "A/B testing"
+      ],
+      "note": "Quantify the decisions your analysis drove, not just the tools."
+    },
+    {
+      "slug": "data-scientist",
+      "name": "Data Scientist",
+      "keywords": [
+        "ML",
+        "Python",
+        "statistics",
+        "experimentation"
+      ],
+      "note": "Show models in production and business outcomes."
+    },
+    {
+      "slug": "product-manager",
+      "name": "Product Manager",
+      "keywords": [
+        "roadmap",
+        "metrics",
+        "user research",
+        "prioritization"
+      ],
+      "note": "Frame achievements as outcomes (growth, retention), not features shipped."
+    },
+    {
+      "slug": "nurse",
+      "name": "Nurse",
+      "keywords": [
+        "licensure",
+        "specialties",
+        "patient care",
+        "EMR"
+      ],
+      "note": "List licenses/registrations clearly; many countries require credential recognition."
+    },
+    {
+      "slug": "doctor",
+      "name": "Doctor / Physician",
+      "keywords": [
+        "specialty",
+        "board certification",
+        "licensure"
+      ],
+      "note": "Highlight registration status and language certification for the target country."
+    },
+    {
+      "slug": "accountant",
+      "name": "Accountant",
+      "keywords": [
+        "IFRS/GAAP",
+        "reconciliation",
+        "ERP",
+        "audit"
+      ],
+      "note": "Note certifications (ACCA, CPA) and systems experience."
+    },
+    {
+      "slug": "marketing-manager",
+      "name": "Marketing Manager",
+      "keywords": [
+        "growth",
+        "SEO/SEM",
+        "analytics",
+        "campaigns"
+      ],
+      "note": "Lead with measurable results (CAC, ROAS, pipeline)."
+    },
+    {
+      "slug": "sales-representative",
+      "name": "Sales Representative",
+      "keywords": [
+        "quota",
+        "CRM",
+        "pipeline",
+        "closing"
+      ],
+      "note": "Numbers win: quota attainment, deal size, growth."
+    },
+    {
+      "slug": "ux-designer",
+      "name": "UX Designer",
+      "keywords": [
+        "Figma",
+        "user research",
+        "prototyping",
+        "design systems"
+      ],
+      "note": "Link a portfolio; show before/after impact."
+    },
+    {
+      "slug": "project-manager",
+      "name": "Project Manager",
+      "keywords": [
+        "Agile",
+        "stakeholders",
+        "budgets",
+        "delivery"
+      ],
+      "note": "Show on-time, on-budget delivery and certifications (PMP)."
+    },
+    {
+      "slug": "devops-engineer",
+      "name": "DevOps Engineer",
+      "keywords": [
+        "Kubernetes",
+        "Terraform",
+        "AWS/GCP",
+        "observability"
+      ],
+      "note": "Quantify reliability and deployment-speed gains."
+    },
+    {
+      "slug": "mechanical-engineer",
+      "name": "Mechanical Engineer",
+      "keywords": [
+        "CAD",
+        "manufacturing",
+        "tolerances",
+        "FEA"
+      ],
+      "note": "List standards and certifications relevant to the target country."
+    },
+    {
+      "slug": "civil-engineer",
+      "name": "Civil Engineer",
+      "keywords": [
+        "structural",
+        "AutoCAD",
+        "site management",
+        "codes"
+      ],
+      "note": "Highlight licensure and major projects."
+    },
+    {
+      "slug": "teacher",
+      "name": "Teacher",
+      "keywords": [
+        "curriculum",
+        "classroom management",
+        "certification"
+      ],
+      "note": "Note teaching license and language proficiency; ESL is a common entry route abroad."
+    },
+    {
+      "slug": "graphic-designer",
+      "name": "Graphic Designer",
+      "keywords": [
+        "Adobe Suite",
+        "branding",
+        "layout",
+        "portfolio"
+      ],
+      "note": "Always link a portfolio."
+    },
+    {
+      "slug": "customer-support",
+      "name": "Customer Support Specialist",
+      "keywords": [
+        "CSAT",
+        "ticketing",
+        "multilingual",
+        "SaaS"
+      ],
+      "note": "Language skills and CSAT/response metrics stand out, especially for remote roles."
+    },
+    {
+      "slug": "financial-analyst",
+      "name": "Financial Analyst",
+      "keywords": [
+        "modeling",
+        "Excel",
+        "valuation",
+        "forecasting"
+      ],
+      "note": "Show models built and decisions influenced."
+    },
+    {
+      "slug": "hr-manager",
+      "name": "HR Manager",
+      "keywords": [
+        "recruiting",
+        "employee relations",
+        "HRIS",
+        "compliance"
+      ],
+      "note": "Show scale (headcount, hires) and program outcomes."
+    },
+    {
+      "slug": "business-analyst",
+      "name": "Business Analyst",
+      "keywords": [
+        "requirements",
+        "SQL",
+        "process mapping",
+        "stakeholders"
+      ],
+      "note": "Bridge tech and business; quantify process improvements."
+    }
   ],
-
   "competitors": [
     {
-      "slug":"sonara",
-      "name":"Sonara",
-      "status":"shut down",
-      "summary":"Sonara.ai was a funded auto-apply startup that scanned listings and submitted AI-tailored applications. It has shut down, leaving its users without a tool.",
-      "whySwitch":["It has shut down — users need a replacement now","It was US/LinkedIn-centric, not built for international applicants","Users criticized it as an opaque 'black box' with inconsistent results"],
-      "ourEdge":["Still running and actively maintained","Covers 50+ countries, not just US LinkedIn","Real free tier (3 apps/day) and a 30-day money-back guarantee","AI resume tailored per role"],
-      "theirPrice":"~$23.95 / 4 weeks (defunct)"
+      "slug": "sonara",
+      "name": "Sonara",
+      "status": "shut down",
+      "summary": "Sonara.ai was a funded auto-apply startup that scanned listings and submitted AI-tailored applications. It has shut down, leaving its users without a tool.",
+      "whySwitch": [
+        "It has shut down — users need a replacement now",
+        "It was US/LinkedIn-centric, not built for international applicants",
+        "Users criticized it as an opaque 'black box' with inconsistent results"
+      ],
+      "ourEdge": [
+        "Still running and actively maintained",
+        "Covers 50+ countries, not just US LinkedIn",
+        "Real free tier (3 apps/day) and a 30-day money-back guarantee",
+        "AI resume tailored per role"
+      ],
+      "theirPrice": "~$23.95 / 4 weeks (defunct)",
+      "features": {
+        "autoApply": "yes (defunct)",
+        "eligibility": "no",
+        "verifiedSubmissions": "no",
+        "replyInbox": "no",
+        "price": "~$23.95/4wks (defunct)"
+      },
+      "sources": [
+        {
+          "label": "Sonara shutdown discussion",
+          "url": "https://www.reddit.com/r/jobsearchhacks/"
+        }
+      ]
     },
     {
-      "slug":"lazyapply",
-      "name":"LazyApply",
-      "status":"active",
-      "summary":"LazyApply is a Chrome extension that auto-applies at high volume across LinkedIn, Indeed, and ZipRecruiter.",
-      "whySwitch":["Heavily US/English-board focused","High volume can mean low-relevance, spammy applications","No real free tier; lifetime pricing is a bigger upfront commitment"],
-      "ourEdge":["50+ countries including the whole EU, Gulf, and Asia","AI tailors the resume per role to lift relevance","Free tier to try before paying","30-day money-back guarantee"],
-      "theirPrice":"~$99-249 one-time"
+      "slug": "lazyapply",
+      "name": "LazyApply",
+      "status": "active",
+      "summary": "LazyApply is a Chrome extension that auto-applies at high volume across LinkedIn, Indeed, and ZipRecruiter.",
+      "whySwitch": [
+        "Heavily US/English-board focused",
+        "High volume can mean low-relevance, spammy applications",
+        "No real free tier; lifetime pricing is a bigger upfront commitment"
+      ],
+      "ourEdge": [
+        "50+ countries including the whole EU, Gulf, and Asia",
+        "AI tailors the resume per role to lift relevance",
+        "Free tier to try before paying",
+        "30-day money-back guarantee"
+      ],
+      "theirPrice": "~$99-249 one-time",
+      "features": {
+        "autoApply": "yes (high volume)",
+        "eligibility": "no",
+        "verifiedSubmissions": "no",
+        "replyInbox": "no",
+        "price": "$99-$249 one-time"
+      },
+      "sources": [
+        {
+          "label": "LazyApply pricing",
+          "url": "https://lazyapply.com/"
+        },
+        {
+          "label": "LazyApply reviews (Trustpilot)",
+          "url": "https://www.trustpilot.com/review/lazyapply.com"
+        }
+      ]
     },
     {
-      "slug":"loopcv",
-      "name":"LoopCV",
-      "status":"active",
-      "summary":"LoopCV scans job boards, filters by your criteria, and auto-applies or queues roles, with email outreach and tracking.",
-      "whySwitch":["Capable but the setup and filtering can be complex","Resume tailoring is limited compared with a per-role AI rewrite"],
-      "ourEdge":["Per-role AI resume generation built in","Simple country-first setup","Comparable price ($19.99/mo) with a money-back guarantee"],
-      "theirPrice":"Free tier; ~$19-99/mo"
+      "slug": "loopcv",
+      "name": "LoopCV",
+      "status": "active",
+      "summary": "LoopCV scans job boards, filters by your criteria, and auto-applies or queues roles, with email outreach and tracking.",
+      "whySwitch": [
+        "Capable but the setup and filtering can be complex",
+        "Resume tailoring is limited compared with a per-role AI rewrite"
+      ],
+      "ourEdge": [
+        "Per-role AI resume generation built in",
+        "Simple country-first setup",
+        "Comparable price ($19.99/mo) with a money-back guarantee"
+      ],
+      "theirPrice": "Free tier; ~$19-99/mo"
     },
     {
-      "slug":"jobright",
-      "name":"Jobright",
-      "status":"active",
-      "summary":"Jobright is an AI job-search copilot with matching, resume tailoring, and 'insider connection' suggestions, focused on the US market.",
-      "whySwitch":["US-focused; weaker for international and relocation job seekers","Full auto-apply agent has been limited/beta","Pricing has risen to ~$29.99-39.99/mo"],
-      "ourEdge":["Built for international and relocation searches across 50+ countries","Full auto-apply included","Lower entry price with a 30-day guarantee"],
-      "theirPrice":"~$29.99-39.99/mo"
+      "slug": "jobright",
+      "name": "Jobright",
+      "status": "active",
+      "summary": "Jobright is an AI job-search copilot with matching, resume tailoring, and 'insider connection' suggestions, focused on the US market.",
+      "whySwitch": [
+        "US-focused; weaker for international and relocation job seekers",
+        "Full auto-apply agent has been limited/beta",
+        "Pricing has risen to ~$29.99-39.99/mo"
+      ],
+      "ourEdge": [
+        "Built for international and relocation searches across 50+ countries",
+        "Full auto-apply included",
+        "Lower entry price with a 30-day guarantee"
+      ],
+      "theirPrice": "~$29.99-39.99/mo"
     },
     {
-      "slug":"aiapply",
-      "name":"AIApply",
-      "status":"active",
-      "summary":"AIApply automates applications and offers cover letters, interview prep, and a job board.",
-      "whySwitch":["Weekly pricing ($12-23/week) adds up fast","No free trial","Less emphasis on multi-country coverage"],
-      "ourEdge":["Predictable monthly/annual pricing instead of weekly","Real free tier","50+ country coverage and per-role AI resumes"],
-      "theirPrice":"~$12-23/week"
+      "slug": "aiapply",
+      "name": "AIApply",
+      "status": "active",
+      "summary": "AIApply automates applications and offers cover letters, interview prep, and a job board.",
+      "whySwitch": [
+        "Weekly pricing ($12-23/week) adds up fast",
+        "No free trial",
+        "Less emphasis on multi-country coverage"
+      ],
+      "ourEdge": [
+        "Predictable monthly/annual pricing instead of weekly",
+        "Real free tier",
+        "50+ country coverage and per-role AI resumes"
+      ],
+      "theirPrice": "~$12-23/week"
     },
     {
-      "slug":"simplify",
-      "name":"Simplify",
-      "status":"active",
-      "summary":"Simplify is a popular free browser extension that autofills job application forms across thousands of sites. It is an autofill helper, not a hands-off auto-apply agent, and it does not track or surface employer replies.",
-      "whySwitch":["It autofills forms but you still click apply on every job — not true hands-off auto-apply","No work-eligibility logic: it doesn't filter to roles you can actually work (remote / authorized countries / sponsorship)","No reply loop — replies scatter across your email, not one tracked inbox","US / on-site biased like most US-built tools"],
-      "ourEdge":["Fully hands-off auto-apply, not just autofill","Eligibility-aware: only applies where you can actually work, and answers screening questions honestly","Captures employer replies in one inbox and confirms each submission via the ATS","Remote-first across 50+ countries with a per-role AI resume"],
-      "theirPrice":"Free (autofill only)"
+      "slug": "simplify",
+      "name": "Simplify",
+      "status": "active",
+      "summary": "Simplify is a popular free browser extension that autofills job application forms across thousands of sites. It is an autofill helper, not a hands-off auto-apply agent, and it does not track or surface employer replies.",
+      "whySwitch": [
+        "It autofills forms but you still click apply on every job — not true hands-off auto-apply",
+        "No work-eligibility logic: it doesn't filter to roles you can actually work (remote / authorized countries / sponsorship)",
+        "No reply loop — replies scatter across your email, not one tracked inbox",
+        "US / on-site biased like most US-built tools"
+      ],
+      "ourEdge": [
+        "Fully hands-off auto-apply, not just autofill",
+        "Eligibility-aware: only applies where you can actually work, and answers screening questions honestly",
+        "Captures employer replies in one inbox and confirms each submission via the ATS",
+        "Remote-first across 50+ countries with a per-role AI resume"
+      ],
+      "theirPrice": "Free (autofill only)",
+      "features": {
+        "autoApply": "no (autofill only)",
+        "eligibility": "no",
+        "verifiedSubmissions": "no",
+        "replyInbox": "no",
+        "price": "Free (autofill)"
+      },
+      "sources": [
+        {
+          "label": "Simplify features",
+          "url": "https://simplify.jobs/"
+        }
+      ]
+    },
+    {
+      "slug": "jobcopilot",
+      "name": "JobCopilot",
+      "status": "active",
+      "summary": "JobCopilot auto-applies to jobs and builds tailored documents. It is closer to a true auto-apply agent than autofill tools, but it is general-purpose and not built around work-eligibility or verified-by-ATS submissions.",
+      "whySwitch": [
+        "No eligibility logic — it will apply to roles you can’t legally work (wrong country / needs sponsorship), which gets you auto-rejected",
+        "Submissions aren’t confirmed against the employer ATS, so \"applied\" can be optimistic",
+        "Replies aren’t captured in one tracked inbox",
+        "Tiered credits can run out mid-search"
+      ],
+      "ourEdge": [
+        "Eligibility-aware: only applies where you’re actually authorized, and answers screening questions honestly",
+        "Confirms each submission via the ATS — no fake \"applied\"",
+        "Captures every employer reply in one inbox",
+        "Remote-first across 50+ countries with a per-role AI resume",
+        "Real free tier + 30-day money-back guarantee"
+      ],
+      "theirPrice": "~$29-$49/mo",
+      "features": {
+        "autoApply": "yes",
+        "eligibility": "no",
+        "verifiedSubmissions": "no",
+        "replyInbox": "no",
+        "price": "~$29-$49/mo"
+      },
+      "sources": [
+        {
+          "label": "JobCopilot pricing",
+          "url": "https://jobcopilot.com/"
+        },
+        {
+          "label": "JobCopilot reviews (Trustpilot)",
+          "url": "https://www.trustpilot.com/review/jobcopilot.com"
+        }
+      ]
+    },
+    {
+      "slug": "teal",
+      "name": "Teal",
+      "status": "active",
+      "summary": "Teal (tealhq.com) is a popular job-tracker and AI resume builder. It is excellent for organizing a search and tailoring resumes, but it does not auto-apply for you — you still submit every application yourself.",
+      "whySwitch": [
+        "No auto-apply — Teal helps you track and tailor, but you click apply on every job manually",
+        "No eligibility filtering for remote / authorized countries / sponsorship",
+        "No automated reply capture tied to your applications",
+        "Most useful features sit behind Teal+ subscription"
+      ],
+      "ourEdge": [
+        "Fully hands-off auto-apply, not just tracking + tailoring",
+        "Eligibility-aware applications across 50+ countries",
+        "Confirms submissions via the ATS and captures replies in one inbox",
+        "Real free tier + 30-day money-back guarantee"
+      ],
+      "theirPrice": "Free / Teal+ ~$9/wk or ~$29/mo",
+      "features": {
+        "autoApply": "no (tracker + builder)",
+        "eligibility": "no",
+        "verifiedSubmissions": "n/a",
+        "replyInbox": "no",
+        "price": "Free / ~$29/mo"
+      },
+      "sources": [
+        {
+          "label": "Teal pricing",
+          "url": "https://www.tealhq.com/"
+        },
+        {
+          "label": "Teal reviews (G2)",
+          "url": "https://www.g2.com/products/teal-teal-hq/reviews"
+        }
+      ]
     }
   ]
 }
