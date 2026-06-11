@@ -6,6 +6,7 @@ import { getPlanByPriceId } from '@/lib/pricing'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Confetti } from '@/components/confetti'
 import Link from 'next/link'
 
 // Pause/resume an autoapply campaign.
@@ -101,19 +102,26 @@ export default async function DashboardPage() {
         <p className="text-slate-500">Welcome back, {session.user.name ?? session.user.email}!</p>
       </div>
 
-      {/* The product's "aha" moment — celebrate interview requests loudly. */}
+      {/* The product's "aha" moment — celebrate interview requests loudly (P3.14). */}
       {interviews > 0 && (
-        <div className="mb-8 rounded-lg border border-emerald-300 bg-emerald-50 p-4">
-          <p className="text-sm font-medium text-emerald-900">
-            🎉 You have {interviews} interview {interviews === 1 ? 'request' : 'requests'}!
-          </p>
-          <p className="text-xs text-emerald-700">
-            A recruiter wants to talk. Open your{' '}
-            <Link href="/dashboard/inbox" className="underline underline-offset-2">
-              inbox
-            </Link>{' '}
-            to reply — fast replies win interviews.
-          </p>
+        <div className="relative mb-8 overflow-hidden rounded-2xl border border-emerald-300 bg-emerald-50 p-6 text-center sm:text-left">
+          <Confetti />
+          <div className="relative flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
+            <div>
+              <p className="text-xl font-bold text-emerald-900">
+                🎉 You&apos;ve got {interviews} interview {interviews === 1 ? 'request' : 'requests'}!
+              </p>
+              <p className="mt-1 text-sm text-emerald-700">
+                A recruiter wants to talk. Reply fast — speed wins interviews.
+              </p>
+            </div>
+            <Link
+              href="/dashboard/inbox"
+              className="shrink-0 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors"
+            >
+              Open your inbox →
+            </Link>
+          </div>
         </div>
       )}
 
