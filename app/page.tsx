@@ -106,12 +106,12 @@ export default async function HomePage() {
               AI resume builder + auto-apply · 50+ countries
             </p>
             <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
-              Your job search, on autopilot &mdash; only where you&apos;re eligible.
+              Your dream job abroad &mdash; applied for while you sleep.
             </h1>
             <p className="mt-5 max-w-xl text-lg text-slate-600 lg:mx-0 mx-auto">
-              We tailor your resume to each role and auto-apply across 50+ countries &mdash; remote,
-              your authorized countries, sponsorship-aware &mdash; then capture every reply in one
-              inbox. Built for applying across borders, not just US LinkedIn.
+              ResumeAI tailors your resume to every role and auto-applies across 50+ countries
+              &mdash; only where you&apos;re genuinely eligible, so you get real replies instead of
+              auto-rejections. Wake up to confirmed applications and recruiter messages in one inbox.
             </p>
             <div className="mt-8 flex flex-col items-center gap-3 lg:items-start">
               <Link

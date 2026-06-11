@@ -16,12 +16,12 @@ export interface Promo {
   endsAt: string
 }
 
-// Current promo. NOTE: this end date is in the past, so the banner is hidden.
-// Set a future `endsAt` + a live Stripe code to run a new launch offer.
+// Active promo — banner shows until endsAt, then auto-hides. The matching Stripe
+// promotion code (LAUNCH40, 40% off) must exist for checkout to accept it.
 export const PROMO: Promo = {
   code: 'LAUNCH40',
   discountLabel: '40% off your first year',
-  endsAt: '2026-06-08T23:59:59Z',
+  endsAt: '2026-09-01T23:59:59Z',
 }
 
 /** True only while the promo is still running (now strictly before endsAt). */

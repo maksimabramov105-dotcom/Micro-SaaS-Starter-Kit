@@ -11,12 +11,16 @@ export function HeroDemo() {
     <div className="relative w-full max-w-md">
       <style>{`
         @keyframes hd-bar { 0%{width:4%} 100%{width:100%} }
-        @keyframes hd-s1 { 0%,100%{opacity:0} 2%,22%{opacity:1} 25%{opacity:0} }
-        @keyframes hd-s2 { 0%,24%{opacity:0} 27%,47%{opacity:1} 50%{opacity:0} }
-        @keyframes hd-s3 { 0%,49%{opacity:0} 52%,72%{opacity:1} 75%{opacity:0} }
-        @keyframes hd-s4 { 0%,74%{opacity:0} 77%,98%{opacity:1} 100%{opacity:0} }
+        /* Non-overlapping windows with blank gaps so two status lines are NEVER
+           visible at once (no text-on-text). Each fades fully out before the next
+           fades in. */
+        @keyframes hd-s1 { 0%,20%{opacity:1} 23%,100%{opacity:0} }
+        @keyframes hd-s2 { 0%,25%{opacity:0} 28%,45%{opacity:1} 48%,100%{opacity:0} }
+        @keyframes hd-s3 { 0%,50%{opacity:0} 53%,70%{opacity:1} 73%,100%{opacity:0} }
+        @keyframes hd-s4 { 0%,75%{opacity:0} 78%,98%{opacity:1} 100%{opacity:0} }
         @keyframes hd-pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
-        .hd-step{position:absolute;inset:0;display:flex;align-items:center;gap:.5rem}
+        /* Hidden by default — only the animation reveals one at a time. */
+        .hd-step{position:absolute;inset:0;display:flex;align-items:center;gap:.5rem;opacity:0}
         .hd-bar{animation:hd-bar 8s linear infinite}
         .hd-s1{animation:hd-s1 8s linear infinite}
         .hd-s2{animation:hd-s2 8s linear infinite}
