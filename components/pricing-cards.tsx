@@ -159,7 +159,11 @@ export function PricingCards() {
             <Card
               key={plan.id}
               className={`relative flex flex-col ${
-                isPro ? 'border-primary shadow-lg' : ''
+                isPro
+                  ? 'border-primary border-2 shadow-lg'
+                  : isFree
+                    ? 'border-slate-200 bg-slate-50/40 shadow-none' // de-emphasized so the eye lands on Pro
+                    : 'shadow-sm'
               }`}
             >
               {/* Most Popular badge */}
@@ -209,6 +213,11 @@ export function PricingCards() {
                     </div>
                   )}
                 </CardDescription>
+                {!isFree && (
+                  <p className="mt-2 text-xs font-medium text-emerald-700">
+                    ≈ ${(isYearly ? plan.price / 365 : plan.price / 30).toFixed(2)} per day — apply every day
+                  </p>
+                )}
               </CardHeader>
 
               <CardContent className="flex-1">

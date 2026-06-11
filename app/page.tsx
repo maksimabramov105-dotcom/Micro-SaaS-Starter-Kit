@@ -3,6 +3,7 @@ import { CheckCircle2, Globe, Inbox, ShieldCheck, FileCheck2 } from 'lucide-reac
 import { PRICING_PLANS, getMonthlyEquivalent } from '@/lib/pricing'
 import { LaunchBanner } from '@/components/launch-banner'
 import { Logo } from '@/components/logo'
+import { HeroDemo } from '@/components/hero-demo'
 import { prisma } from '@/lib/prisma'
 import { testimonials, replyScreenshots } from '@/lib/proof'
 
@@ -96,47 +97,52 @@ export default async function HomePage() {
         </div>
       </nav>
 
-      {/* Hero (HOMEPAGE_COPY.md §1) */}
-      <section className="flex flex-col items-center justify-center px-4 py-24 text-center">
-        <p className="mb-4 text-sm font-semibold uppercase tracking-wide text-emerald-600">
-          AI resume builder + auto-apply · 50+ countries
-        </p>
-        <h1 className="max-w-4xl text-4xl font-bold tracking-tight text-slate-900 sm:text-6xl">
-          Land a job abroad. Our AI writes your resume and auto-applies to jobs in 50+ countries
-          &mdash; while you sleep.
-        </h1>
-        <p className="mt-6 max-w-2xl text-xl text-slate-600">
-          ResumeAI-Bot only applies to jobs you&apos;re actually eligible for &mdash; remote,
-          your authorized countries, sponsorship-aware &mdash; tailors your resume to each role,
-          and captures the replies in one inbox. Built for people applying across borders, not just
-          US LinkedIn.
-        </p>
-        <div className="mt-10">
-          <Link
-            href="/login"
-            className="rounded-lg bg-emerald-600 px-8 py-3 text-lg font-semibold text-white hover:bg-emerald-700 transition-colors"
-          >
-            Start free &mdash; 3 applications/day &rarr;
-          </Link>
-          <p className="mt-3 text-sm text-slate-600">
-            No credit card · 30-day money-back guarantee on paid plans
-          </p>
-        </div>
+      {/* Hero — split layout: message left, product proof right (P2.9) */}
+      <section className="px-4 py-16 sm:py-20">
+        <div className="mx-auto grid max-w-6xl items-center gap-12 lg:grid-cols-2">
+          {/* Left — message + CTA */}
+          <div className="text-center lg:text-left">
+            <p className="mb-4 text-sm font-semibold uppercase tracking-wide text-emerald-600">
+              AI resume builder + auto-apply · 50+ countries
+            </p>
+            <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
+              Your job search, on autopilot &mdash; only where you&apos;re eligible.
+            </h1>
+            <p className="mt-5 max-w-xl text-lg text-slate-600 lg:mx-0 mx-auto">
+              We tailor your resume to each role and auto-apply across 50+ countries &mdash; remote,
+              your authorized countries, sponsorship-aware &mdash; then capture every reply in one
+              inbox. Built for applying across borders, not just US LinkedIn.
+            </p>
+            <div className="mt-8 flex flex-col items-center gap-3 lg:items-start">
+              <Link
+                href="/login"
+                className="rounded-lg bg-emerald-600 px-8 py-3 text-lg font-semibold text-white hover:bg-emerald-700 transition-colors"
+              >
+                Start free &mdash; 3 applications/day &rarr;
+              </Link>
+              <p className="text-sm text-slate-600">
+                No credit card · 30-day money-back guarantee on paid plans
+              </p>
+            </div>
 
-        {/* Honest trust strip — no fabricated metrics (HOMEPAGE_COPY.md §1) */}
-        <div className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-slate-600">
-          <span className="inline-flex items-center gap-1.5">
-            <CheckCircle2 className="h-4 w-4 text-brand" aria-hidden="true" /> Only applies where you&apos;re eligible
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <Globe className="h-4 w-4 text-brand" aria-hidden="true" /> Remote &amp; 50+ countries
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <Inbox className="h-4 w-4 text-brand" aria-hidden="true" /> Confirmed by the employer&apos;s ATS — no fake &ldquo;applied&rdquo;
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <ShieldCheck className="h-4 w-4 text-brand" aria-hidden="true" /> 30-day money-back guarantee
-          </span>
+            {/* Honest trust strip — no fabricated metrics */}
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm text-slate-600 lg:justify-start">
+              <span className="inline-flex items-center gap-1.5">
+                <CheckCircle2 className="h-4 w-4 text-brand" aria-hidden="true" /> Only where you&apos;re eligible
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Globe className="h-4 w-4 text-brand" aria-hidden="true" /> Remote &amp; 50+ countries
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Inbox className="h-4 w-4 text-brand" aria-hidden="true" /> Confirmed by the ATS — no fake &ldquo;applied&rdquo;
+              </span>
+            </div>
+          </div>
+
+          {/* Right — animated product proof */}
+          <div className="flex justify-center lg:justify-end">
+            <HeroDemo />
+          </div>
         </div>
       </section>
 
@@ -144,8 +150,12 @@ export default async function HomePage() {
       {outcomes && (
         <section className="border-y border-slate-100 bg-emerald-50/40 px-4 py-12">
           <div className="mx-auto flex max-w-4xl flex-col items-center gap-3 text-center">
-            <p className="text-sm font-semibold uppercase tracking-wide text-emerald-700">
-              Real activity on ResumeAI-Bot
+            <p className="inline-flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-emerald-700">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+              </span>
+              Live activity on ResumeAI-Bot
             </p>
             <div className="flex flex-wrap items-center justify-center gap-x-14 gap-y-4">
               <div>
