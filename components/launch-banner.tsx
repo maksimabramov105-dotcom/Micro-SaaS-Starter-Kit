@@ -1,31 +1,30 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-
-// Time-boxed launch offer. To end it early, set ACTIVE = false (or just let the
-// Stripe promo code LAUNCH40 expire — checkout will reject it after that).
-const ACTIVE = true
-const CODE = 'LAUNCH40'
-const ENDS_LABEL = 'June 8'
+import { PROMO, isPromoActive, promoEndLabel } from '@/lib/promo'
 
 export function LaunchBanner() {
-  const [dismissed, setDismissed] = useState(false)
+  // Compute "active" on the client after mount so an expired promo never renders
+  // (and to avoid an SSR/CSR time mismatch). Hidden until proven active.
+  const [show, setShow] = useState(false)
 
   useEffect(() => {
+    let dismissed = false
     try {
-      if (localStorage.getItem('launch40_dismissed') === '1') setDismissed(true)
+      dismissed = localStorage.getItem('launch40_dismissed') === '1'
     } catch {
       /* ignore */
     }
+    setShow(isPromoActive(new Date()) && !dismissed)
   }, [])
 
-  if (!ACTIVE || dismissed) return null
+  if (!show) return null
 
   return (
     <div className="relative bg-emerald-700 px-4 py-2 text-center text-sm text-white">
-      🚀 <strong>Launch week</strong> — 40% off your first year. Use code{' '}
-      <strong className="rounded bg-white/20 px-1.5 py-0.5 font-mono">{CODE}</strong>{' '}
-      at checkout. Ends {ENDS_LABEL}.
+      🚀 <strong>Launch week</strong> — {PROMO.discountLabel}. Use code{' '}
+      <strong className="rounded bg-white/20 px-1.5 py-0.5 font-mono">{PROMO.code}</strong>{' '}
+      at checkout. Ends {promoEndLabel()}.
       <button
         type="button"
         aria-label="Dismiss"
@@ -35,7 +34,7 @@ export function LaunchBanner() {
           } catch {
             /* ignore */
           }
-          setDismissed(true)
+          setShow(false)
         }}
         className="absolute right-3 top-1/2 -translate-y-1/2 text-white/80 hover:text-white"
       >

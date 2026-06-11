@@ -10,16 +10,25 @@ export const revalidate = 3600
 
 // Real funnel proof (D2) — aggregate, anonymized. Only shown once there's a
 // meaningful volume so early/empty numbers never undersell the product.
-async function getOutcomes(): Promise<{ submitted: number; confirmed: number } | null> {
+// Single source of truth for the homepage proof counters. Definitions are
+// EXACT and must match the caption:
+//   sent      = our system completed the application (JobApplication SUBMITTED+)
+//   confirmed = the employer's ATS acknowledged receipt (ApplicationEvent 'confirmed')
+async function getOutcomes(): Promise<{
+  sent: number
+  sentThisWeek: number
+  confirmed: number
+} | null> {
   try {
-    const [submitted, confirmed] = await Promise.all([
-      prisma.jobApplication.count({
-        where: { status: { in: ['SUBMITTED', 'INTERVIEW', 'REJECTED', 'OFFER'] } },
-      }),
+    const SENT = ['SUBMITTED', 'INTERVIEW', 'REJECTED', 'OFFER'] as const
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    const [sent, sentThisWeek, confirmed] = await Promise.all([
+      prisma.jobApplication.count({ where: { status: { in: [...SENT] } } }),
+      prisma.jobApplication.count({ where: { status: { in: [...SENT] }, createdAt: { gte: weekAgo } } }),
       prisma.applicationEvent.count({ where: { type: 'confirmed' } }),
     ])
-    if (submitted < 200) return null // hold until the number is impressive
-    return { submitted, confirmed }
+    if (sent < 200) return null // hold until the number is impressive
+    return { sent, sentThisWeek, confirmed }
   } catch {
     return null
   }
@@ -130,19 +139,25 @@ export default async function HomePage() {
             </p>
             <div className="flex flex-wrap items-center justify-center gap-x-14 gap-y-4">
               <div>
-                <div className="text-4xl font-bold text-slate-900">{outcomes.submitted.toLocaleString()}</div>
-                <div className="text-sm text-slate-500">applications submitted</div>
+                <div className="text-4xl font-bold text-slate-900">{outcomes.sent.toLocaleString()}</div>
+                <div className="text-sm text-slate-600">applications sent</div>
+                {outcomes.sentThisWeek > 0 && (
+                  <div className="mt-0.5 text-xs font-medium text-emerald-700">
+                    +{outcomes.sentThisWeek.toLocaleString()} this week
+                  </div>
+                )}
               </div>
               {outcomes.confirmed > 0 && (
                 <div>
                   <div className="text-4xl font-bold text-slate-900">{outcomes.confirmed.toLocaleString()}</div>
-                  <div className="text-sm text-slate-500">confirmed received by employers</div>
+                  <div className="text-sm text-slate-600">confirmed by employer ATS</div>
                 </div>
               )}
             </div>
-            <p className="mt-1 text-xs text-slate-400">
-              Live totals across all users, updated hourly. A job counts as &ldquo;submitted&rdquo;
-              only after the employer&apos;s ATS accepts it.
+            <p className="mt-1 text-xs text-slate-500">
+              Live totals across all users, updated hourly. &ldquo;Sent&rdquo; means our system
+              completed the application; &ldquo;confirmed&rdquo; means the employer&apos;s ATS
+              acknowledged receipt.
             </p>
           </div>
         </section>
@@ -396,9 +411,9 @@ export default async function HomePage() {
         <h2 className="mx-auto max-w-3xl text-3xl font-bold text-slate-900">
           Your next job could be in any of 50+ countries. Let&apos;s go find it.
         </h2>
-        <p className="mx-auto mt-4 max-w-2xl text-slate-500">
-          Start free — 3 applications a day, no credit card. Upgrade only when you see the
-          interviews come in.
+        <p className="mx-auto mt-4 max-w-2xl text-slate-600">
+          Start free — 3 applications a day, no credit card. Upgrade when you see confirmed
+          applications and replies land in your inbox.
         </p>
         <div className="mt-8">
           <Link
