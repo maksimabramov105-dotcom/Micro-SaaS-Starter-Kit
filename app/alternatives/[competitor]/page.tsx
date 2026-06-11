@@ -49,11 +49,19 @@ export default async function Page({ params }: { params: Promise<Params> }) {
     { q: `Can I cancel anytime?`, a: `Yes, and every paid plan is backed by a 30-day money-back guarantee.` },
   ];
 
+  const features = (c as { features?: Record<string, string> }).features;
+  const sources = (c as { sources?: { label: string; url: string }[] }).sources;
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@graph": [
       { "@type": "Article", headline: `Best ${c.name} Alternative (2026)`, mainEntityOfPage: url, author: { "@type": "Organization", name: "ResumeAI-Bot" }, publisher: { "@type": "Organization", name: "ResumeAI-Bot" } },
       { "@type": "FAQPage", mainEntity: faq.map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })) },
+      { "@type": "BreadcrumbList", itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: SITE },
+        { "@type": "ListItem", position: 2, name: "Alternatives", item: `${SITE}/compare` },
+        { "@type": "ListItem", position: 3, name: `${c.name} alternative`, item: url },
+      ] },
     ],
   };
 
@@ -78,14 +86,34 @@ export default async function Page({ params }: { params: Promise<Params> }) {
           <tr><th style={{ textAlign: "left" }}></th><th style={{ textAlign: "left" }}>ResumeAI-Bot</th><th style={{ textAlign: "left" }}>{c.name}</th></tr>
         </thead>
         <tbody>
+          {features ? (
+            <>
+              <tr><td>Hands-off auto-apply</td><td>✅ Yes</td><td>{features.autoApply}</td></tr>
+              <tr><td>Eligibility check (work auth / sponsorship / remote)</td><td>✅ Yes</td><td>{features.eligibility}</td></tr>
+              <tr><td>Verified by employer ATS</td><td>✅ Yes</td><td>{features.verifiedSubmissions}</td></tr>
+              <tr><td>Replies captured in one inbox</td><td>✅ Yes</td><td>{features.replyInbox}</td></tr>
+            </>
+          ) : null}
           <tr><td>Countries covered</td><td><strong>50+</strong></td><td>Limited</td></tr>
           <tr><td>AI resume tailored per role</td><td>✅</td><td>Limited</td></tr>
           <tr><td>Free tier</td><td>✅ (3 apps/day)</td><td>{c.slug === "loopcv" || c.slug === "jobright" ? "✅" : "❌"}</td></tr>
-          <tr><td>Money-back guarantee</td><td>✅ 30-day</td><td>—</td></tr>
-          <tr><td>Price</td><td>$19.99/mo</td><td>{c.theirPrice}</td></tr>
+          <tr><td>30-day money-back guarantee</td><td>✅ 30-day</td><td>—</td></tr>
+          <tr><td>Price</td><td>$19.99/mo</td><td>{features ? features.price : c.theirPrice}</td></tr>
           <tr><td>Status</td><td>Active</td><td>{c.status === "shut down" ? "Shut down" : "Active"}</td></tr>
         </tbody>
       </table>
+
+      {sources && sources.length > 0 && (
+        <p style={{ fontSize: 13, color: "#64748b" }}>
+          Sources (verify the claims yourself):{" "}
+          {sources.map((s, i) => (
+            <span key={s.url}>
+              {i > 0 ? " · " : ""}
+              <a href={s.url} target="_blank" rel="nofollow noopener noreferrer">{s.label}</a>
+            </span>
+          ))}
+        </p>
+      )}
 
       <h2>What makes ResumeAI-Bot different</h2>
       <ul>{c.ourEdge.map((e) => <li key={e}>{e}</li>)}</ul>
@@ -104,7 +132,9 @@ export default async function Page({ params }: { params: Promise<Params> }) {
         {competitors.filter((x) => x.slug !== c.slug).map((x) => (
           <Link key={x.slug} href={`/alternatives/${x.slug}`} style={{ marginRight: 8 }}>{x.name} alternative</Link>
         ))}
-        · <Link href="/compare">Full comparison →</Link>
+        · <Link href="/compare">Full comparison</Link>
+        · <Link href="/proof">Live proof</Link>
+        · <Link href="/pricing">Pricing →</Link>
       </p>
     </article>
   );

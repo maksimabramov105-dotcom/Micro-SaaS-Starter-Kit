@@ -11,6 +11,7 @@ import {
   getFunnelReport,
   getLastUpdated,
 } from '@/lib/pmf/queries'
+import sitemap from '@/app/sitemap'
 
 // ── helpers ──────────────────────────────────────────────────────────────
 
@@ -149,6 +150,11 @@ export default async function PmfDashboardPage() {
             title="Active paying subscribers"
             value={funnel.activeSubs}
             accent={funnel.activeSubs > 0 ? 'green' : undefined}
+          />
+          <Tile
+            title="SEO pages indexed"
+            value={sitemap().length}
+            sub="entries in sitemap.xml"
           />
         </Section>
 

@@ -8,9 +8,9 @@ const SITE = seo._meta.site
 const competitors = seo.competitors
 
 export const metadata: Metadata = {
-  title: 'Compare Auto-Apply Tools (2026): ResumeAI-Bot vs Sonara, LazyApply & More',
+  title: 'Compare Auto-Apply Job Tools (2026) — ResumeAI-Bot',
   description:
-    'Side-by-side comparison of AI auto-apply job tools — countries covered, AI resume tailoring, free tier, money-back guarantee and price. See how ResumeAI-Bot compares.',
+    'Side-by-side comparison of AI auto-apply job tools: countries, AI resume tailoring, free tier, money-back guarantee and price.',
   alternates: { canonical: `${SITE}/compare` },
   openGraph: {
     title: 'Compare Auto-Apply Tools (2026) — ResumeAI-Bot',

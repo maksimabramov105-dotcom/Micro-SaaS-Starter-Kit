@@ -11,6 +11,9 @@ import { testimonials, replyScreenshots } from '@/lib/proof'
 // the page stays fully server-rendered + indexable.
 export const revalidate = 3600
 
+// Self-referencing canonical for the homepage (resolved against metadataBase).
+export const metadata = { alternates: { canonical: '/' } }
+
 // Real funnel proof (D2) — aggregate, anonymized. Only shown once there's a
 // meaningful volume so early/empty numbers never undersell the product.
 // Single source of truth for the homepage proof counters. Definitions are
