@@ -14,7 +14,7 @@ const BASE = (process.env.BASE_URL || 'http://localhost:3000').replace(/\/$/, ''
 const PAGES = [
   '/', '/pricing', '/proof', '/faq', '/compare',
   '/alternatives/lazyapply', '/alternatives/teal', '/alternatives/jobcopilot',
-  '/jobs-in/germany', '/auto-apply/greenhouse', '/resume/software-engineer',
+  '/jobs-in/germany', '/auto-apply/linkedin', '/resume/software-engineer',
 ]
 
 type Problem = string

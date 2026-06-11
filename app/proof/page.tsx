@@ -10,7 +10,7 @@ export const revalidate = 3600
 export const metadata = {
   title: 'Live proof — real applications & replies | ResumeAI',
   description:
-    'Live, real numbers from ResumeAI: applications confirmed-submitted to employer ATS, recruiter replies received, and time-to-first-reply. No fake reviews — just our actual data.',
+    'Live, real numbers from ResumeAI: applications confirmed by employer ATS, recruiter replies, and time-to-first-reply. No fake reviews — our actual data.',
   alternates: { canonical: `${SITE}/proof` },
   openGraph: {
     title: 'Live proof — real applications & replies | ResumeAI',

@@ -22,7 +22,7 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
   const { profession } = await params;
   const p = get(profession);
   if (!p) return {};
-  const title = `${p.name} Resume: AI Builder + Auto-Apply (2026) — ResumeAI-Bot`;
+  const title = `${p.name} Resume — AI Builder + Auto-Apply (2026)`;
   const description = `Build an ATS-ready ${p.name} resume with AI and auto-apply to ${p.name} jobs in 50+ countries. Free tier + 30-day money-back guarantee.`;
   const url = `${SITE}/resume/${p.slug}`;
   return { title, description, alternates: { canonical: url }, openGraph: { title, description, url, siteName: "ResumeAI-Bot", type: "article" }, twitter: { card: "summary_large_image", title, description } };

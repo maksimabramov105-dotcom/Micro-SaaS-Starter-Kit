@@ -31,7 +31,7 @@ export async function generateMetadata(
   const { country } = await params;
   const c = getCountry(country);
   if (!c) return {};
-  const title = `How to Apply for Jobs in ${c.name} from Abroad (2026 Guide + Auto-Apply)`;
+  const title = `Apply to Jobs in ${c.name} from Abroad (2026)`;
   const description = `Applying for jobs in ${c.name}? Learn the job boards, resume format and visa routes that work — and auto-apply to ${c.name} jobs with AI. Free tier available.`;
   const url = `${SITE}/jobs-in/${c.slug}`;
   return {
