@@ -239,7 +239,13 @@ export function eligibilityKnockout(
   }
 
   if (job.isRemote) {
-    if (!v2) return null // legacy: any remote role passes
+    // The remote-region gate is ALWAYS on — it is the #1 cause of wasted
+    // applications (a "remote" role at a US company usually only employs in the
+    // US/EU, so a non-US candidate is auto-knocked at screening). A remote role
+    // passes ONLY when its detected hiring region is compatible with the
+    // candidate's work eligibility. We deliberately DON'T skip on uncertainty:
+    // unknown region, global hiring, or unknown candidate auth all pass, so we
+    // never silently drop a winnable role.
     const region = detectHiringRegion(opts?.text ?? '')
     if (region === null) return null // no hiring-region signal — don't skip
     if ('global' in region) return null // hires anywhere

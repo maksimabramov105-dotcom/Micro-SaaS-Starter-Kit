@@ -26,6 +26,7 @@ export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { classifyEmail } from '@/lib/inbox/classify'
+import { recordFunnel } from '@/lib/funnel'
 import { notifyHumanReply, shouldNotify } from '@/lib/inbox/notify'
 import { verifyResendSignature, parseFrom, parseToAddress, extractCompanyFromSubject, isConfirmationSubject } from '@/lib/inbox/inbound-utils'
 import { publishEvent } from '@/lib/redis'
@@ -237,6 +238,26 @@ export async function POST(req: Request) {
       ])
     } catch (err) {
       console.error('[inbox/inbound] notification failed', err)
+    }
+
+    // Funnel telemetry: a human reply (and, specifically, an interview request)
+    // is the bottom of the funnel — what proves the product delivers value.
+    // Tie it to the campaign when the reply was linked to an application.
+    try {
+      let campaignId: string | null = null
+      if (applicationId) {
+        const app = await prisma.jobApplication.findUnique({
+          where: { id: applicationId },
+          select: { campaignId: true },
+        })
+        campaignId = app?.campaignId ?? null
+      }
+      await recordFunnel('reply_received', { userId: user.id, campaignId, applicationId })
+      if (classification === 'INTERVIEW_REQUEST') {
+        await recordFunnel('interview', { userId: user.id, campaignId, applicationId })
+      }
+    } catch (err) {
+      console.error('[inbox/inbound] funnel telemetry failed', err)
     }
   }
 
