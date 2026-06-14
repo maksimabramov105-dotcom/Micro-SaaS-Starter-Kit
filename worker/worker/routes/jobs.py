@@ -11,6 +11,7 @@ Job records are persisted in Redis (24 h TTL) and mirrored in a local in-process
 dict for zero-latency same-process lookups.  Redis persistence survives worker
 restarts; the local dict is a fast-path cache only.
 """
+import asyncio
 import os
 import uuid
 from datetime import datetime, timezone
@@ -439,9 +440,45 @@ async def score_jobs(body: ScoreRequest) -> dict:
 # affected. Tune via MIN_APPLY_MEMORY_MB (raise it after a VPS resize).
 MIN_APPLY_MEMORY_MB = int(os.environ.get("MIN_APPLY_MEMORY_MB", "300"))
 
+# Cap simultaneous Playwright/chromium applies. Each apply launches a fresh
+# chromium (~300-400 MB), and this worker container is limited to ~1500 MB, so
+# >2-3 concurrent browsers would OOM-kill it. This semaphore is the HARD ceiling
+# (the web side's APPLY_CONCURRENCY only controls how many it *sends*). Default 2
+# fits the limit with headroom; bump only after a VPS/worker-memory resize.
+MAX_CONCURRENT_APPLIES = int(os.environ.get("MAX_CONCURRENT_APPLIES", "2"))
+_APPLY_SEMAPHORE = asyncio.Semaphore(MAX_CONCURRENT_APPLIES)
+
 
 def _available_memory_mb() -> int:
-    """MemAvailable in MB (includes reclaimable cache). 999999 if unknown."""
+    """
+    Memory headroom in MB. Prefers the CONTAINER's cgroup limit (what actually
+    OOM-kills us) over host MemAvailable — inside Docker /proc/meminfo reports the
+    host, which would let us launch a browser even when the container is near its
+    own 1500 MB cap. cgroup v2 first, then v1, then /proc/meminfo. 999999 if all
+    unknown.
+    """
+    # cgroup v2
+    try:
+        with open("/sys/fs/cgroup/memory.max") as f:
+            mx = f.read().strip()
+        if mx and mx != "max":
+            limit = int(mx)
+            with open("/sys/fs/cgroup/memory.current") as f:
+                cur = int(f.read().strip())
+            return max(0, (limit - cur) // (1024 * 1024))
+    except Exception:
+        pass
+    # cgroup v1
+    try:
+        with open("/sys/fs/cgroup/memory/memory.limit_in_bytes") as f:
+            limit = int(f.read().strip())
+        if limit < (1 << 62):  # not the "unlimited" sentinel
+            with open("/sys/fs/cgroup/memory/memory.usage_in_bytes") as f:
+                cur = int(f.read().strip())
+            return max(0, (limit - cur) // (1024 * 1024))
+    except Exception:
+        pass
+    # host fallback
     try:
         with open("/proc/meminfo") as f:
             for line in f:
@@ -456,33 +493,39 @@ def _available_memory_mb() -> int:
 async def autoapply_careerops(body: CareerOpsApplyRequest) -> dict:
     """Submit a job application via the CareerOps ATS filler."""
     job = await _new_job()
-    # ── Memory guard (C1): never spawn a browser without headroom ────────────
-    avail = _available_memory_mb()
-    if avail < MIN_APPLY_MEMORY_MB:
-        logger.warning("job.careerops.insufficient_memory", available_mb=avail, min_mb=MIN_APPLY_MEMORY_MB)
-        _finish(job, {"status": "error", "ats": "deferred",
-                      "error": f"insufficient_memory ({avail}MB < {MIN_APPLY_MEMORY_MB}MB)"})
-        await _redis_save(job)
-        return job.model_dump()
-    logger.info(
-        "job.careerops.started",
-        job_id=job.job_id,
-        user_id=body.user_id,
-        campaign_id=body.campaign_id,
-        available_mb=avail,
-    )
-    try:
-        applicator = CareerOpsApplicator()
-        await applicator.start()
+    # Bound simultaneous browsers (MAX_CONCURRENT_APPLIES) so parallel applies
+    # never exceed the container's memory limit, regardless of how many requests
+    # the web side sends at once. We acquire BEFORE checking memory so the check
+    # reflects headroom at launch time (after concurrent applies hold their slots).
+    async with _APPLY_SEMAPHORE:
+        # ── Memory guard (cgroup-aware): never spawn a browser without headroom ──
+        avail = _available_memory_mb()
+        if avail < MIN_APPLY_MEMORY_MB:
+            logger.warning("job.careerops.insufficient_memory", available_mb=avail, min_mb=MIN_APPLY_MEMORY_MB)
+            _finish(job, {"status": "error", "ats": "deferred",
+                          "error": f"insufficient_memory ({avail}MB < {MIN_APPLY_MEMORY_MB}MB)"})
+            await _redis_save(job)
+            return job.model_dump()
+        logger.info(
+            "job.careerops.started",
+            job_id=job.job_id,
+            user_id=body.user_id,
+            campaign_id=body.campaign_id,
+            available_mb=avail,
+            max_concurrent=MAX_CONCURRENT_APPLIES,
+        )
         try:
-            result = await applicator.apply(body.apply_url, body.user_data)
-        finally:
-            await applicator.close()
-        _finish(job, result)
-        logger.info("job.careerops.done", job_id=job.job_id)
-    except Exception as exc:
-        _fail(job, str(exc))
-        logger.error("job.careerops.error", job_id=job.job_id, error=str(exc))
+            applicator = CareerOpsApplicator()
+            await applicator.start()
+            try:
+                result = await applicator.apply(body.apply_url, body.user_data)
+            finally:
+                await applicator.close()
+            _finish(job, result)
+            logger.info("job.careerops.done", job_id=job.job_id)
+        except Exception as exc:
+            _fail(job, str(exc))
+            logger.error("job.careerops.error", job_id=job.job_id, error=str(exc))
 
     await _redis_save(job)
     return job.model_dump()

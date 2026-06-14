@@ -37,6 +37,7 @@ import {
   type RunSummary,
 } from '@/lib/run-campaigns-ops'
 import { inferJobLocation, eligibilityKnockout, extractSeniority, type EligibilityProfile } from '@/lib/eligibility'
+import { interleaveByUser, estimateDailyCapacity } from '@/lib/scheduling'
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -432,8 +433,11 @@ async function runCampaigns(
     const enc = (c as { linkedinPasswordEnc?: string | null }).linkedinPasswordEnc
     return Boolean(c.linkedinEmail && enc)
   }
-  const careerOpsCampaigns = campaigns.filter(
-    (c) => c.source === 'CAREEROPS' || (c.source === 'LINKEDIN' && !hasLinkedInCreds(c)),
+  const careerOpsCampaigns = interleaveByUser(
+    campaigns.filter(
+      (c) => c.source === 'CAREEROPS' || (c.source === 'LINKEDIN' && !hasLinkedInCreds(c)),
+    ),
+    (c) => c.user.id,
   )
   const linkedInCampaigns = campaigns.filter(
     (c) => c.source === 'LINKEDIN' && hasLinkedInCreds(c),
@@ -443,6 +447,28 @@ async function runCampaigns(
     linkedIn: linkedInCampaigns.length,
     note: 'credential-less LinkedIn campaigns run via the CAREEROPS engine',
   })
+
+  // ── Capacity guardrail ────────────────────────────────────────────────────
+  // Verify the marketed daily limits are actually deliverable with the current
+  // throughput knobs. demand = sum of active users' daily limits (what we
+  // promise); capacity = runs/day × concurrency × (budget / avg apply time).
+  // This logs an early WARNING long before users complain — see docs/SCALING.md.
+  {
+    const RUNS_PER_DAY = Number(process.env.CAMPAIGN_RUNS_PER_DAY ?? '48') // cron */30
+    const CONCURRENCY = Math.max(1, Math.min(5, Number(process.env.APPLY_CONCURRENCY ?? '2') || 2))
+    const AVG_APPLY_MS = Number(process.env.AVG_APPLY_MS ?? '45000') // conservative planning avg
+    const demandByUser = new Map<string, number>()
+    for (const c of careerOpsCampaigns) demandByUser.set(c.user.id, c.user.dailyApplicationLimit)
+    const demandPerDay = [...demandByUser.values()].reduce((s, n) => s + n, 0)
+    const capacity = estimateDailyCapacity({ runsPerDay: RUNS_PER_DAY, concurrency: CONCURRENCY, runBudgetMs: RUN_BUDGET_MS, avgApplyMs: AVG_APPLY_MS })
+    const ratio = demandPerDay > 0 ? capacity / demandPerDay : Infinity
+    const line = { activeUsers: demandByUser.size, demandPerDay, capacityPerDay: capacity, headroomRatio: Number(ratio.toFixed(2)) }
+    if (capacity < demandPerDay) {
+      console.warn('[run-campaigns] CAPACITY WARNING: marketed daily limits exceed throughput', line)
+    } else {
+      console.log('[run-campaigns] capacity ok', line)
+    }
+  }
 
   // ── Pre-scrape Greenhouse ONCE for the entire run ─────────────────────────
   //
@@ -1071,11 +1097,15 @@ async function runCampaigns(
     }
 
     // ── Apply dispatch (bounded concurrency, C1) ──────────────────────────
-    // APPLY_CONCURRENCY workers pull from scrapedJobs. At the default of 1 this
-    // is exactly the previous sequential loop. >1 is only safe after a VPS
-    // resize — the worker memory guard refuses to launch a browser without
-    // headroom, so the pool degrades gracefully. See docs/SCALING.md.
-    const APPLY_CONCURRENCY = Math.max(1, Math.min(5, Number(process.env.APPLY_CONCURRENCY ?? '1') || 1))
+    // APPLY_CONCURRENCY web workers pull from scrapedJobs and call the worker in
+    // parallel. The hard memory ceiling is enforced WORKER-side: a semaphore
+    // (MAX_CONCURRENT_APPLIES, default 2) bounds simultaneous chromium browsers
+    // regardless of how many requests we send, and a cgroup-aware memory guard
+    // refuses to launch below MIN_APPLY_MEMORY_MB. Default 2 ≈ doubles per-run
+    // throughput and fits the worker's 1500 MB limit (each apply ≈ 300-400 MB).
+    // Keep this <= worker MAX_CONCURRENT_APPLIES to avoid pointless queuing.
+    // See docs/SCALING.md.
+    const APPLY_CONCURRENCY = Math.max(1, Math.min(5, Number(process.env.APPLY_CONCURRENCY ?? '2') || 2))
     let poolStop = false
     let nextJobIdx = 0
     const attemptJob = async (job: (typeof scrapedJobs)[number]): Promise<'next' | 'stop'> => {
