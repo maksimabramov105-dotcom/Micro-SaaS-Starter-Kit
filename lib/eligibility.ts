@@ -67,6 +67,45 @@ function looksUS(location: string): boolean {
   return false
 }
 
+// Major hiring cities → country. Lets us understand a location that names only
+// a city (e.g. a candidate who types "Sydney" or a job posted as "Berlin"),
+// which is extremely common. Used for BOTH candidate-residency inference and
+// job-location detection, so it benefits every user, not just one region.
+const CITY_TO_COUNTRY: Record<string, string> = {
+  // United States
+  'new york': 'united states', 'san francisco': 'united states', 'los angeles': 'united states',
+  seattle: 'united states', austin: 'united states', boston: 'united states', chicago: 'united states',
+  denver: 'united states', atlanta: 'united states', miami: 'united states', dallas: 'united states',
+  'san diego': 'united states', portland: 'united states', 'washington': 'united states',
+  // United Kingdom
+  london: 'united kingdom', manchester: 'united kingdom', edinburgh: 'united kingdom',
+  bristol: 'united kingdom', cambridge: 'united kingdom',
+  // Germany
+  berlin: 'germany', munich: 'germany', münchen: 'germany', hamburg: 'germany', frankfurt: 'germany', cologne: 'germany',
+  // France / NL / ES / IE / PL / PT
+  paris: 'france', lyon: 'france', amsterdam: 'netherlands', rotterdam: 'netherlands',
+  madrid: 'spain', barcelona: 'spain', dublin: 'ireland', warsaw: 'poland', krakow: 'poland', 'kraków': 'poland',
+  lisbon: 'portugal', porto: 'portugal',
+  // Canada
+  toronto: 'canada', vancouver: 'canada', montreal: 'canada', ottawa: 'canada', calgary: 'canada',
+  // Australia / NZ
+  sydney: 'australia', melbourne: 'australia', brisbane: 'australia', perth: 'australia',
+  adelaide: 'australia', canberra: 'australia',
+  auckland: 'new zealand', wellington: 'new zealand', christchurch: 'new zealand',
+  // India / APAC / LATAM
+  bangalore: 'india', bengaluru: 'india', mumbai: 'india', delhi: 'india', hyderabad: 'india',
+  pune: 'india', chennai: 'india', 'sao paulo': 'brazil', 'são paulo': 'brazil',
+  'rio de janeiro': 'brazil', 'mexico city': 'mexico',
+}
+
+// Tokens that are NOT a country — stop "Remote"/"Anywhere"/etc. from being
+// mistaken for a country by the last-segment fallback.
+const NON_COUNTRY_TOKENS = new Set([
+  'remote', 'anywhere', 'worldwide', 'world wide', 'distributed', 'wfh', 'global',
+  'hybrid', 'onsite', 'on-site', 'on site', 'flexible', 'various', 'multiple locations',
+  'work from home', 'home based', 'home-based', 'eu', 'emea', 'apac', 'latam', 'europe', 'anz',
+])
+
 /**
  * Best-effort inference of a job's country + remote-ness from its free-text
  * location (and title as a hint). Country is returned normalized (lowercase),
@@ -87,8 +126,18 @@ export function inferJobLocation(
     country = 'united states'
   } else {
     const segs = loc.split(',').map((s) => normalizeCountry(s)).filter(Boolean)
-    const last = segs[segs.length - 1]
-    country = last && last.length >= 3 ? last : null
+    // 1. Prefer a recognised major city in any segment. Handles "Sydney",
+    //    "Melbourne, VIC", "Toronto, ON", "New York" — so a city-only location
+    //    resolves and sub-national abbreviations (VIC/ON/NSW) don't fool us.
+    for (const seg of segs) {
+      if (CITY_TO_COUNTRY[seg]) { country = CITY_TO_COUNTRY[seg]; break }
+    }
+    // 2. Otherwise fall back to an explicit country in the last segment
+    //    (e.g. "Lagos, Nigeria"), ignoring non-country tokens like "Remote".
+    if (!country) {
+      const last = segs[segs.length - 1]
+      if (last && last.length >= 3 && !NON_COUNTRY_TOKENS.has(last)) country = last
+    }
   }
   return { country, isRemote }
 }
