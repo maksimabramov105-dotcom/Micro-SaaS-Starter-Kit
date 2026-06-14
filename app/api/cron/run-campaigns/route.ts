@@ -455,7 +455,12 @@ async function runCampaigns(
   // This logs an early WARNING long before users complain — see docs/SCALING.md.
   {
     const RUNS_PER_DAY = Number(process.env.CAMPAIGN_RUNS_PER_DAY ?? '48') // cron */30
-    const CONCURRENCY = Math.max(1, Math.min(5, Number(process.env.APPLY_CONCURRENCY ?? '2') || 2))
+    // Effective concurrency = min(what the web sends, what the worker semaphore
+    // allows). The worker's MAX_CONCURRENT_APPLIES is the real ceiling, so the
+    // capacity estimate must not exceed it even if APPLY_CONCURRENCY is set higher.
+    const webConcurrency = Math.max(1, Math.min(5, Number(process.env.APPLY_CONCURRENCY ?? '2') || 2))
+    const workerCap = Math.max(1, Number(process.env.MAX_CONCURRENT_APPLIES ?? '2') || 2)
+    const CONCURRENCY = Math.min(webConcurrency, workerCap)
     const AVG_APPLY_MS = Number(process.env.AVG_APPLY_MS ?? '45000') // conservative planning avg
     const demandByUser = new Map<string, number>()
     for (const c of careerOpsCampaigns) demandByUser.set(c.user.id, c.user.dailyApplicationLimit)
