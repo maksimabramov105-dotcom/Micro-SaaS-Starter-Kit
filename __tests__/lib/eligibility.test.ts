@@ -56,6 +56,24 @@ describe('inferJobLocation', () => {
   it('returns null country when unknown', () => {
     expect(inferJobLocation('').country).toBeNull()
   })
+
+  it('resolves a bare city to its country (city-only locations)', () => {
+    expect(inferJobLocation('Sydney').country).toBe('australia')
+    expect(inferJobLocation('Berlin').country).toBe('germany')
+    expect(inferJobLocation('Toronto').country).toBe('canada')
+    expect(inferJobLocation('New York').country).toBe('united states')
+  })
+
+  it('resolves city + sub-national region abbreviation', () => {
+    expect(inferJobLocation('Melbourne, VIC').country).toBe('australia')
+    expect(inferJobLocation('Toronto, ON').country).toBe('canada')
+  })
+
+  it('does not mistake non-country tokens (Remote / Worldwide / EMEA) for a country', () => {
+    expect(inferJobLocation('Remote').country).toBeNull()
+    expect(inferJobLocation('Worldwide').country).toBeNull()
+    expect(inferJobLocation('EMEA').country).toBeNull()
+  })
 })
 
 describe('eligibilityKnockout', () => {
@@ -105,6 +123,12 @@ describe('detectHiringRegion', () => {
   })
   it('authorized to work in the United States', () => {
     expect(us('You must be authorized to work in the United States.')).toEqual({ countries: ['united states'] })
+  })
+  it('Remote from USA (Select States)', () => {
+    expect(us('Customer Support Specialist - Remote from USA (Select States)')).toEqual({ countries: ['united states'] })
+  })
+  it('US-based, remote', () => {
+    expect(us('US-based, fully remote')).toEqual({ countries: ['united states'] })
   })
   it('Remote (EMEA) → europe group', () => {
     const r = detectHiringRegion('Remote (EMEA)')
@@ -185,8 +209,11 @@ describe('eligibilityKnockout — targeting_v2', () => {
     const p = { ...AU, willingToRelocate: true, needsVisaSponsorship: false }
     expect(v2('Remote (US only)', p)).toBeNull()
   })
-  it('legacy (flag off) never applies region knockout', () => {
-    expect(eligibilityKnockout(AU, { country: null, isRemote: true }, { text: 'Remote (US only)' })).toBeNull()
+  it('region knockout applies even with the flag OFF (region gate is always on)', () => {
+    // The remote-region gate is no longer behind targeting_v2 — a US-only remote
+    // role is skipped for an AU candidate regardless of the flag. (targeting_v2
+    // now only governs the experimental seniority-distance check.)
+    expect(eligibilityKnockout(AU, { country: null, isRemote: true }, { text: 'Remote (US only)' })).toBe('remote_region')
   })
   it('seniority_mismatch: mid candidate vs Director role', () => {
     expect(v2('Director, Customer Support', AU, true, 2)).toBe('seniority_mismatch')

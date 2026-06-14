@@ -29,6 +29,7 @@ import { NextResponse, after } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { canSendApplication, consumeQuota } from '@/lib/quota'
 import { trackEvent } from '@/lib/analytics-advanced'
+import { recordFunnel } from '@/lib/funnel'
 import { publishEvent, getRedis } from '@/lib/redis'
 import { isResumeQualityV2, isFlagEnabled } from '@/lib/flags'
 import {
@@ -692,6 +693,7 @@ async function runCampaigns(
       applied: number
       failed: number
       skipped: number
+      eligible: number
       error?: string
       scraped?: number
     } = {
@@ -701,6 +703,7 @@ async function runCampaigns(
       applied: 0,
       failed: 0,
       skipped: 0,
+      eligible: 0,
     }
 
     console.log('[run-campaigns] processing campaign', {
@@ -1202,6 +1205,11 @@ async function runCampaigns(
         return 'next'
       }
 
+      // Past every gate (sourced → eligible → good job-fit): this is a role the
+      // candidate could actually win. Count it as eligible BEFORE the capacity
+      // check, so the funnel separates "not eligible" from "out of daily quota".
+      campaignLog.eligible++
+
       // Check user quota
       const hasQuota = await canSendApplication(user.id)
       if (!hasQuota) {
@@ -1387,6 +1395,15 @@ async function runCampaigns(
         totalSent: { increment: campaignLog.applied },
       },
     })
+
+    // Funnel telemetry: sourced → eligible → applied for this campaign run.
+    // Lets us measure exactly where applications die (sourcing vs eligibility
+    // vs the apply step) per campaign. Best-effort; never blocks the run.
+    await Promise.all([
+      recordFunnel('sourced', { userId: user.id, campaignId: campaign.id, count: campaignLog.scraped ?? 0, source: campaign.source }),
+      recordFunnel('eligible', { userId: user.id, campaignId: campaign.id, count: campaignLog.eligible, source: campaign.source }),
+      recordFunnel('applied', { userId: user.id, campaignId: campaign.id, count: campaignLog.applied, source: campaign.source }),
+    ])
 
     summary.push(campaignLog)
   }

@@ -1,0 +1,28 @@
+name: No-response follow-up nudges
+
+on:
+  schedule:
+    # Once daily at 09:00 UTC. Each application is nudged at most once (deduped
+    # via a followup_nudged ApplicationEvent), so a daily cadence is safe.
+    - cron: '0 9 * * *'
+  workflow_dispatch:         # manual trigger for testing
+
+jobs:
+  run:
+    name: Trigger follow-up nudges
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call follow-up cron endpoint
+        run: |
+          HTTP_STATUS=$(curl -s -o /tmp/body.txt -w "%{http_code}" \
+            -X POST "https://resumeai-bot.ru/api/cron/follow-up" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            --max-time 300)
+          BODY=$(cat /tmp/body.txt)
+          echo "Status  : $HTTP_STATUS"
+          echo "Response: $BODY"
+          if [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "::error::Follow-up runner returned HTTP $HTTP_STATUS: $BODY"
+            exit 1
+          fi
