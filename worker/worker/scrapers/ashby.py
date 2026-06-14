@@ -33,6 +33,9 @@ _COMPANIES: list[str] = [
     # Global-remote + ANZ/APAC (Airwallex AU, Xero/Auror NZ) — eligible pool for
     # non-US candidates; Docker/Confluent/Prefect hire globally remote.
     "airwallex", "xero", "auror", "confluent", "docker", "easygenerator", "prefect",
+    # Phase C expansion (2026-06-14) — verified live on Ashby with high volume.
+    "sierra", "vanta", "decagon", "cursor", "baseten", "ashby", "mercor",
+    "gamma", "watershed", "mintlify", "browserbase", "runway",
 ]
 
 

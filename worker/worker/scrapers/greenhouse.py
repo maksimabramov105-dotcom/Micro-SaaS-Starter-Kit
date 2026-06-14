@@ -90,6 +90,11 @@ _COMPANIES: list[str] = [
     "fingerprint",
     "planetscale",
     "octopusdeploy",
+    # Phase C expansion (2026-06-14) — large, high-volume Greenhouse employers
+    # verified live with hundreds of open roles each (deepens the fillable pool
+    # across support/CX, ops, marketing, fintech — not just engineering).
+    "stripe", "datadog", "samsara", "airbnb", "instacart", "affirm", "asana",
+    "flexport", "coinbase", "faire", "amplitude", "squarespace", "remote",
 ]
 
 
