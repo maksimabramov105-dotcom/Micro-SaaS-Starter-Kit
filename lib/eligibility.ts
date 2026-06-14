@@ -123,7 +123,10 @@ export function detectHiringRegion(text: string): HiringRegion {
   }
 
   // 2. Explicit US-only / US-authorization signals.
-  if (/\b(us only|u\.s\. only|usa only|united states only|us[- ]based only|must be (located|based) in the (us|united states)|authorized to work in the (us|united states|u\.s\.?)|us work authorization|remote[, (–-]+(us|usa|united states)\b|\(us\b|\bus[- ]remote\b|remote within the (us|united states))\b/.test(t)) {
+  // Includes "remote from/in/within the US", "US-based", and "(select states)"
+  // — phrasings that mean US-only but previously slipped through as no-signal,
+  // so we'd wrongly attempt them for non-US candidates.
+  if (/\b(us only|u\.s\. only|usa only|united states only|us[- ]based|must be (located|based) in the (us|united states)|authorized to work in the (us|united states|u\.s\.?)|us work authorization|remote[, (–-]+(us|usa|united states)\b|remote (from|in|within)( the)? (us|u\.s\.?|usa|united states)\b|select states|based in (the )?(us|u\.s\.?|usa|united states)\b|\(us\b|\bus[- ]remote\b|remote within the (us|united states))\b/.test(t)) {
     return { countries: ['united states'] }
   }
 
