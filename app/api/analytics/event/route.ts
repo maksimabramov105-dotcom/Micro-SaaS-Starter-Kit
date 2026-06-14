@@ -29,9 +29,24 @@ export async function POST(req: Request) {
         ? (body.properties as Record<string, unknown>)
         : {}
 
+    // Visitor identity + request metadata so we can count UNIQUE visitors and
+    // attribute traffic. `visitorId` is an anonymous, client-persisted id (no
+    // PII). IP is read server-side from the proxy headers (Caddy → Next).
+    const sessionId = typeof body?.visitorId === 'string' ? body.visitorId.slice(0, 64) : undefined
+    const page = typeof body?.page === 'string' ? body.page.slice(0, 300) : undefined
+    const referrer = typeof body?.referrer === 'string' ? body.referrer.slice(0, 300) : undefined
+    const fwd = req.headers.get('x-forwarded-for')
+    const ipAddress = (fwd ? fwd.split(',')[0] : req.headers.get('x-real-ip') || '').trim() || undefined
+    const userAgent = req.headers.get('user-agent')?.slice(0, 300) || undefined
+
     await trackEvent({
       event,
       userId: session?.user?.id ?? undefined,
+      sessionId,
+      page,
+      referrer,
+      ipAddress,
+      userAgent,
       properties,
     })
 
