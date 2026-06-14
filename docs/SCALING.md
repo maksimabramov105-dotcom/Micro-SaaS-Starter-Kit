@@ -1,66 +1,119 @@
-# Apply-throughput scaling (C1)
+# Scaling — Playwright apply throughput
 
-How the auto-apply engine scales on a single VPS, the throughput at each step,
-and the exact cutover to do **the moment the VPS is resized**.
+How many job applications the system can actually deliver per day, why, and the
+knobs to turn — within the single-VPS / Docker-Compose / no-queue-broker
+constraint (2 vCPU, 4 GB RAM). **Supersedes the earlier single-browser plan:
+bounded concurrency (option b) is now shipped and made memory-safe.**
 
-## Constraints
+## The pipeline
 
-- **Apply cost:** a Greenhouse application takes ~60–100 s (fill → submit → poll
-  inbox for the security code → resubmit). Browser concurrency is **1**.
-- **Box today:** 1 vCPU / 961 MB RAM (~428 MB `MemAvailable`). A single Chromium
-  uses ~300 MB, so there is **no headroom for a 2nd concurrent browser**.
+```
+GitHub Actions cron (*/30)  →  POST /api/cron/run-campaigns  (web, backgrounded via Next after())
+   → for each campaign (fair-share ordered): scrape → eligibility/fit gates →
+     POST /jobs/autoapply/careerops  (worker)  → Playwright launches chromium → submit
+```
 
-## Throughput by option (applies/day, system-wide)
+- **Web** (`app/api/cron/run-campaigns/route.ts`) decides *what* to apply to and
+  sends applies with `APPLY_CONCURRENCY` parallelism.
+- **Worker** (`worker/worker/routes/jobs.py`) launches chromium. It owns the
+  memory limit, so it enforces the **hard** concurrency ceiling.
 
-| Step | Cadence | RUN_BUDGET_MS | Concurrency | Applies/run | Applies/day |
-|---|---|---|---|---|---|
-| Before | 2 h | 600 s | 1 | ~6 | **~72** |
-| **Now (a)** — shipped | 30 min | 1200 s | 1 | ~13 | **~250–600**¹ |
-| After resize (b) | 30 min | 1200 s | 2–3 | ~13×N | **~1500–1800** |
+## Capacity model
 
-¹ Ceiling is `1200/90 ≈ 13` applies/run × 48 runs/day ≈ 600; real number is lower
-because runs also share time with scraping and are bounded by per-user `dailyLimit`.
-Measured number from the post-deploy load test is recorded in MEMORY.
+```
+appliesPerRun  = floor(concurrency × runBudgetMs / avgApplyMs)
+dailyCapacity  = appliesPerRun × runsPerDay
+```
 
-**Capacity vs users:** at ~15 applies/user/day, step (a) supports roughly
-**15–40 active users**; step (b) supports **~100**.
+Pure functions in `lib/scheduling.ts` (`appliesPerRun`, `estimateDailyCapacity`,
+`isDeliverable`). The runner logs a `CAPACITY WARNING` when the sum of active
+users' daily limits exceeds capacity; `scripts/throughput_sim.ts` checks it
+against the tier promises.
 
-## What shipped now (option a + safety for b)
+### Knobs (current shipped values)
 
-- **Cron 2 h → 30 min** (`.github/workflows/run-campaigns.yml`) — ~4× runs/day.
-- **`RUN_BUDGET_MS` 600 s → 1200 s** — ~2× applies/run; peak RAM unchanged (still 1 browser).
-- **Redis SETNX lock** on `run-campaigns` — overlapping fires are skipped, so the
-  shorter cadence can never start a 2nd concurrent run.
-- **Worker memory guard** (`MIN_APPLY_MEMORY_MB`, default 300) — the worker
-  refuses to launch a browser below the threshold; `run-campaigns` treats that
-  as a transient pause (deletes the QUEUED row, stops the run) instead of a
-  FAILED attempt. This is the per-context headroom check that makes (b) safe.
-- **Per-source circuit breaker** — 3 consecutive failures from one ATS host stops
-  applying to it for the rest of the run (anti-ban / anti-hammer).
+| Knob | Where | Default | Effect |
+|---|---|---|---|
+| `RUN_BUDGET_MS` | run-campaigns | 1,200,000 (20 min) | wall-clock per run |
+| runs/day | `run-campaigns.yml` cron | 48 (`*/30`) | trigger frequency |
+| `APPLY_CONCURRENCY` | run-campaigns (env) | **2** | parallel applies the web *sends* |
+| `MAX_CONCURRENT_APPLIES` | worker (env) | **2** | **hard cap** on simultaneous chromium |
+| `MIN_APPLY_MEMORY_MB` | worker (env) | 300 | refuse to launch a browser below this headroom |
 
-## Cutover to option (b) — do AFTER resizing to ≥2 vCPU / 4 GB
+Keep `APPLY_CONCURRENCY <= MAX_CONCURRENT_APPLIES` (else the web just queues at
+the worker).
 
-1. **Resize the VPS** (provider action) to ≥2 vCPU / 4 GB.
-2. **Raise the memory guard** so each context still gates on real headroom:
-   set `MIN_APPLY_MEMORY_MB=700` in the worker env (docker-compose `worker.environment`).
-3. **Parallelize the apply dispatch** (code change, not yet written — intentionally
-   deferred so the proven sequential path isn't destabilized on the small box):
-   in `app/api/cron/run-campaigns/route.ts`, replace the sequential
-   `for (const job of scrapedJobs)` apply section with a bounded pool of
-   `APPLY_CONCURRENCY` (env, default 1) workers. Each worker still: checks budget,
-   quota (`canSendApplication`), the fit gate, eligibility, dedup, then calls
-   `careeropsApply`. The worker memory guard already prevents the Nth browser from
-   spawning without headroom, so the pool degrades gracefully.
-4. Set `APPLY_CONCURRENCY=3`.
-5. **Load test:** trigger `POST /api/cron/run-campaigns`, watch
-   `docker stats` — peak container memory must stay < ~80 % of RAM, and
-   `free -h` `available` must not approach 0. Confirm no source returns 429/ban
-   (check worker logs for the per-source breaker tripping).
+## Memory safety (the real ceiling)
+
+The worker container is capped at **1500 MB** (`docker-compose.yml`
+`deploy.resources.limits.memory`). Each apply launches a fresh chromium at
+**~300–400 MB**:
+
+| concurrency | browser RAM | + python/base (~300 MB) | fits 1500 MB? |
+|---|---|---|---|
+| 1 | ~400 MB | ~700 MB | yes (big margin) |
+| **2 (shipped)** | ~800 MB | ~1100 MB | **yes (~400 MB margin)** |
+| 3 | ~1200 MB | ~1500 MB | borderline — bump worker memory first |
+
+Two guards make concurrency safe:
+1. **Worker semaphore** `MAX_CONCURRENT_APPLIES` (default 2) bounds simultaneous
+   browsers regardless of how many requests arrive — the deterministic ceiling.
+2. **cgroup-aware memory check** (`_available_memory_mb`): reads the container's
+   cgroup limit (v2 then v1), not host `/proc/meminfo` (which reports the whole
+   4 GB box and would let us launch while the *container* is near its cap).
+
+## Fair-share scheduling
+
+Without fairness the runner processes campaigns in fetch order, so one user with
+many campaigns (or first in the list) could consume the whole 20-min budget and
+starve everyone else. Three mechanisms prevent it:
+
+1. **`interleaveByUser`** (`lib/scheduling.ts`) round-robins campaigns across
+   users — every user gets a turn before any user gets a second.
+2. **Per-user quota distribution**: a user's remaining daily quota is split across
+   their own campaigns so campaign 1 can't drain it.
+3. **Adaptive per-campaign time slice**: `(RUN_BUDGET_MS − elapsed) /
+   campaignsRemaining`, recomputed each campaign.
+
+## Simulation results (`npx tsx scripts/throughput_sim.ts`)
+
+Demand modeled: 10×Pro@25/day + 3×Unlimited@100/day = **550 applies/day**.
+
+| concurrency | typical 20s | conservative 45s | worst-case 100s |
+|---|---|---|---|
+| 1 | 2,880/day (5.2×) | 1,248/day (2.3×) | 576/day (1.0×) |
+| **2 (shipped)** | 5,760/day (10.5×) | **2,544/day (4.6×)** | 1,152/day (2.1×) |
+| 3 | 8,640/day (15.7×) | 3,840/day (7.0×) | 1,728/day (3.1×) |
+
+**Shipped (concurrency 2, conservative latency): 2,544 applies/day vs 550 demand
+→ DELIVERABLE, 4.6× headroom.** Even worst-case latency stays above demand
+(2.1×). Marketed Pro "25/day" and Unlimited are deliverable for dozens of paying
+users on the current single VPS.
+
+## When this stops being enough (in order of cost)
+
+1. **Raise concurrency to 3** (`APPLY_CONCURRENCY=3` + `MAX_CONCURRENT_APPLIES=3`)
+   *after* bumping the worker `limits.memory` to ≥ 2 GB — i.e. a VPS RAM bump
+   (4 → 8 GB). Also raise `MIN_APPLY_MEMORY_MB` to ~500.
+2. **Shorten `RUN_BUDGET_MS` and run the cron more often** (e.g. 10-min budget at
+   `*/10` = 144 runs/day). The Redis SETNX lock prevents overlap; keep budget ≤
+   cron spacing so runs aren't skipped.
+3. **Vertical resize** the VPS and raise concurrency accordingly.
+
+## Load-test / verification
+
+```bash
+npx tsx scripts/throughput_sim.ts        # capacity vs tier promises (CI-friendly, exits 1 if not deliverable)
+# Live: trigger a real run and watch container memory stays under the cap:
+gh workflow run run-campaigns.yml
+ssh root@<vps> 'docker stats --no-stream resumeai-worker'   # peak must stay < 1500 MB
+```
 
 ## Option (c) — Redis-backed continuous queue (NOT built; needs sign-off)
 
-If (a)+(b) are still insufficient at 100 users, move applies off the 2-bursts-per-hour
-cron into a continuous BullMQ worker (Redis already runs) that drains a queue at a
-steady rate with the same per-context memory guard. Trade-offs: a long-lived worker
-process (more baseline RAM), more moving parts to monitor, but smooth throughput and
-no thundering-herd at each cron tick. **Do not build without explicit sign-off.**
+If (1)+(2) are still insufficient past ~100 paying users, move applies off the
+cron into a continuous BullMQ worker (Redis already runs) draining a queue at a
+steady rate with the same per-browser memory guard. Trade-off: a long-lived
+worker process (more baseline RAM) for smooth throughput and no thundering-herd
+at each cron tick. **Do not build without explicit sign-off** — single-VPS holds
+well past early traction without it.
