@@ -12,11 +12,22 @@ jest.mock('@/lib/prisma', () => ({
     },
     jobApplication: {
       count: jest.fn(),
+      findMany: jest.fn(),
     },
     survey: {
       count: jest.fn(),
     },
   },
+}))
+
+// Deterministic plan prices (env price IDs are undefined in tests).
+jest.mock('@/lib/pricing', () => ({
+  getPlanByPriceId: (id: string | null | undefined) =>
+    id === 'price_pro'
+      ? { price: 19.99, intervalKey: 'month' }
+      : id === 'price_annual'
+        ? { price: 199, intervalKey: 'year' }
+        : { price: 0, intervalKey: null },
 }))
 
 // unstable_cache passthrough — run functions directly in tests
@@ -25,7 +36,7 @@ jest.mock('next/cache', () => ({
   revalidateTag: jest.fn(),
 }))
 
-import { getCohortRetention, getLast30DaysMetrics } from '@/lib/pmf/queries'
+import { getCohortRetention, getLast30DaysMetrics, getRevenueMetrics, getWeeklyTrends } from '@/lib/pmf/queries'
 import { prisma } from '@/lib/prisma'
 
 const mockPrisma = prisma as unknown as {
@@ -34,7 +45,7 @@ const mockPrisma = prisma as unknown as {
     findMany: jest.Mock
     groupBy: jest.Mock
   }
-  jobApplication: { count: jest.Mock }
+  jobApplication: { count: jest.Mock; findMany: jest.Mock }
   survey: { count: jest.Mock }
 }
 
@@ -169,5 +180,69 @@ describe('getLast30DaysMetrics', () => {
 
     const result = await getLast30DaysMetrics()
     expect(result.interviewRateSurvey).toBe(30) // 3/10 = 30%
+  })
+})
+
+// ── getRevenueMetrics ──────────────────────────────────────────────────────
+
+describe('getRevenueMetrics', () => {
+  it('computes MRR / ARR / ARPU and normalizes annual plans to monthly', async () => {
+    mockPrisma.user.findMany
+      // active subs: 2 monthly Pro + 1 annual Pro
+      .mockResolvedValueOnce([
+        { stripePriceId: 'price_pro' },
+        { stripePriceId: 'price_pro' },
+        { stripePriceId: 'price_annual' },
+      ])
+      // churned in last 30d: 1 monthly Pro
+      .mockResolvedValueOnce([{ stripePriceId: 'price_pro' }])
+    mockPrisma.user.count
+      .mockResolvedValueOnce(5)  // payingEver
+      .mockResolvedValueOnce(50) // totalUsers
+
+    const r = await getRevenueMetrics()
+    // 2 * 1999 + round(19900/12)=1658  => 5656 cents
+    expect(r.mrrCents).toBe(1999 + 1999 + 1658)
+    expect(r.arrCents).toBe(r.mrrCents * 12)
+    expect(r.payingCustomers).toBe(3)
+    expect(r.arpuCents).toBe(Math.round(r.mrrCents / 3))
+    expect(r.churnedMrrCents).toBe(1999)
+    expect(r.freeToPaidRate).toBe(10) // 5 / 50
+  })
+
+  it('handles zero paying customers without dividing by zero', async () => {
+    mockPrisma.user.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([])
+    mockPrisma.user.count.mockResolvedValueOnce(0).mockResolvedValueOnce(0)
+
+    const r = await getRevenueMetrics()
+    expect(r.mrrCents).toBe(0)
+    expect(r.arpuCents).toBe(0)
+    expect(r.freeToPaidRate).toBeNull()
+  })
+})
+
+// ── getWeeklyTrends ────────────────────────────────────────────────────────
+
+describe('getWeeklyTrends', () => {
+  it('buckets this week\'s events into the latest of 8 week buckets', async () => {
+    const now = new Date()
+    mockPrisma.user.findMany
+      .mockResolvedValueOnce([{ createdAt: now }, { createdAt: now }]) // signups
+      .mockResolvedValueOnce([{ firstPaidAt: now, stripePriceId: 'price_pro' }]) // conversions
+      .mockResolvedValueOnce([]) // churn
+    mockPrisma.jobApplication.findMany
+      .mockResolvedValueOnce([{ appliedAt: now }, { appliedAt: now }, { appliedAt: now }]) // submitted
+      .mockResolvedValueOnce([{ responseAt: now }]) // interviews
+
+    const weeks = await getWeeklyTrends()
+    expect(weeks).toHaveLength(8)
+    const latest = weeks[weeks.length - 1]
+    expect(latest.signups).toBe(2)
+    expect(latest.conversions).toBe(1)
+    expect(latest.submitted).toBe(3)
+    expect(latest.interviews).toBe(1)
+    expect(latest.netNewMrrCents).toBe(1999)
+    // The series has no gaps (every week present, oldest → newest).
+    expect(weeks[0].signups).toBe(0)
   })
 })
