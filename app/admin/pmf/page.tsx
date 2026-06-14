@@ -9,6 +9,8 @@ import {
   getReferralMetrics,
   getExitReasonHistogram,
   getFunnelReport,
+  getRevenueMetrics,
+  getWeeklyTrends,
   getLastUpdated,
 } from '@/lib/pmf/queries'
 import sitemap from '@/app/sitemap'
@@ -69,6 +71,64 @@ function centsStr(cents: number): string {
   return `${sign}$${(abs / 100).toFixed(2)}`
 }
 
+/** Plain USD (no leading sign), thousands-separated. */
+function usd(cents: number): string {
+  return `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
+/** Inline SVG sparkline — no chart library (no external BI tool). */
+function Sparkline({ data, color = '#059669' }: { data: number[]; color?: string }) {
+  const w = 130
+  const h = 34
+  const pad = 3
+  if (data.length === 0) return null
+  const min = Math.min(...data, 0)
+  const max = Math.max(...data, 1)
+  const span = max - min || 1
+  const xAt = (i: number) => pad + (i * (w - 2 * pad)) / Math.max(1, data.length - 1)
+  const yAt = (v: number) => h - pad - ((v - min) / span) * (h - 2 * pad)
+  const pts = data.map((v, i) => `${xAt(i).toFixed(1)},${yAt(v).toFixed(1)}`).join(' ')
+  const lastX = xAt(data.length - 1)
+  const lastY = yAt(data[data.length - 1])
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden="true">
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+      <circle cx={lastX} cy={lastY} r="2.5" fill={color} />
+    </svg>
+  )
+}
+
+/** One week-over-week trend row: label · sparkline · latest value + WoW delta. */
+function TrendRow({
+  label,
+  data,
+  format,
+}: {
+  label: string
+  data: number[]
+  format?: (n: number) => string
+}) {
+  const fmt = format ?? ((n: number) => String(n))
+  const last = data[data.length - 1] ?? 0
+  const prev = data[data.length - 2] ?? 0
+  const delta = last - prev
+  const deltaPct = prev !== 0 ? Math.round((delta / Math.abs(prev)) * 100) : null
+  const deltaClass = delta > 0 ? 'text-green-600' : delta < 0 ? 'text-red-600' : 'text-muted-foreground'
+  return (
+    <div className="flex items-center gap-4 border-b py-2.5 last:border-0">
+      <span className="w-44 text-sm font-medium">{label}</span>
+      <Sparkline data={data} color={delta >= 0 ? '#059669' : '#dc2626'} />
+      <span className="ml-auto text-right">
+        <span className="block text-lg font-bold tabular-nums">{fmt(last)}</span>
+        <span className={`text-xs tabular-nums ${deltaClass}`}>
+          {delta >= 0 ? '▲' : '▼'} {fmt(Math.abs(delta))}
+          {deltaPct !== null ? ` (${delta >= 0 ? '+' : ''}${deltaPct}%)` : ''} WoW
+        </span>
+      </span>
+    </div>
+  )
+}
+
 // ── page ─────────────────────────────────────────────────────────────────
 
 export default async function PmfDashboardPage() {
@@ -78,16 +138,27 @@ export default async function PmfDashboardPage() {
     redirect('/dashboard')
   }
 
-  const [today, last30, cohort, referral, exitReasons, funnel] = await Promise.all([
+  const [today, last30, cohort, referral, exitReasons, funnel, revenue, weekly] = await Promise.all([
     getTodayMetrics(),
     getLast30DaysMetrics(),
     getCohortRetention(),
     getReferralMetrics(),
     getExitReasonHistogram(),
     getFunnelReport(),
+    getRevenueMetrics(),
+    getWeeklyTrends(),
   ])
 
   const updatedAt = getLastUpdated()
+
+  // Week-over-week series (oldest → newest) for the trend lines.
+  const trend = {
+    signups: weekly.map((w) => w.signups),
+    conversions: weekly.map((w) => w.conversions),
+    submitted: weekly.map((w) => w.submitted),
+    interviews: weekly.map((w) => w.interviews),
+    netNewMrr: weekly.map((w) => w.netNewMrrCents),
+  }
 
   // interview rate: prefer survey-based, fall back to app-status-based
   const interviewRate =
@@ -122,6 +193,42 @@ export default async function PmfDashboardPage() {
       </header>
 
       <main className="mx-auto max-w-6xl px-6 py-8">
+        {/* REVENUE (Stripe-synced) */}
+        <Section title="Revenue (Stripe-synced · MRR normalized monthly)">
+          <Tile title="MRR" value={usd(revenue.mrrCents)} accent={revenue.mrrCents > 0 ? 'green' : undefined} />
+          <Tile title="ARR" value={usd(revenue.arrCents)} sub="MRR × 12" />
+          <Tile title="Paying customers" value={revenue.payingCustomers} sub="active, non-expired subs" />
+          <Tile title="Blended ARPU" value={usd(revenue.arpuCents)} sub="MRR ÷ paying customers" />
+          <Tile
+            title="Free → paid conversion"
+            value={pctStr(revenue.freeToPaidRate)}
+            sub={`${revenue.payingEver} ever-paid of ${revenue.totalUsers} signups`}
+          />
+          <Tile
+            title="Churned MRR (30d)"
+            value={usd(revenue.churnedMrrCents)}
+            accent={revenue.churnedMrrCents > 0 ? 'red' : undefined}
+            sub="cancellations in last 30 days"
+          />
+        </Section>
+
+        {/* WEEK-OVER-WEEK TRENDS — the single most important investor view */}
+        <section className="mb-8">
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            Week-over-week trends (last 8 weeks)
+          </h2>
+          <div className="rounded-lg border bg-card px-5 py-2 shadow-sm">
+            <TrendRow label="Signups" data={trend.signups} />
+            <TrendRow label="Free → paid conversions" data={trend.conversions} />
+            <TrendRow label="Applications submitted" data={trend.submitted} />
+            <TrendRow label="Interviews" data={trend.interviews} />
+            <TrendRow label="Net-new MRR" data={trend.netNewMrr} format={(n) => centsStr(n)} />
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Each row: 8-week sparkline · latest week value · change vs. the prior week.
+          </p>
+        </section>
+
         {/* ACQUISITION → REVENUE FUNNEL */}
         <Section title="Funnel (last 30 days)">
           <Tile title="Signups" value={funnel.signups} />
@@ -145,6 +252,12 @@ export default async function PmfDashboardPage() {
             value={funnel.humanReplies}
             sub="interview · question · rejection"
             accent={funnel.humanReplies > 0 ? 'green' : undefined}
+          />
+          <Tile
+            title="Interviews"
+            value={funnel.interviews}
+            sub="interview-request replies"
+            accent={funnel.interviews > 0 ? 'green' : undefined}
           />
           <Tile
             title="Active paying subscribers"

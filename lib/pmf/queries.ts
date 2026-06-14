@@ -27,10 +27,15 @@ function pct(num: number, den: number): number | null {
   return Math.round((num / den) * 100)
 }
 
-/** Map Stripe priceId → monthly price in USD cents. */
+/**
+ * Map Stripe priceId → MONTHLY recurring revenue in USD cents.
+ * Annual plans bill 12 months up front but contribute price/12 to MRR, so we
+ * normalize them — otherwise MRR/ARR would be overstated 12x for annual subs.
+ */
 function monthlyPriceCents(priceId: string | null | undefined): number {
   const plan = getPlanByPriceId(priceId)
-  return Math.round((plan.price ?? 0) * 100)
+  const cents = Math.round((plan.price ?? 0) * 100)
+  return plan.intervalKey === 'year' ? Math.round(cents / 12) : cents
 }
 
 // ── TODAY ──────────────────────────────────────────────────────────────────
@@ -267,9 +272,116 @@ export const getFunnelReport = unstable_cache(
       ])
     const c = (k: string) => replyGroups.find((g) => g.classification === k)?._count._all ?? 0
     const humanReplies = c('INTERVIEW_REQUEST') + c('REJECTION') + c('QUESTION')
-    return { signups, resumeUsers, campaignUsers, submitted, humanReplies, activeSubs }
+    const interviews = c('INTERVIEW_REQUEST')
+    return { signups, resumeUsers, campaignUsers, submitted, humanReplies, interviews, activeSubs }
   },
   ['pmf-funnel-report'],
+  { revalidate: 900 }
+)
+
+// ── REVENUE (MRR / ARR / ARPU / paying customers / churned MRR) ─────────────
+// Derived from the active-subscription rows that Stripe webhooks keep in sync
+// on the User table (the DB is our materialized view of Stripe). MRR is
+// monthly-normalized so annual subscribers count as price/12. scripts/
+// funnel_report.ts additionally cross-checks this against the live Stripe API.
+
+export const getRevenueMetrics = unstable_cache(
+  async () => {
+    const now = new Date()
+    const [activeSubs, churned30d, payingEver, totalUsers] = await Promise.all([
+      prisma.user.findMany({
+        where: { stripeSubscriptionId: { not: null }, stripeCurrentPeriodEnd: { gt: now } },
+        select: { stripePriceId: true },
+      }),
+      prisma.user.findMany({
+        where: { cancelledAt: { gte: daysAgo(30) } },
+        select: { stripePriceId: true },
+      }),
+      prisma.user.count({ where: { firstPaidAt: { not: null } } }),
+      prisma.user.count(),
+    ])
+
+    const mrrCents = activeSubs.reduce((s, u) => s + monthlyPriceCents(u.stripePriceId), 0)
+    const payingCustomers = activeSubs.length
+    const churnedMrrCents = churned30d.reduce((s, u) => s + monthlyPriceCents(u.stripePriceId), 0)
+
+    return {
+      mrrCents,
+      arrCents: mrrCents * 12,
+      payingCustomers,
+      arpuCents: payingCustomers > 0 ? Math.round(mrrCents / payingCustomers) : 0,
+      churnedMrrCents,
+      freeToPaidRate: pct(payingEver, totalUsers),
+      payingEver,
+      totalUsers,
+    }
+  },
+  ['pmf-revenue'],
+  { revalidate: 900 }
+)
+
+// ── WEEK-OVER-WEEK TRENDS ───────────────────────────────────────────────────
+// The single most important investor view: are the core numbers growing each
+// week? Returns the last 8 ISO weeks (Mon-anchored) with signups, free→paid
+// conversions, applications submitted, interviews, and net-new MRR per week.
+
+export type TrendMetric = 'signups' | 'conversions' | 'submitted' | 'interviews' | 'netNewMrrCents'
+export interface WeekBucket {
+  weekStart: string // YYYY-MM-DD (Monday)
+  signups: number
+  conversions: number
+  submitted: number
+  interviews: number
+  netNewMrrCents: number
+}
+
+const TREND_WEEKS = 8
+
+function weekStartIso(d: Date): string {
+  const x = new Date(d)
+  x.setHours(0, 0, 0, 0)
+  const monday = (x.getDay() + 6) % 7 // days since Monday
+  x.setDate(x.getDate() - monday)
+  return x.toISOString().slice(0, 10)
+}
+
+export const getWeeklyTrends = unstable_cache(
+  async (): Promise<WeekBucket[]> => {
+    const cutoff = daysAgo(TREND_WEEKS * 7)
+    const submittedStatuses = ['SUBMITTED', 'INTERVIEW', 'OFFER', 'REJECTED'] as const
+
+    const [signupRows, paidRows, churnRows, submittedRows, interviewRows] = await Promise.all([
+      prisma.user.findMany({ where: { createdAt: { gte: cutoff } }, select: { createdAt: true } }),
+      prisma.user.findMany({ where: { firstPaidAt: { gte: cutoff } }, select: { firstPaidAt: true, stripePriceId: true } }),
+      prisma.user.findMany({ where: { cancelledAt: { gte: cutoff } }, select: { cancelledAt: true, stripePriceId: true } }),
+      prisma.jobApplication.findMany({ where: { status: { in: [...submittedStatuses] }, appliedAt: { gte: cutoff } }, select: { appliedAt: true } }),
+      prisma.jobApplication.findMany({ where: { status: 'INTERVIEW', responseAt: { gte: cutoff } }, select: { responseAt: true } }),
+    ])
+
+    // Seed the last TREND_WEEKS weeks so the series has no gaps.
+    const buckets = new Map<string, WeekBucket>()
+    for (let i = TREND_WEEKS - 1; i >= 0; i--) {
+      const ws = weekStartIso(daysAgo(i * 7))
+      buckets.set(ws, { weekStart: ws, signups: 0, conversions: 0, submitted: 0, interviews: 0, netNewMrrCents: 0 })
+    }
+    const bump = (date: Date | null, key: TrendMetric, amt = 1) => {
+      if (!date) return
+      const b = buckets.get(weekStartIso(date))
+      if (b) b[key] += amt
+    }
+
+    for (const r of signupRows) bump(r.createdAt, 'signups')
+    for (const r of paidRows) {
+      bump(r.firstPaidAt, 'conversions')
+      bump(r.firstPaidAt, 'netNewMrrCents', monthlyPriceCents(r.stripePriceId))
+    }
+    for (const r of churnRows) bump(r.cancelledAt, 'netNewMrrCents', -monthlyPriceCents(r.stripePriceId))
+    for (const r of submittedRows) bump(r.appliedAt, 'submitted')
+    for (const r of interviewRows) bump(r.responseAt, 'interviews')
+
+    return Array.from(buckets.values())
+  },
+  ['pmf-weekly-trends'],
   { revalidate: 900 }
 )
 
