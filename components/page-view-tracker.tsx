@@ -15,6 +15,31 @@ import { usePathname } from 'next/navigation'
  * Deliberately uses usePathname + window.location (NOT useSearchParams) so it
  * never forces the statically-generated marketing pages into client rendering.
  */
+/**
+ * Returns a stable, anonymous per-browser visitor id (persisted in
+ * localStorage). This is what lets us count UNIQUE visitors — without it every
+ * pageview is just a row with no way to dedupe one person's many pageviews.
+ * It is a random id, contains no PII, and is sent as `visitorId` so the server
+ * can store it as the event's sessionId.
+ */
+function getVisitorId(): string {
+  try {
+    const KEY = 'rai_vid'
+    let id = localStorage.getItem(KEY)
+    if (!id) {
+      id =
+        typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `v_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
+      localStorage.setItem(KEY, id)
+    }
+    return id
+  } catch {
+    // localStorage blocked (private mode / consent) — fall back to a per-load id.
+    return `v_anon_${Math.random().toString(36).slice(2, 10)}`
+  }
+}
+
 export function PageViewTracker() {
   const pathname = usePathname()
   const lastSent = useRef<string | null>(null)
@@ -40,7 +65,13 @@ export function PageViewTracker() {
     fetch('/api/analytics/event', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ event: 'page_view', properties }),
+      body: JSON.stringify({
+        event: 'page_view',
+        visitorId: getVisitorId(),
+        page: pathname,
+        referrer: properties.referrer,
+        properties,
+      }),
       keepalive: true,
     }).catch(() => {
       // fire-and-forget

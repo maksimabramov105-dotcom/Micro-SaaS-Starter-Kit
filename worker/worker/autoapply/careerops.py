@@ -1717,8 +1717,22 @@ class CareerOpsApplicator:
             await _check_required_boxes(page)
             _ = (eligibility, job_country)  # threaded via user_data into the fill
 
-            for txt in ["Submit Application", "Submit"]:
-                btn = page.locator(f'button[type="submit"]:has-text("{txt}")').first
+            # Lever's submit control is NOT reliably button[type="submit"]: many
+            # postings (e.g. Aircall) render it as <button type="button">SUBMIT
+            # APPLICATION</button> with a JS submit handler, while the lone
+            # type="submit" button has empty text. So match by visible text
+            # first (any button/input), and fall back to the type attr last.
+            submit_selectors = [
+                'button:has-text("Submit Application")',
+                'button:has-text("Submit application")',
+                'input[type="submit"][value*="Submit" i]',
+                'button[type="submit"]:has-text("Submit")',
+                'button:has-text("Submit")',
+                'input[type="submit"]',
+                'button[type="submit"]',
+            ]
+            for sel in submit_selectors:
+                btn = page.locator(sel).first
                 if await btn.count() > 0:
                     try:
                         await btn.scroll_into_view_if_needed(timeout=3000)
@@ -1730,10 +1744,10 @@ class CareerOpsApplicator:
                     except Exception:
                         pass
                     if await _verify_submitted(page):
-                        logger.info("careerops.lever.submitted", url=job_url)
+                        logger.info("careerops.lever.submitted", url=job_url, selector=sel)
                         return {"status": "submitted", "url": job_url, "ats": "lever",
                                 "answers": screening_answers}
-                    logger.warning("careerops.lever.submit_unconfirmed", url=job_url)
+                    logger.warning("careerops.lever.submit_unconfirmed", url=job_url, selector=sel)
                     return {"status": "error", "url": job_url, "ats": "lever",
                             "error": "submission not confirmed"}
 
