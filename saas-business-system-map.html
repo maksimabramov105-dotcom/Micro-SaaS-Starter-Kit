@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The SaaS Business System — From $0 to $1,000,000</title>
+<style>
+  :root{
+    --bg:#0a0e1a;
+    --panel:#111726;
+    --panel2:#161e30;
+    --line:#243049;
+    --ink:#e8edf7;
+    --muted:#93a0bd;
+    --dim:#67738f;
+    --acc:#5b8cff;      /* product / blue */
+    --acc2:#37d3a0;     /* money / green */
+    --acc3:#ffb84d;     /* growth / amber */
+    --purple:#b07cff;
+    --pink:#ff7ab6;
+    --cyan:#3fd2e0;
+    --radius:16px;
+    --shadow:0 10px 40px rgba(0,0,0,.45);
+    font-synthesis:none;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:
+      radial-gradient(1100px 600px at 80% -10%, rgba(91,140,255,.16), transparent 60%),
+      radial-gradient(900px 500px at 0% 10%, rgba(55,211,160,.10), transparent 55%),
+      var(--bg);
+    color:var(--ink);
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:0 22px}
+  a{color:inherit}
+
+  /* ---------- HEADER ---------- */
+  header.hero{padding:64px 0 36px;text-align:center;position:relative;overflow:hidden}
+  .eyebrow{display:inline-block;font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--acc);
+    border:1px solid var(--line);padding:6px 14px;border-radius:100px;background:rgba(91,140,255,.07);margin-bottom:22px}
+  h1{font-size:clamp(30px,5vw,54px);line-height:1.05;margin:0 0 14px;font-weight:800;letter-spacing:-.02em}
+  h1 .grad{background:linear-gradient(100deg,var(--acc),var(--cyan) 40%,var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{max-width:720px;margin:0 auto;color:var(--muted);font-size:clamp(15px,1.6vw,18px)}
+  .hero-meta{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:26px}
+  .chip{font-size:13px;color:var(--muted);border:1px solid var(--line);background:var(--panel);padding:8px 14px;border-radius:100px}
+  .chip b{color:var(--ink)}
+
+  /* ---------- NAV ---------- */
+  nav.toc{position:sticky;top:0;z-index:50;background:rgba(10,14,26,.78);backdrop-filter:blur(12px);
+    border-bottom:1px solid var(--line);margin-top:30px}
+  nav.toc .wrap{display:flex;gap:6px;flex-wrap:wrap;padding-top:12px;padding-bottom:12px;justify-content:center}
+  nav.toc a{font-size:13px;color:var(--muted);text-decoration:none;padding:7px 13px;border-radius:100px;border:1px solid transparent;transition:.18s}
+  nav.toc a:hover{color:var(--ink);border-color:var(--line);background:var(--panel)}
+
+  section{padding:54px 0;border-top:1px solid transparent}
+  .sec-head{margin-bottom:30px}
+  .sec-kicker{font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--acc2);font-weight:600}
+  h2{font-size:clamp(24px,3.4vw,36px);margin:8px 0 10px;font-weight:800;letter-spacing:-.02em}
+  .sec-lead{color:var(--muted);max-width:760px;font-size:16px}
+
+  /* ---------- JOURNEY / STAGES ---------- */
+  .rail{position:relative;margin-top:14px}
+  .rail::before{content:"";position:absolute;left:26px;top:8px;bottom:8px;width:2px;
+    background:linear-gradient(var(--acc),var(--acc3),var(--acc2))}
+  .stage{position:relative;padding:0 0 18px 70px;cursor:pointer}
+  .dot{position:absolute;left:16px;top:6px;width:22px;height:22px;border-radius:50%;background:var(--panel);
+    border:2px solid var(--acc);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--acc);z-index:2}
+  .stage .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;transition:.2s}
+  .stage:hover .card{border-color:var(--acc);transform:translateX(2px)}
+  .stage .top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}
+  .stage h3{margin:0;font-size:17px;font-weight:700}
+  .mrr{font-size:12.5px;font-weight:700;color:var(--acc2);white-space:nowrap;background:rgba(55,211,160,.1);
+    border:1px solid rgba(55,211,160,.25);padding:4px 10px;border-radius:100px}
+  .stage .goal{color:var(--muted);font-size:14px;margin-top:6px}
+  .stage .body{max-height:0;overflow:hidden;transition:max-height .35s ease;}
+  .stage.open .body{max-height:640px}
+  .stage .body-inner{padding-top:14px;margin-top:12px;border-top:1px dashed var(--line);
+    display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .blk h5{margin:0 0 6px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+  .blk ul{margin:0;padding-left:16px;color:var(--muted);font-size:13.5px}
+  .blk li{margin:3px 0}
+  .risk{color:var(--pink)!important}
+  .proof{color:var(--acc3)!important}
+  .hint{font-size:12px;color:var(--dim);margin-top:8px}
+
+  /* ---------- SUBSYSTEMS GRID ---------- */
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .sub{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;cursor:pointer;transition:.2s;position:relative;overflow:hidden}
+  .sub::before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:var(--c,var(--acc))}
+  .sub:hover{transform:translateY(-3px);border-color:var(--c,var(--acc));box-shadow:var(--shadow)}
+  .sub .ico{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;
+    font-size:19px;background:color-mix(in srgb,var(--c,var(--acc)) 16%,transparent);margin-bottom:10px}
+  .sub h3{margin:0 0 4px;font-size:16px;font-weight:700}
+  .sub .role{font-size:13px;color:var(--muted)}
+  .sub .det{max-height:0;overflow:hidden;transition:max-height .35s ease}
+  .sub.open .det{max-height:520px}
+  .sub .det-inner{padding-top:12px;margin-top:12px;border-top:1px dashed var(--line)}
+  .sub .det-inner .lab{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin:10px 0 4px}
+  .tags{display:flex;flex-wrap:wrap;gap:6px}
+  .tag{font-size:11.5px;color:var(--muted);background:var(--panel2);border:1px solid var(--line);padding:4px 9px;border-radius:7px}
+  .kpi{font-size:13px;color:var(--c,var(--acc));font-weight:600}
+
+  /* ---------- FLYWHEEL ---------- */
+  .fly-wrap{display:grid;grid-template-columns:1.05fr 1fr;gap:28px;align-items:center}
+  .stage-row{display:flex;flex-direction:column;gap:10px}
+  .fnode{display:flex;gap:14px;align-items:flex-start;background:var(--panel);border:1px solid var(--line);
+    border-radius:12px;padding:14px 16px;transition:.2s}
+  .fnode:hover{border-color:var(--c)}
+  .fnum{flex:0 0 30px;height:30px;border-radius:50%;background:color-mix(in srgb,var(--c) 22%,transparent);
+    color:var(--c);font-weight:800;display:flex;align-items:center;justify-content:center;font-size:13px}
+  .fnode h4{margin:0 0 2px;font-size:15px}
+  .fnode p{margin:0;font-size:13px;color:var(--muted)}
+  .fnode .m{font-size:11.5px;color:var(--dim);margin-top:4px}
+  .loopnote{text-align:center;color:var(--dim);font-size:12.5px;margin-top:8px}
+
+  /* ---------- UNIT ECON ---------- */
+  .econ{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .metric{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:16px}
+  .metric .name{font-size:12.5px;color:var(--muted);font-weight:600}
+  .metric .big{font-size:22px;font-weight:800;margin:6px 0 2px;letter-spacing:-.01em}
+  .metric .desc{font-size:12px;color:var(--dim)}
+  .good{color:var(--acc2)}
+  .warn{color:var(--acc3)}
+
+  /* ---------- MATH ROUTES ---------- */
+  .routes{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .route{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:14px;padding:18px}
+  .route h4{margin:0 0 2px;font-size:16px}
+  .route .seg{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.1em}
+  .route .eq{font-size:14px;color:var(--muted);margin:12px 0}
+  .route .eq b{color:var(--ink)}
+  .route .price{font-size:30px;font-weight:800;color:var(--acc);letter-spacing:-.02em}
+  .route ul{margin:12px 0 0;padding-left:16px;font-size:13px;color:var(--muted)}
+
+  /* ---------- LAYERS / STACK DIAGRAM ---------- */
+  .stack{display:flex;flex-direction:column;gap:8px}
+  .layer{display:flex;align-items:center;gap:14px;background:var(--panel);border:1px solid var(--line);
+    border-radius:10px;padding:12px 16px}
+  .layer .lname{flex:0 0 200px;font-weight:700;font-size:14px}
+  .layer .ldesc{color:var(--muted);font-size:13px}
+  .layer .bar{flex:0 0 6px;align-self:stretch;border-radius:4px;background:var(--c,var(--acc))}
+
+  footer{padding:50px 0 70px;color:var(--dim);font-size:13px;text-align:center;border-top:1px solid var(--line);margin-top:30px}
+  .legend{font-size:12px;color:var(--dim);margin-top:10px;text-align:center}
+
+  @media(max-width:900px){
+    .grid,.routes{grid-template-columns:1fr 1fr}
+    .econ{grid-template-columns:1fr 1fr}
+    .fly-wrap{grid-template-columns:1fr}
+    .stage .body-inner{grid-template-columns:1fr}
+  }
+  @media(max-width:560px){
+    .grid,.routes,.econ{grid-template-columns:1fr}
+    .layer .lname{flex-basis:120px}
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="eyebrow">The Operating Map · A → Z</span>
+    <h1>The SaaS Business System<br><span class="grad">From $0 to $1,000,000</span></h1>
+    <p class="sub">Every SaaS that reaches $1M ARR is the same machine wearing different clothes. This is the whole system — the stages you pass through, the subsystems that make it run, and the money engine that turns effort into recurring revenue. Click anything to open it.</p>
+    <div class="hero-meta">
+      <span class="chip"><b>6</b> growth stages</span>
+      <span class="chip"><b>9</b> subsystems</span>
+      <span class="chip"><b>1</b> revenue flywheel</span>
+      <span class="chip">$1M ARR = <b>$83,333</b> MRR</span>
+    </div>
+  </div>
+</header>
+
+<nav class="toc">
+  <div class="wrap">
+    <a href="#journey">① Growth Journey</a>
+    <a href="#stack">② Business Stack</a>
+    <a href="#subsystems">③ The 9 Subsystems</a>
+    <a href="#flywheel">④ Money Engine</a>
+    <a href="#econ">⑤ Unit Economics</a>
+    <a href="#math">⑥ The $1M Math</a>
+  </div>
+</nav>
+
+<!-- ===================== 1. JOURNEY ===================== -->
+<section id="journey">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-kicker">Part 1 · The timeline</div>
+      <h2>The Growth Journey: 6 stages from idea to $1M</h2>
+      <p class="sec-lead">A SaaS business isn't built all at once — it's unlocked stage by stage. Each stage has one job, one proof point you need before moving on, and one risk that kills most companies there. <b>Click a stage to expand it.</b></p>
+    </div>
+
+    <div class="rail" id="rail">
+
+      <div class="stage" onclick="toggle(this)">
+        <div class="dot">0</div>
+        <div class="card">
+          <div class="top"><h3>Stage 0 — Foundation: Idea &amp; Founder-Market Fit</h3><span class="mrr">$0 MRR</span></div>
+          <div class="goal">Pick a painful, recurring problem you're uniquely positioned to solve — and a market that can pay.</div>
+          <div class="body"><div class="body-inner">
+            <div class="blk"><h5>What you build</h5><ul>
+              <li>A sharp problem statement &amp; target customer (ICP)</li>
+              <li>Founder-market fit: why you, why now</li>
+              <li>Market sizing (TAM / SAM / SOM)</li>
+              <li>A wedge: the one thing you do better</li>
+            </ul></div>
+            <div class="blk"><h5>Key activities</h5><ul>
+              <li>Talk to 20–50 potential users</li>
+              <li>Map existing alternatives &amp; their gaps</li>
+              <li>Define the "before vs. after" transformation</li>
+              <li class="proof">✓ Proof to advance: a problem people describe with emotion</li>
+              <li class="risk">⚠ Risk: building for a problem nobody urgently has</li>
+            </ul></div>
+          </div></div>
+        </div>
+      </div>
+
+      <div class="stage" onclick="toggle(this)">
+        <div class="dot">1</div>
+        <div class="card">
+          <div class="top"><h3>Stage 1 — Validation: Problem/Solution Fit</h3><span class="mrr">$0 MRR</span></div>
+          <div class="goal">Prove people want the solution before you fully build it. Sell the promise, then the product.</div>
+          <div class="body"><div class="body-inner">
+            <div class="blk"><h5>What you build</h5><ul>
+              <li>Landing page + waitlist / pre-orders</li>
+              <li>Clickable prototype or demo (Figma/no-code)</li>
+              <li>Pricing hypothesis &amp; value proposition</li>
+              <li>Letters of intent or design-partner commitments</li>
+            </ul></div>
+            <div class="blk"><h5>Key activities</h5><ul>
+              <li>Customer interviews → spec the must-have feature</li>
+              <li>Smoke tests / fake-door tests</li>
+              <li>Get verbal "yes, I'd pay for that"</li>
+              <li class="proof">✓ Proof: pre-sales, LOIs, or a waitlist that converts</li>
+              <li class="risk">⚠ Risk: false positives — polite interest ≠ demand</li>
+            </ul></div>
+          </div></div>
+        </div>
+      </div>
+
+      <div class="stage" onclick="toggle(this)">
+        <div class="dot">2</div>
+        <div class="card">
+          <div class="top"><h3>Stage 2 — MVP &amp; First Customers</h3><span class="mrr">$0 → $1k MRR</span></div>
+          <div class="goal">Ship the smallest version that delivers the core value, and get the first handful of paying customers.</div>
+          <div class="body"><div class="body-inner">
+            <div class="blk"><h5>What you build</h5><ul>
+              <li>MVP: core workflow only, nothing extra</li>
+              <li>Auth, billing (Stripe), basic onboarding</li>
+              <li>Analytics + a way to talk to every user</li>
+              <li>A simple, manual "do things that don't scale" service layer</li>
+            </ul></div>
+            <div class="blk"><h5>Key activities</h5><ul>
+              <li>Founder-led sales to 5–10 customers</li>
+              <li>Weekly ship cycle driven by user feedback</li>
+              <li>Charge from day one (even if small)</li>
+              <li class="proof">✓ Proof: first real dollars + users coming back</li>
+              <li class="risk">⚠ Risk: over-building features before anyone pays</li>
+            </ul></div>
+          </div></div>
+        </div>
+      </div>
+
+      <div class="stage" onclick="toggle(this)">
+        <div class="dot">3</div>
+        <div class="card">
+          <div class="top"><h3>Stage 3 — Product-Market Fit</h3><span class="mrr">$1k → $10k MRR</span></div>
+          <div class="goal">Find the point where retention is strong and growth pulls instead of pushes. The "can't live without it" moment.</div>
+          <div class="body"><div class="body-inner">
+            <div class="blk"><h5>What you build</h5><ul>
+              <li>A reliable activation flow (time-to-value)</li>
+              <li>The 2–3 features that drive retention</li>
+              <li>Repeatable onboarding &amp; support</li>
+              <li>Instrumented funnel + cohort retention</li>
+            </ul></div>
+            <div class="blk"><h5>Key activities</h5><ul>
+              <li>Track cohort retention &amp; usage frequency</li>
+              <li>Sean Ellis test (40%+ "very disappointed")</li>
+              <li>Tighten ICP — fire bad-fit customers</li>
+              <li class="proof">✓ Proof: flat/“smiling” retention curve, organic word-of-mouth</li>
+              <li class="risk">⚠ Risk: scaling spend before PMF = leaky bucket</li>
+            </ul></div>
+          </div></div>
+        </div>
+      </div>
+
+      <div class="stage" onclick="toggle(this)">
+        <div class="dot">4</div>
+        <div class="card">
+          <div class="top"><h3>Stage 4 — Repeatable Go-to-Market Engine</h3><span class="mrr">$10k → ~$42k MRR</span></div>
+          <div class="goal">Turn growth from founder hustle into a predictable, measurable machine with positive unit economics.</div>
+          <div class="body"><div class="body-inner">
+            <div class="blk"><h5>What you build</h5><ul>
+              <li>1–2 proven acquisition channels</li>
+              <li>A documented sales / self-serve funnel</li>
+              <li>Onboarding → activation → expansion path</li>
+              <li>First key hires (sales, marketing, support)</li>
+            </ul></div>
+            <div class="blk"><h5>Key activities</h5><ul>
+              <li>Calculate CAC, LTV, payback per channel</li>
+              <li>Double down on what converts, cut what doesn't</li>
+              <li>Build a content/SEO or outbound motion</li>
+              <li class="proof">✓ Proof: $1 in → predictable &gt;$3 out, payback &lt; 12mo</li>
+              <li class="risk">⚠ Risk: scaling a channel with broken economics</li>
+            </ul></div>
+          </div></div>
+        </div>
+      </div>
+
+      <div class="stage" onclick="toggle(this)">
+        <div class="dot">5</div>
+        <div class="card">
+          <div class="top"><h3>Stage 5 — Scale to $1M ARR</h3><span class="mrr">~$42k → $83k MRR</span></div>
+          <div class="goal">Pour fuel on the working engine. Compound new MRR + expansion while keeping churn low.</div>
+          <div class="body"><div class="body-inner">
+            <div class="blk"><h5>What you build</h5><ul>
+              <li>Multi-channel acquisition + referral loops</li>
+              <li>Customer success org to drive net revenue retention</li>
+              <li>Tiered pricing &amp; expansion (upsell/cross-sell)</li>
+              <li>Ops, finance, and reporting cadence</li>
+            </ul></div>
+            <div class="blk"><h5>Key activities</h5><ul>
+              <li>Grow MRR ~10–15% / month compounding</li>
+              <li>Push net revenue retention above 100%</li>
+              <li>Systematize hiring &amp; processes</li>
+              <li class="proof">✓ Proof: $83,333 MRR with healthy retention</li>
+              <li class="risk">⚠ Risk: churn + CAC creep eating new growth</li>
+            </ul></div>
+          </div></div>
+        </div>
+      </div>
+
+    </div>
+    <p class="hint">Note: MRR bands are illustrative — the sequence of <i>proof points</i> matters more than exact dollar figures.</p>
+  </div>
+</section>
+
+<!-- ===================== 2. STACK ===================== -->
+<section id="stack">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-kicker">Part 2 · The anatomy</div>
+      <h2>The Business Stack: what a SaaS is built out of</h2>
+      <p class="sec-lead">Underneath the journey, every SaaS is a stack of layers. The bottom layers create the value; the top layers capture and compound it. Money only flows when all of them connect.</p>
+    </div>
+    <div class="stack">
+      <div class="layer"><div class="bar" style="--c:var(--acc3)"></div><div class="lname">⑤ Capital &amp; Finance</div><div class="ldesc">Bootstrapped or funded runway, P&amp;L, cash flow, metrics dashboard — the fuel and the scoreboard.</div></div>
+      <div class="layer"><div class="bar" style="--c:var(--pink)"></div><div class="lname">④ Growth &amp; GTM</div><div class="ldesc">Marketing, sales, and referral loops that attract, convert, and expand customers.</div></div>
+      <div class="layer"><div class="bar" style="--c:var(--acc2)"></div><div class="lname">③ Monetization</div><div class="ldesc">Pricing, packaging, billing, and the recurring-revenue model that captures value.</div></div>
+      <div class="layer"><div class="bar" style="--c:var(--purple)"></div><div class="lname">② Customer Experience</div><div class="ldesc">Onboarding, activation, support, and success — turning signups into retained, expanding accounts.</div></div>
+      <div class="layer"><div class="bar" style="--c:var(--acc)"></div><div class="lname">① Product &amp; Technology</div><div class="ldesc">The software itself + the infrastructure it runs on. The core value-creation engine.</div></div>
+      <div class="layer"><div class="bar" style="--c:var(--cyan)"></div><div class="lname">⓪ Foundation</div><div class="ldesc">Problem, market, ICP, positioning, team, and legal/compliance — the ground it all stands on.</div></div>
+    </div>
+    <p class="legend">Read bottom-up: Foundation → Product → Experience → Monetization → Growth → Finance.</p>
+  </div>
+</section>
+
+<!-- ===================== 3. SUBSYSTEMS ===================== -->
+<section id="subsystems">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-kicker">Part 3 · The machine</div>
+      <h2>The 9 Subsystems that make it run</h2>
+      <p class="sec-lead">These are the working parts of the engine. None of them generate money alone — they generate money <i>together</i>. <b>Click any card</b> to see its components, typical tools, and the metric it owns.</p>
+    </div>
+    <div class="grid" id="grid">
+
+      <div class="sub" style="--c:var(--acc)" onclick="toggle(this)">
+        <div class="ico">⚙️</div><h3>1 · Product &amp; Engineering</h3>
+        <div class="role">Builds and ships the software that delivers the core value.</div>
+        <div class="det"><div class="det-inner">
+          <div class="lab">Components</div>
+          <div class="tags"><span class="tag">Core features</span><span class="tag">UX/UI</span><span class="tag">Roadmap</span><span class="tag">QA / reliability</span><span class="tag">Releases</span></div>
+          <div class="lab">Typical tools</div>
+          <div class="tags"><span class="tag">Linear / Jira</span><span class="tag">GitHub</span><span class="tag">Figma</span><span class="tag">Feature flags</span></div>
+          <div class="lab">Owns the metric</div>
+          <div class="kpi">Activation rate · feature adoption · uptime</div>
+        </div></div>
+      </div>
+
+      <div class="sub" style="--c:var(--cyan)" onclick="toggle(this)">
+        <div class="ico">🏗️</div><h3>2 · Infrastructure &amp; Tech Stack</h3>
+        <div class="role">The plumbing the product runs on — secure, scalable, observable.</div>
+        <div class="det"><div class="det-inner">
+          <div class="lab">Components</div>
+          <div class="tags"><span class="tag">Cloud hosting</span><span class="tag">Database</span><span class="tag">Auth</span><span class="tag">CI/CD</span><span class="tag">Monitoring</span><span class="tag">Security</span></div>
+          <div class="lab">Typical tools</div>
+          <div class="tags"><span class="tag">AWS / GCP / Vercel</span><span class="tag">Postgres</span><span class="tag">Auth0 / Clerk</span><span class="tag">Datadog</span></div>
+          <div class="lab">Owns the metric</div>
+          <div class="kpi">Uptime · latency · infra cost % of revenue</div>
+        </div></div>
+      </div>
+
+      <div class="sub" style="--c:var(--pink)" onclick="toggle(this)">
+        <div class="ico">📣</div><h3>3 · Customer Acquisition (Marketing)</h3>
+        <div class="role">Generates awareness and a steady flow of qualified leads/signups.</div>
+        <div class="det"><div class="det-inner">
+          <div class="lab">Components</div>
+          <div class="tags"><span class="tag">Content / SEO</span><span class="tag">Paid ads</span><span class="tag">Social</span><span class="tag">Email</span><span class="tag">Partnerships</span><span class="tag">Brand</span></div>
+          <div class="lab">Typical tools</div>
+          <div class="tags"><span class="tag">Webflow</span><span class="tag">Ahrefs</span><span class="tag">Google/Meta Ads</span><span class="tag">Klaviyo</span></div>
+          <div class="lab">Owns the metric</div>
+          <div class="kpi">Traffic → lead conversion · CAC · channel ROI</div>
+        </div></div>
+      </div>
+
+      <div class="sub" style="--c:var(--acc3)" onclick="toggle(this)">
+        <div class="ico">🤝</div><h3>4 · Sales &amp; Conversion</h3>
+        <div class="role">Turns interested prospects into paying customers (self-serve or sales-led).</div>
+        <div class="det"><div class="det-inner">
+          <div class="lab">Components</div>
+          <div class="tags"><span class="tag">Funnel / pricing page</span><span class="tag">Free trial / freemium</span><span class="tag">Demos</span><span class="tag">CRM pipeline</span><span class="tag">Proposals</span></div>
+          <div class="lab">Typical tools</div>
+          <div class="tags"><span class="tag">Stripe Checkout</span><span class="tag">HubSpot / Close</span><span class="tag">Calendly</span></div>
+          <div class="lab">Owns the metric</div>
+          <div class="kpi">Trial→paid conversion · win rate · sales cycle</div>
+        </div></div>
+      </div>
+
+      <div class="sub" style="--c:var(--purple)" onclick="toggle(this)">
+        <div class="ico">🚀</div><h3>5 · Onboarding &amp; Activation</h3>
+        <div class="role">Gets a new user to their first "aha" — the moment value is felt.</div>
+        <div class="det"><div class="det-inner">
+          <div class="lab">Components</div>
+          <div class="tags"><span class="tag">Setup flow</span><span class="tag">Checklists</span><span class="tag">Templates</span><span class="tag">In-app guides</span><span class="tag">Welcome emails</span></div>
+          <div class="lab">Typical tools</div>
+          <div class="tags"><span class="tag">Pendo / Appcues</span><span class="tag">Intercom</span><span class="tag">Loops</span></div>
+          <div class="lab">Owns the metric</div>
+          <div class="kpi">Activation rate · time-to-value</div>
+        </div></div>
+      </div>
+
+      <div class="sub" style="--c:var(--acc2)" onclick="toggle(this)">
+        <div class="ico">💚</div><h3>6 · Retention &amp; Customer Success</h3>
+        <div class="role">Keeps customers paying and growing — the heart of recurring revenue.</div>
+        <div class="det"><div class="det-inner">
+          <div class="lab">Components</div>
+          <div class="tags"><span class="tag">Support</span><span class="tag">Health scoring</span><span class="tag">QBRs</span><span class="tag">Expansion plays</span><span class="tag">Churn-save</span></div>
+          <div class="lab">Typical tools</div>
+          <div class="tags"><span class="tag">Intercom / Zendesk</span><span class="tag">Vitally</span><span class="tag">Product analytics</span></div>
+          <div class="lab">Owns the metric</div>
+          <div class="kpi">Churn · Net Revenue Retention (NRR) · NPS</div>
+        </div></div>
+      </div>
+
+      <div class="sub" style="--c:var(--acc2)" onclick="toggle(this)">
+        <div class="ico">💰</div><h3>7 · Monetization &amp; Pricing</h3>
+        <div class="role">Decides how value is captured: model, tiers, and billing.</div>
+        <div class="det"><div class="det-inner">
+          <div class="lab">Components</div>
+          <div class="tags"><span class="tag">Pricing model</span><span class="tag">Tiers / packaging</span><span class="tag">Billing &amp; invoicing</span><span class="tag">Discounts</span><span class="tag">Dunning</span></div>
+          <div class="lab">Typical tools</div>
+          <div class="tags"><span class="tag">Stripe Billing</span><span class="tag">Chargebee</span><span class="tag">Paddle</span></div>
+          <div class="lab">Owns the metric</div>
+          <div class="kpi">ARPU · expansion revenue · gross margin</div>
+        </div></div>
+      </div>
+
+      <div class="sub" style="--c:var(--acc3)" onclick="toggle(this)">
+        <div class="ico">📊</div><h3>8 · Finance, Metrics &amp; Ops</h3>
+        <div class="role">The scoreboard and the fuel: cash, runway, and the numbers that steer.</div>
+        <div class="det"><div class="det-inner">
+          <div class="lab">Components</div>
+          <div class="tags"><span class="tag">P&amp;L / cash flow</span><span class="tag">MRR/ARR tracking</span><span class="tag">Forecasting</span><span class="tag">Fundraising</span><span class="tag">Dashboards</span></div>
+          <div class="lab">Typical tools</div>
+          <div class="tags"><span class="tag">QuickBooks / Xero</span><span class="tag">ChartMogul</span><span class="tag">Mosaic</span></div>
+          <div class="lab">Owns the metric</div>
+          <div class="kpi">MRR/ARR · burn · runway · Rule of 40</div>
+        </div></div>
+      </div>
+
+      <div class="sub" style="--c:var(--dim)" onclick="toggle(this)">
+        <div class="ico">⚖️</div><h3>9 · Team, Legal &amp; Compliance</h3>
+        <div class="role">The people and guardrails that let the system run and earn trust.</div>
+        <div class="det"><div class="det-inner">
+          <div class="lab">Components</div>
+          <div class="tags"><span class="tag">Founders &amp; hires</span><span class="tag">Culture / ops</span><span class="tag">ToS &amp; privacy</span><span class="tag">Data security</span><span class="tag">SOC 2 / GDPR</span></div>
+          <div class="lab">Typical tools</div>
+          <div class="tags"><span class="tag">Stripe Atlas</span><span class="tag">Vanta / Drata</span><span class="tag">Notion</span></div>
+          <div class="lab">Owns the metric</div>
+          <div class="kpi">Team velocity · compliance status · trust</div>
+        </div></div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 4. FLYWHEEL ===================== -->
+<section id="flywheel">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-kicker">Part 4 · The money engine</div>
+      <h2>The Revenue Flywheel — how the parts make money together</h2>
+      <p class="sec-lead">This is where the subsystems connect into a loop (the classic <b>AARRR</b> / "pirate" funnel). Each turn of the wheel should cost less and return more — that compounding loop is what actually generates the $1M.</p>
+    </div>
+    <div class="fly-wrap">
+      <div class="stage-row">
+        <div class="fnode" style="--c:var(--pink)">
+          <div class="fnum">A</div><div><h4>Acquisition</h4><p>Strangers discover you via content, ads, referrals, or outbound.</p><div class="m">Subsystem 3 · Metric: CAC, traffic→signup</div></div>
+        </div>
+        <div class="fnode" style="--c:var(--purple)">
+          <div class="fnum">A</div><div><h4>Activation</h4><p>New users hit the "aha" — they experience the core value fast.</p><div class="m">Subsystems 4 &amp; 5 · Metric: activation rate</div></div>
+        </div>
+        <div class="fnode" style="--c:var(--acc2)">
+          <div class="fnum">R</div><div><h4>Revenue</h4><p>Activated users convert to paying plans; billing recurs monthly.</p><div class="m">Subsystems 4 &amp; 7 · Metric: trial→paid, ARPU</div></div>
+        </div>
+        <div class="fnode" style="--c:var(--acc)">
+          <div class="fnum">R</div><div><h4>Retention</h4><p>Customers stay, succeed, and expand — recurring revenue compounds.</p><div class="m">Subsystem 6 · Metric: churn, NRR</div></div>
+        </div>
+        <div class="fnode" style="--c:var(--acc3)">
+          <div class="fnum">R</div><div><h4>Referral</h4><p>Happy customers bring new ones, lowering CAC for the next turn.</p><div class="m">Subsystems 3 &amp; 6 · Metric: viral / referral rate</div></div>
+        </div>
+        <p class="loopnote">↺ Referral feeds back into Acquisition — the loop spins faster and cheaper each cycle.</p>
+      </div>
+
+      <div>
+        <svg viewBox="0 0 320 320" width="100%" style="max-width:340px;display:block;margin:0 auto">
+          <defs>
+            <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#ff7ab6"/><stop offset="33%" stop-color="#b07cff"/>
+              <stop offset="66%" stop-color="#37d3a0"/><stop offset="100%" stop-color="#ffb84d"/>
+            </linearGradient>
+          </defs>
+          <circle cx="160" cy="160" r="120" fill="none" stroke="url(#ring)" stroke-width="14" stroke-linecap="round" stroke-dasharray="690 60" transform="rotate(-90 160 160)"/>
+          <polygon points="160,28 150,48 170,48" fill="#ffb84d"/>
+          <text x="160" y="150" text-anchor="middle" fill="#e8edf7" font-size="22" font-weight="800" font-family="Inter,sans-serif">$1M</text>
+          <text x="160" y="176" text-anchor="middle" fill="#93a0bd" font-size="13" font-family="Inter,sans-serif">ARR engine</text>
+          <text x="160" y="300" text-anchor="middle" fill="#67738f" font-size="11" font-family="Inter,sans-serif">acquire → activate → earn → retain → refer ↺</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 5. UNIT ECONOMICS ===================== -->
+<section id="econ">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-kicker">Part 5 · The math that makes it work</div>
+      <h2>Unit Economics — the dials that decide if the engine is profitable</h2>
+      <p class="sec-lead">A SaaS only "works" when these numbers line up. They're the difference between a growth machine and a leaky bucket. Healthy benchmarks shown below.</p>
+    </div>
+    <div class="econ">
+      <div class="metric"><div class="name">MRR / ARR</div><div class="big">$83,333 / $1M</div><div class="desc">Monthly &amp; annual recurring revenue — the core scoreboard.</div></div>
+      <div class="metric"><div class="name">CAC</div><div class="big">Cost to acquire</div><div class="desc">Total sales+marketing ÷ new customers. Lower is better.</div></div>
+      <div class="metric"><div class="name">LTV</div><div class="big">Lifetime value</div><div class="desc">ARPU × gross margin × avg. customer lifetime.</div></div>
+      <div class="metric"><div class="name">LTV : CAC</div><div class="big good">≥ 3 : 1</div><div class="desc">Each $1 of acquisition returns $3+ over time.</div></div>
+      <div class="metric"><div class="name">CAC Payback</div><div class="big good">&lt; 12 months</div><div class="desc">Months to recover acquisition cost from gross profit.</div></div>
+      <div class="metric"><div class="name">Gross Margin</div><div class="big good">70–85%</div><div class="desc">Revenue minus cost to serve. SaaS should be high-margin.</div></div>
+      <div class="metric"><div class="name">Monthly Churn</div><div class="big warn">&lt; 3–5%</div><div class="desc">% of revenue/customers lost. The silent killer of growth.</div></div>
+      <div class="metric"><div class="name">Net Revenue Retention</div><div class="big good">&gt; 100%</div><div class="desc">Expansion outpaces churn — you grow even with zero new signups.</div></div>
+    </div>
+    <p class="legend">⭐ The Rule of 40: growth rate % + profit margin % should exceed 40 once at scale. The Magic Number measures sales efficiency (new ARR ÷ prior-quarter S&amp;M spend).</p>
+  </div>
+</section>
+
+<!-- ===================== 6. THE $1M MATH ===================== -->
+<section id="math">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-kicker">Part 6 · Putting it together</div>
+      <h2>The $1M Math — three routes to the same number</h2>
+      <p class="sec-lead">$1M ARR is just <b>$83,333 MRR</b>. How you get there depends on who you sell to. More customers at low price, or fewer at high price — same destination, very different machine.</p>
+    </div>
+    <div class="routes">
+      <div class="route">
+        <div class="seg">Route A · SMB / Self-serve</div>
+        <h4>Volume</h4>
+        <div class="price">$50<span style="font-size:14px;color:var(--dim)">/mo</span></div>
+        <div class="eq"><b>1,667</b> customers × $50 = $83k MRR</div>
+        <ul>
+          <li>Marketing-led, low-touch, freemium/trial</li>
+          <li>Wins on funnel &amp; activation at scale</li>
+          <li>Churn is the biggest threat</li>
+        </ul>
+      </div>
+      <div class="route">
+        <div class="seg">Route B · Mid-market</div>
+        <h4>Balance</h4>
+        <div class="price">$500<span style="font-size:14px;color:var(--dim)">/mo</span></div>
+        <div class="eq"><b>167</b> customers × $500 = $83k MRR</div>
+        <ul>
+          <li>Blended self-serve + light sales touch</li>
+          <li>Wins on onboarding + customer success</li>
+          <li>Expansion revenue powers NRR</li>
+        </ul>
+      </div>
+      <div class="route">
+        <div class="seg">Route C · Enterprise</div>
+        <h4>High-touch</h4>
+        <div class="price">$5,000<span style="font-size:14px;color:var(--dim)">/mo</span></div>
+        <div class="eq"><b>17</b> customers × $5,000 = $83k MRR</div>
+        <ul>
+          <li>Sales-led, demos, contracts, procurement</li>
+          <li>Wins on relationships &amp; ROI proof</li>
+          <li>Few logos = concentration risk</li>
+        </ul>
+      </div>
+    </div>
+    <p class="legend">Same $1M, three different businesses. The route you pick reshapes every subsystem above — pricing, sales motion, and which metrics matter most.</p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p><b>The whole system in one line:</b> a Foundation defines who you serve → Product creates value → Experience delivers it → Monetization captures it → the Growth flywheel compounds it → Finance steers it — and the loop spins from $0 to $1M.</p>
+    <p style="margin-top:10px;color:var(--dim)">Interactive map · click stages &amp; subsystem cards to expand. Built as a self-contained reference.</p>
+  </div>
+</footer>
+
+<script>
+  function toggle(el){ el.classList.toggle('open'); }
+  // open the first stage by default to hint interactivity
+  document.addEventListener('DOMContentLoaded',function(){
+    var first=document.querySelector('#rail .stage');
+    if(first) first.classList.add('open');
+  });
+</script>
+</body>
+</html>
