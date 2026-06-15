@@ -36,7 +36,11 @@ test('Stripe webhook: rejects unsigned, accepts validly-signed', async ({ reques
 // ── 5 · the Stripe test key actually works end-to-end (test-mode checkout) ──
 test('Stripe test key creates a checkout session (test mode)', async () => {
   const key = process.env.STRIPE_SECRET_KEY
-  test.skip(!key || !key.startsWith('sk_test'), 'requires a Stripe test key')
+  // `sk_test_ci` is the CI placeholder used when secrets aren't available
+  // (e.g. dependabot / fork pull_request events). It starts with sk_test but is
+  // NOT a real key, so skip it — otherwise the live checkout call fails with
+  // "Invalid API Key" and reds the whole journey job on every secret-less run.
+  test.skip(!key || !key.startsWith('sk_test') || key === 'sk_test_ci', 'requires a real Stripe test key')
   const stripe = new Stripe(key!, { apiVersion: '2023-10-16' })
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
