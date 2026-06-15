@@ -85,6 +85,8 @@ model User {
   cancelledAt  DateTime?  // set when subscription deleted; used for churn rate + exit-reason histogram
   refundReason String?    // exit-reason captured in cancellation flow; one of the enum values in lib/pmf/types.ts
   refundedAt   DateTime?  // set when a refund is issued; guards the one-refund-per-customer rule
+  winBackAt    DateTime?  // when to send the win-back re-engagement (set on cancel = cancel + WIN_BACK_DELAY_DAYS)
+  winBackSentAt DateTime? // set when the win-back email is sent, so it fires at most once per cancellation
 
   // Notification preferences
   dailyDigestEnabled Boolean @default(true)  // opt-out of daily activity digest email
@@ -119,6 +121,7 @@ model User {
   @@index([email])
   @@index([firstPaidAt])
   @@index([cancelledAt])
+  @@index([winBackAt])
   @@index([referralCode])
 }
 

@@ -127,6 +127,12 @@ export async function POST(req: Request) {
 
     case 'customer.subscription.deleted': {
       const freePlan = getPlanByPriceId(null)
+      // Schedule a one-time win-back re-engagement for when the user likely
+      // re-enters the job market (default 30 days). winBackSentAt is reset so a
+      // re-cancellation after resubscribing schedules a fresh one. See
+      // lib/notifications/win-back.ts + the win-back cron.
+      const winBackDelayDays = Number(process.env.WIN_BACK_DELAY_DAYS ?? '30')
+      const winBackAt = new Date(Date.now() + winBackDelayDays * 86_400_000)
 
       await prisma.user.update({
         where: { stripeSubscriptionId: subscription.id },
@@ -136,6 +142,8 @@ export async function POST(req: Request) {
           dailyApplicationLimit: freePlan.dailyLimit,
           // Record cancellation date for PMF churn / exit-reason histogram
           cancelledAt: new Date(),
+          winBackAt,
+          winBackSentAt: null,
         },
       })
       break

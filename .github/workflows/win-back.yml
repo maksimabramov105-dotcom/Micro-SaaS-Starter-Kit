@@ -1,0 +1,25 @@
+name: Win-back re-engagement
+
+on:
+  schedule:
+    - cron: '30 9 * * *'   # once daily, 09:30 UTC
+  workflow_dispatch:        # manual trigger for testing
+
+jobs:
+  send:
+    name: Trigger win-back cron
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call win-back cron endpoint
+        run: |
+          HTTP_STATUS=$(curl -s -o /tmp/body.txt -w "%{http_code}" \
+            -X POST "https://resumeai-bot.ru/api/cron/win-back" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json")
+          BODY=$(cat /tmp/body.txt)
+          echo "Status : $HTTP_STATUS"
+          echo "Response: $BODY"
+          if [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "::error::Cron returned HTTP $HTTP_STATUS: $BODY"
+            exit 1
+          fi
