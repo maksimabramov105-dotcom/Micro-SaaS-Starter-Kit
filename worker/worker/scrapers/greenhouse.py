@@ -95,6 +95,9 @@ _COMPANIES: list[str] = [
     # across support/CX, ops, marketing, fintech — not just engineering).
     "stripe", "datadog", "samsara", "airbnb", "instacart", "affirm", "asana",
     "flexport", "coinbase", "faire", "amplitude", "squarespace", "remote",
+    # Phase D expansion (2026-06-15) — more high-volume employers (support/CX/ops
+    # heavy) to widen the fresh eligible pool. Verified live with open roles.
+    "anthropic", "verkada", "pinterest", "lyft", "smartsheet", "chime", "udemy",
 ]
 
 
