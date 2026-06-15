@@ -36,6 +36,8 @@ _COMPANIES: list[str] = [
     # Phase C expansion (2026-06-14) — verified live on Ashby with high volume.
     "sierra", "vanta", "decagon", "cursor", "baseten", "ashby", "mercor",
     "gamma", "watershed", "mintlify", "browserbase", "runway",
+    # Phase D expansion (2026-06-15) — verified live on Ashby with open roles.
+    "deepgram", "persona", "warp", "granola", "resend", "julius", "greptile", "tldraw",
 ]
 
 
