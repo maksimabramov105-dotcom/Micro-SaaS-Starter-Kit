@@ -978,6 +978,39 @@ async def _fill_unanswered_required(
             except Exception:
                 pass
 
+    # ── Tier 3: deterministic fallback for still-empty required NATIVE selects ─
+    # A required <select> with no detectable label (e.g. Lever's "How did you
+    # hear about us?" cards[] dropdown) is skipped by the LLM tier (which needs a
+    # label), leaving it empty so the form won't submit (this was the Lever
+    # submit_unconfirmed bug). These are logistics dropdowns, NOT screening
+    # questions — work-auth/sponsorship/EEO are radios or labeled selects already
+    # answered honestly above — so picking the first real option is
+    # compliance-safe and unblocks submission. We explicitly SKIP any select
+    # whose label looks like a standard/sensitive question (never blind-pick those).
+    try:
+        leftover = await _collect_unanswered_required(page)
+    except Exception:
+        leftover = []
+    for f in leftover:
+        if f.get("kind") != "native_select":
+            continue
+        label = f.get("label") or ""
+        if label and _is_standard_question(label):
+            continue  # honest screening Q — don't blind-pick
+        opts = _clean_options(f.get("options") or [])  # placeholders stripped
+        choice = opts[0] if opts else None
+        if not choice:
+            continue
+        try:
+            if await _commit_field(page, f, choice):
+                stats["fallback"] = stats.get("fallback", 0) + 1
+                if answers_sink is not None:
+                    answers_sink.append(
+                        {"question": label or "(unlabeled select)", "answer": choice, "source": "fallback"}
+                    )
+        except Exception:
+            pass
+
     logger.info("careerops.fill_unanswered", **stats)
     return stats
 
