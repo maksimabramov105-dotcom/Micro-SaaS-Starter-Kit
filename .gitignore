@@ -48,3 +48,7 @@ __pycache__/
 
 # Playwright test-auth minted session (do not commit)
 e2e/.auth/
+
+# Generated test output
+playwright-report/
+test-results/
