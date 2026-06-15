@@ -8,7 +8,7 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { getReferralStats, MAX_REFERRALS, REFERRAL_CREDIT_CENTS } from '@/lib/referral'
+import { getReferralStats, MAX_REFERRALS, REFERRAL_FREE_MONTHS, PRO_MONTHLY_VALUE_USD } from '@/lib/referral'
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
 } from '@/components/ui/card'
@@ -30,11 +30,11 @@ export default async function ReferralsPage() {
   const stats = await getReferralStats(session.user.id)
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
   const shareUrl = `${appUrl}/r/${stats.code}`
-  const creditPerReferral = REFERRAL_CREDIT_CENTS / 100
+  const monthLabel = REFERRAL_FREE_MONTHS === 1 ? '1 free month' : `${REFERRAL_FREE_MONTHS} free months`
 
   // Pre-written share copy
   const twitterText = encodeURIComponent(
-    `I use ${process.env.NEXT_PUBLIC_APP_NAME ?? 'ResumeAI'} to automate my job applications with AI. Try it free — we both get $${creditPerReferral} credit: ${shareUrl}`,
+    `I use ${process.env.NEXT_PUBLIC_APP_NAME ?? 'ResumeAI'} to automate my job applications with AI. Try it free with my link: ${shareUrl}`,
   )
   const linkedinText = encodeURIComponent(shareUrl)
 
@@ -44,8 +44,8 @@ export default async function ReferralsPage() {
       <div>
         <h1 className="text-2xl font-bold">Referral Program</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Share your link — you both get <strong>${creditPerReferral} credit</strong> when your friend subscribes.
-          Earn up to <strong>${MAX_REFERRALS * creditPerReferral}</strong> total.
+          Share your link — when a friend gets a <strong>year of Pro</strong>, you get <strong>{monthLabel} of Pro</strong>, free.
+          Earn up to <strong>{MAX_REFERRALS} free months</strong>.
         </p>
       </div>
 
@@ -53,7 +53,7 @@ export default async function ReferralsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Your referral link</CardTitle>
-          <CardDescription>Share it anywhere — the credit is applied automatically.</CardDescription>
+          <CardDescription>Share it anywhere — your free month is applied automatically.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <CopyLinkButton url={shareUrl} />
@@ -77,7 +77,7 @@ export default async function ReferralsPage() {
               Share on LinkedIn
             </a>
             <a
-              href={`mailto:?subject=Try ${process.env.NEXT_PUBLIC_APP_NAME ?? 'ResumeAI'} — you'll get $${creditPerReferral} off&body=Hey!%0A%0AI've been using ${process.env.NEXT_PUBLIC_APP_NAME ?? 'ResumeAI'} to automate my job search. Sign up with my link and we both get $${creditPerReferral} credit:%0A${encodeURIComponent(shareUrl)}`}
+              href={`mailto:?subject=Try ${process.env.NEXT_PUBLIC_APP_NAME ?? 'ResumeAI'} for your job search&body=Hey!%0A%0AI've been using ${process.env.NEXT_PUBLIC_APP_NAME ?? 'ResumeAI'} to automate my job search. Sign up with my link:%0A${encodeURIComponent(shareUrl)}`}
               className="inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors"
             >
               Send via email
@@ -96,8 +96,8 @@ export default async function ReferralsPage() {
         </Card>
         <Card>
           <CardContent className="pt-6 text-center">
-            <p className="text-3xl font-bold">${stats.referralEarned.toFixed(0)}</p>
-            <p className="text-xs text-muted-foreground mt-1">Earned (lifetime)</p>
+            <p className="text-3xl font-bold">{Math.round(stats.referralEarned / PRO_MONTHLY_VALUE_USD)}</p>
+            <p className="text-xs text-muted-foreground mt-1">Free months earned</p>
           </CardContent>
         </Card>
         <Card>
@@ -121,7 +121,7 @@ export default async function ReferralsPage() {
           />
         </div>
         <p className="text-xs text-muted-foreground">
-          Max {MAX_REFERRALS} rewarded referrals per account (${MAX_REFERRALS * creditPerReferral} total credit).
+          Max {MAX_REFERRALS} rewarded referrals per account (up to {MAX_REFERRALS} free months of Pro).
           See our <a href="/terms" className="underline underline-offset-2">terms</a>.
         </p>
       </div>

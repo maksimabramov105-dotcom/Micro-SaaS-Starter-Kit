@@ -80,10 +80,11 @@ export async function POST(req: Request) {
           },
         })
 
-        // Qualify any pending referral on the referee's first payment
+        // Qualify any pending referral on the referee's first payment. Pass the
+        // purchased priceId — a referral only rewards when it's the Pro ANNUAL plan.
         if (isFirstPayment && customerId) {
           try {
-            await qualifyReferral(userId, customerId)
+            await qualifyReferral(userId, customerId, priceId)
           } catch (err) {
             // Non-fatal — referral can be manually rewarded if this fails
             console.error('[webhook] referral qualification failed for user', userId, err)

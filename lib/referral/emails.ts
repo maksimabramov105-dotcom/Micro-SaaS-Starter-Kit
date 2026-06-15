@@ -11,35 +11,34 @@ import { sendEmail } from '@/lib/email'
 const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? 'ResumeAI'
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
 
-// ── Referrer: "you earned $20" ────────────────────────────────────────────────
+// ── Referrer: "you earned a free month of Pro" ───────────────────────────────
 
 interface ReferralQualifiedOptions {
   to: string
   referrerName: string | null | undefined
-  creditAmount: number  // dollars
+  freeMonths: number  // months of Pro, free
 }
 
 export async function sendReferralQualifiedEmail({
   to,
   referrerName,
-  creditAmount,
+  freeMonths,
 }: ReferralQualifiedOptions) {
   const name = referrerName ?? 'there'
-  const amount = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(creditAmount)
+  const label = freeMonths === 1 ? '1 free month of Pro' : `${freeMonths} free months of Pro`
 
-  const subject = `🎉 You earned ${amount} — a friend just subscribed!`
+  const subject = `🎉 You earned ${label} — a friend just got a year of Pro!`
   const html = `
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#111">
-      <h2 style="color:#111">You earned ${amount}! 🎉</h2>
+      <h2 style="color:#111">You earned ${label}! 🎉</h2>
       <p>Hi ${name},</p>
       <p>
-        Great news: a friend you referred just subscribed to ${APP_NAME}.
-        We've added a <strong>${amount} credit</strong> to your account — it will be applied
-        automatically to your next invoice.
+        Great news: a friend you referred just subscribed to a <strong>year of ${APP_NAME} Pro</strong>.
+        We've added <strong>${label}</strong> to your account — it applies automatically to your
+        next Pro invoice (or your first, if you upgrade later).
       </p>
       <p>
-        Keep the referrals coming! Every friend who subscribes earns you another ${amount}.
-        You can earn up to $200 in total credits.
+        Keep sharing! Every friend who gets a year of Pro earns you another free month.
       </p>
       <a href="${APP_URL}/dashboard/referrals"
          style="display:inline-block;padding:12px 24px;background:#000;color:#fff;
