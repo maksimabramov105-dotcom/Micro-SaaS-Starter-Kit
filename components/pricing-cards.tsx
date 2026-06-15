@@ -13,7 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import { Check } from 'lucide-react'
+import { Check, Lock } from 'lucide-react'
 import { PRICING_PLANS, getMonthlyEquivalent, type BillingInterval } from '@/lib/pricing'
 
 // ── Analytics helper (fire-and-forget; never throws) ─────────────────────────
@@ -245,9 +245,13 @@ export function PricingCards() {
                     : 'Get Started'}
                 </Button>
                 {!isFree && (
-                  <p className="text-center text-xs text-muted-foreground">
-                    30-day money-back guarantee · cancel anytime
-                  </p>
+                  <div className="space-y-1 text-center text-xs text-muted-foreground">
+                    <p>30-day money-back guarantee · cancel anytime</p>
+                    <p className="flex items-center justify-center gap-1">
+                      <Lock className="h-3 w-3" aria-hidden="true" />
+                      Secured by Stripe · no card details touch our servers
+                    </p>
+                  </div>
                 )}
               </CardFooter>
             </Card>
