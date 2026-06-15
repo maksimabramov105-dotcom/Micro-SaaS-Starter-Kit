@@ -24,85 +24,28 @@ logger = structlog.get_logger(__name__)
 
 _HEADERS = {"User-Agent": "ResumeAI-Worker/1.0 (support@example.com)"}
 
-# Remote-first / globally-hiring companies on Greenhouse, verified live and
-# (critically) cross-functional: each posts substantial NON-engineering volume
-# (support, success, sales, marketing, ops, people, finance) so AND-keyword
-# matching surfaces *whatever role* a given user is searching for — not just eng.
-# Verified counts at curation time, e.g. gitlab 147 (52 non-eng), elastic 160
-# (95), mongodb 429 (155), twilio 147 (72), intercom 153 (50), notion-tier.
+# Curated for INTERVIEW PROBABILITY, not raw volume (2026-06-15). These are
+# mid-market, support/CX/ops-heavy, and/or global-remote companies where a solid
+# non-elite candidate (e.g. a few years' experience, no FAANG pedigree) has a
+# REAL shot at an interview. We deliberately DROPPED FAANG / top AI labs / top
+# fintech / prestige unicorns (Stripe, Anthropic, Airbnb, Figma, Coinbase,
+# Databricks, Datadog, Cloudflare, MongoDB, Brex, Reddit, Discord, Pinterest,
+# Lyft, etc.) — even their support roles draw thousands of applicants and a very
+# high bar, so applying there just burns shots. All entries verified live.
 _COMPANIES: list[str] = [
-    "gitlab",
-    "elastic",
-    "mongodb",
-    "twilio",
-    "intercom",
-    "cloudflare",
-    "dropbox",
-    "gusto",
-    "contentful",
-    "algolia",
-    "customerio",
-    "mattermost",
-    "webflow",
-    "calendly",
-    "airtable",
-    "postman",
-    "fivetran",
-    "hightouch",
-    "huntress",
-    "mercury",
-    "checkr",
-    "monzo",
-    "n26",
-    "brex",
-    "figma",
-    "vercel",
-    "turing",
-    "circleci",
-    "gemini",
-    "robinhood",
-    # Phase A expansion — support/CX, fintech, HR-tech, health, marketing heavy
-    # (all verified live; deepens the fillable pool for non-engineering roles).
-    "cockroachlabs",
-    "typeform",
-    "dialpad",
-    "lattice",
-    "cultureamp",
-    "justworks",
-    "payoneer",
-    "gocardless",
-    "truelayer",
-    "modernhealth",
-    "reddit",
-    "discord",
-    "later",
-    "hootsuite",
-    "klaviyo",
-    "nubank",
-    # Global-remote-first (hire from anywhere incl APAC/NZ) + ANZ/APAC employers —
-    # gives non-US-authorized candidates a genuinely eligible fillable pool.
-    "canonical",
-    "remotecom",
-    "grafanalabs",
-    "databricks",
-    "cargurus",
-    "pushpay",
-    "fingerprint",
-    "planetscale",
-    "octopusdeploy",
-    # Phase C expansion (2026-06-14) — large, high-volume Greenhouse employers
-    # verified live with hundreds of open roles each (deepens the fillable pool
-    # across support/CX, ops, marketing, fintech — not just engineering).
-    "stripe", "datadog", "samsara", "airbnb", "instacart", "affirm", "asana",
-    "flexport", "coinbase", "faire", "amplitude", "squarespace", "remote",
-    # Phase D expansion (2026-06-15) — more high-volume employers (support/CX/ops
-    # heavy) to widen the fresh eligible pool. Verified live with open roles.
-    "anthropic", "verkada", "pinterest", "lyft", "smartsheet", "chime", "udemy",
-    # Phase E expansion (2026-06-15) — fintech/edtech/health with support+ops
-    # volume. Verified live. (Lever/Ashby candidates this pass were all already
-    # in the lists — supply now spans ~95 direct-ATS companies.)
-    "duolingo", "fireblocks", "carta", "marqeta", "betterment", "consensys",
-    "guild", "coursera", "masterclass", "cerebral", "cameo", "calm",
+    # Mid-market SaaS with real support/CX/ops volume
+    "gitlab", "elastic", "twilio", "intercom", "gusto", "contentful", "algolia",
+    "customerio", "mattermost", "webflow", "calendly", "airtable", "postman",
+    "fivetran", "hightouch", "huntress", "mercury", "checkr", "turing", "circleci",
+    "cockroachlabs", "typeform", "dialpad", "lattice", "cultureamp", "justworks",
+    "payoneer", "gocardless", "truelayer", "modernhealth", "later", "hootsuite",
+    "klaviyo", "cargurus", "pushpay", "fingerprint", "planetscale", "octopusdeploy",
+    "asana", "flexport", "faire", "amplitude", "squarespace", "verkada",
+    "smartsheet", "chime", "udemy", "carta", "betterment", "guild", "coursera",
+    "masterclass", "cerebral", "cameo", "calm",
+    # Global-remote-first / EOR (hire from anywhere incl APAC/NZ) — best eligible
+    # pool for non-US candidates.
+    "canonical", "remotecom", "remote", "grafanalabs",
 ]
 
 

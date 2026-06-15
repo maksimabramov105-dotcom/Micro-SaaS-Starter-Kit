@@ -20,24 +20,24 @@ logger = structlog.get_logger(__name__)
 
 _HEADERS = {"User-Agent": "ResumeAI-Worker/1.0 (support@example.com)", "Accept": "application/json"}
 
-# Remote-first / globally-hiring companies on Ashby, verified live and
-# cross-functional (deel/oyster/andela/zapier are global all-functions employers;
-# notion 147, ramp 111 carry heavy non-eng volume). Role-agnostic by design.
+# Remote-first / globally-hiring companies on Ashby, curated for interview
+# probability (2026-06-15): support-SaaS, EOR/global-talent, and devtools that
+# hire support/ops — where a non-elite candidate converts. Dropped prestige
+# unicorns + tiny eng-only AI labs (Notion, Linear, Ramp, Cursor, Sierra, Vanta,
+# Decagon, Baseten, Deepgram, Mercor, Runway, Confluent, Replit, Modal, Pinecone,
+# Docker, Quora, Watershed, Gamma, Warp/Granola/Greptile/Julius/Mintlify/
+# Browserbase/tldraw) — too-high a bar / too eng-only to land an interview.
 _COMPANIES: list[str] = [
-    "deel", "andela", "oyster", "1password", "close", "zapier", "float",
-    "notion", "ramp", "linear", "supabase", "posthog", "render", "modal",
-    "replit", "benchling", "sentry", "mux", "helpscout", "gitbook", "buffer",
-    # Phase A expansion — CX-tooling (gorgias/kustomer), fintech, health, media.
-    "gorgias", "kustomer", "pinecone", "temporal", "airbyte", "wealthsimple",
-    "pleo", "patreon", "substack", "quora", "maven",
-    # Global-remote + ANZ/APAC (Airwallex AU, Xero/Auror NZ) — eligible pool for
-    # non-US candidates; Docker/Confluent/Prefect hire globally remote.
-    "airwallex", "xero", "auror", "confluent", "docker", "easygenerator", "prefect",
-    # Phase C expansion (2026-06-14) — verified live on Ashby with high volume.
-    "sierra", "vanta", "decagon", "cursor", "baseten", "ashby", "mercor",
-    "gamma", "watershed", "mintlify", "browserbase", "runway",
-    # Phase D expansion (2026-06-15) — verified live on Ashby with open roles.
-    "deepgram", "persona", "warp", "granola", "resend", "julius", "greptile", "tldraw",
+    # EOR / global-talent (best eligibility + heavy support/ops volume)
+    "deel", "andela", "oyster",
+    # Support-SaaS + remote-first with real CX/ops hiring
+    "1password", "close", "zapier", "float", "helpscout", "gorgias", "kustomer",
+    "buffer", "gitbook", "supabase", "posthog", "render", "sentry", "mux",
+    "temporal", "airbyte", "easygenerator", "prefect", "persona", "resend",
+    # Fintech / media / edtech mid-market
+    "wealthsimple", "pleo", "patreon", "substack", "maven",
+    # ANZ/APAC (eligible pool for NZ/AU-resident candidates)
+    "airwallex", "xero", "auror",
 ]
 
 

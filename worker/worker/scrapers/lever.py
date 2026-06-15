@@ -20,19 +20,17 @@ logger = structlog.get_logger(__name__)
 
 _HEADERS = {"User-Agent": "ResumeAI-Worker/1.0 (support@example.com)", "Accept": "application/json"}
 
-# Companies verified live on Lever's public postings API. Mix of remote-friendly
-# global employers (toptal all-remote; whoop/ro/spotify hire cross-function) with
-# high posting volume so any-role keyword matching has depth.
+# Companies verified live on Lever's public postings API, curated for interview
+# probability (2026-06-15): remote-friendly mid-market employers with real
+# support/CX/ops volume. Dropped FAANG / elite (Netflix, Spotify, Plaid,
+# Palantir, Veeva) — too-high a bar for a non-elite candidate to convert.
 _COMPANIES: list[str] = [
-    "toptal", "whoop", "ro", "veeva", "gopuff", "spotify", "plaid",
-    "attentive", "netflix", "kayak", "brevo", "nerdwallet", "leadgenius",
-    "matchgroup",
-    # Phase A expansion — CX-tooling + fintech + HR-tech (cross-function depth).
+    "toptal", "whoop", "ro", "gopuff", "attentive", "kayak", "brevo",
+    "nerdwallet", "leadgenius",
+    # CX-tooling + fintech + HR-tech (cross-function depth).
     "pipedrive", "aircall", "outreach", "qonto", "lyrahealth", "15five",
     # ANZ/APAC employers (eligible pool for NZ/AU-resident candidates).
     "deputy", "immutable",
-    # Phase C expansion (2026-06-14) — verified live, high volume.
-    "palantir",
 ]
 
 
