@@ -10,12 +10,17 @@ import {
   clawbackReferral,
   ensureReferralCode,
   MAX_REFERRALS,
-  REFERRAL_CREDIT_CENTS,
 } from '@/lib/referral'
 
 // nanoid v5 is ESM-only; mock it for Jest (CommonJS environment)
 jest.mock('nanoid', () => ({
   customAlphabet: () => () => 'abc123',
+}))
+
+// Pricing: pro_yearly resolves to a known price ID so the Pro-annual gate works.
+const PRO_YEARLY = 'price_pro_yearly'
+jest.mock('@/lib/pricing', () => ({
+  getPlanById: (id: string) => (id === 'pro_yearly' ? { priceId: 'price_pro_yearly' } : { priceId: null }),
 }))
 
 // ── Mock Prisma ───────────────────────────────────────────────────────────────
@@ -116,7 +121,7 @@ describe('captureReferral', () => {
 describe('qualifyReferral', () => {
   beforeEach(resetMocks)
 
-  it('creates two coupons, applies them, marks rewarded, increments counters', async () => {
+  it('on Pro-annual purchase: one free-month coupon to the referrer, marks rewarded', async () => {
     prisma.referral.findFirst.mockResolvedValueOnce({
       id: 'ref-1',
       referrerId: 'referrer-1',
@@ -132,23 +137,27 @@ describe('qualifyReferral', () => {
     })
     prisma.referral.update.mockResolvedValue({})
     prisma.user.update.mockResolvedValue({})
-    stripe.coupons.create
-      .mockResolvedValueOnce({ id: 'coupon-referrer' })
-      .mockResolvedValueOnce({ id: 'coupon-referee' })
+    stripe.coupons.create.mockResolvedValueOnce({ id: 'coupon-freemonth' })
     stripe.customers.update.mockResolvedValue({})
 
-    await qualifyReferral('referee-1', 'cus_referee')
+    await qualifyReferral('referee-1', 'cus_referee', PRO_YEARLY)
 
-    expect(stripe.coupons.create).toHaveBeenCalledTimes(2)
-    expect(stripe.customers.update).toHaveBeenCalledWith('cus_referee', { coupon: 'coupon-referee' })
-    expect(stripe.customers.update).toHaveBeenCalledWith('cus_referrer', { coupon: 'coupon-referrer' })
+    // ONE coupon, 100% off for 1 month, applied to the REFERRER only.
+    expect(stripe.coupons.create).toHaveBeenCalledTimes(1)
+    expect(stripe.coupons.create.mock.calls[0][0]).toMatchObject({ percent_off: 100, duration: 'repeating', duration_in_months: 1 })
+    expect(stripe.customers.update).toHaveBeenCalledTimes(1)
+    expect(stripe.customers.update).toHaveBeenCalledWith('cus_referrer', { coupon: 'coupon-freemonth' })
     expect(sendReferralQualifiedEmail).toHaveBeenCalledTimes(1)
-    // Verify the rewarded update call
     expect(prisma.referral.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ status: 'rewarded' }),
-      }),
+      expect.objectContaining({ data: expect.objectContaining({ status: 'rewarded' }) }),
     )
+  })
+
+  it('does NOT reward when the referee did not buy Pro annual (monthly/other)', async () => {
+    await qualifyReferral('referee-1', 'cus_referee', 'price_pro_monthly')
+    // Gate returns before touching the referral or Stripe.
+    expect(prisma.referral.findFirst).not.toHaveBeenCalled()
+    expect(stripe.coupons.create).not.toHaveBeenCalled()
   })
 
   it('enforces the MAX_REFERRALS cap by marking status=abused', async () => {
@@ -167,7 +176,7 @@ describe('qualifyReferral', () => {
     })
     prisma.referral.update.mockResolvedValue({})
 
-    await qualifyReferral('referee-cap', 'cus_referee_cap')
+    await qualifyReferral('referee-cap', 'cus_referee_cap', PRO_YEARLY)
 
     expect(stripe.coupons.create).not.toHaveBeenCalled()
     expect(prisma.referral.update).toHaveBeenCalledWith(
@@ -178,7 +187,7 @@ describe('qualifyReferral', () => {
   it('no-ops when no pending referral found', async () => {
     prisma.referral.findFirst.mockResolvedValueOnce(null)
 
-    await qualifyReferral('nobody', 'cus_nobody')
+    await qualifyReferral('nobody', 'cus_nobody', PRO_YEARLY)
 
     expect(stripe.coupons.create).not.toHaveBeenCalled()
   })

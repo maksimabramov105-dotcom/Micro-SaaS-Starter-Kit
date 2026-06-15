@@ -1,14 +1,18 @@
 /**
  * lib/referral/index.ts
  *
- * In-house double-sided referral program.
+ * In-house referral program: "refer a friend — when they get a year of Pro,
+ * you get 1 free month of Pro."
  *
- * Rewards: $20 Stripe coupon for the referrer on the referee's first paid invoice;
- *          $20 Stripe coupon for the referee applied to their first subscription.
+ * Reward: a 1-free-month-of-Pro Stripe coupon (100% off for 1 month) for the
+ * REFERRER, granted ONLY when the referred friend's purchase is the Pro ANNUAL
+ * plan. (Annual commitment is what makes a referral worth a free month, and it
+ * pulls cash forward — see prompt 05/06.) The referee already gets the annual
+ * price; the free month is the referrer's reward to share with their friend.
  *
  * Anti-abuse rules:
  *  - No self-referral
- *  - Max 10 rewarded referrals per user (= $200/yr cap — documented in T&C)
+ *  - Max 10 rewarded referrals per user (documented in T&C)
  *  - Abused status manually set when fraud detected — coupons not issued
  *  - Clawback if referee refunds within 30 days
  *
@@ -17,15 +21,22 @@
 
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
+import { getPlanById } from '@/lib/pricing'
 import { customAlphabet } from 'nanoid'
 import { sendReferralQualifiedEmail, sendReferralReceivedEmail } from './emails'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-export const REFERRAL_CREDIT_CENTS = 2_000   // $20
+export const REFERRAL_FREE_MONTHS = 1        // reward: 1 free month of Pro
+export const PRO_MONTHLY_VALUE_USD = 19.99   // value of the free month (referralEarned tracking)
 export const MAX_REFERRALS = 10              // max rewarded referrals per user per lifetime
 export const REFERRAL_COOKIE = 'referral_code'
 export const CLAWBACK_WINDOW_DAYS = 30
+
+/** Stripe price ID for Pro annual — a referral only rewards when the friend buys this. */
+export function proYearlyPriceId(): string | null {
+  return getPlanById('pro_yearly').priceId
+}
 
 // nanoid alphabet: lowercase letters without ambiguous chars (l, 1, 0, o, i)
 const codeAlphabet = customAlphabet('abcdefghjkmnpqrstuvwxyz23456789', 6)
@@ -153,7 +164,17 @@ export async function captureReferral(
 export async function qualifyReferral(
   refereeUserId: string,
   refereeStripeCustomerId: string,
+  refereePriceId?: string | null,
 ): Promise<void> {
+  // Reward ONLY when the referred friend committed to a YEAR of Pro. A monthly
+  // or Unlimited purchase doesn't trigger the free month. The referral stays
+  // pending so it could still qualify if they upgrade to Pro annual later.
+  const proYearly = proYearlyPriceId()
+  if (!proYearly || refereePriceId !== proYearly) {
+    console.log('[referral] referee purchase is not Pro annual — no free-month reward', { refereePriceId })
+    return
+  }
+
   // Find the pending referral
   const referral = await prisma.referral.findFirst({
     where: { refereeId: refereeUserId, status: 'pending' },
@@ -186,37 +207,24 @@ export async function qualifyReferral(
     data: { status: 'qualified', qualifiedAt: new Date() },
   })
 
-  // ── Create Stripe coupons (idempotent via idempotencyKey) ─────────────────
+  // ── Create the 1-free-month-of-Pro coupon for the REFERRER (idempotent) ────
+  // 100% off for 1 month. Applied to the referrer's Stripe customer so it lands
+  // on their next Pro invoice (or their first, if they subscribe later).
   let referrerCouponId: string
-  let refereeCouponId: string
-
   try {
-    const [referrerCoupon, refereeCoupon] = await Promise.all([
-      stripe.coupons.create(
-        {
-          amount_off: REFERRAL_CREDIT_CENTS,
-          currency: 'usd',
-          duration: 'once',
-          name: 'Referral reward — $20',
-          metadata: { referralId: referral.id, side: 'referrer' },
-        },
-        { idempotencyKey: `referral-${referral.id}-referrer` },
-      ),
-      stripe.coupons.create(
-        {
-          amount_off: REFERRAL_CREDIT_CENTS,
-          currency: 'usd',
-          duration: 'once',
-          name: 'Referral credit — $20',
-          metadata: { referralId: referral.id, side: 'referee' },
-        },
-        { idempotencyKey: `referral-${referral.id}-referee` },
-      ),
-    ])
-    referrerCouponId = referrerCoupon.id
-    refereeCouponId = refereeCoupon.id
+    const coupon = await stripe.coupons.create(
+      {
+        percent_off: 100,
+        duration: 'repeating',
+        duration_in_months: REFERRAL_FREE_MONTHS,
+        name: 'Referral reward — 1 free month of Pro',
+        metadata: { referralId: referral.id, side: 'referrer', reward: 'free_month_pro' },
+      },
+      { idempotencyKey: `referral-${referral.id}-referrer-freemonth` },
+    )
+    referrerCouponId = coupon.id
   } catch (err) {
-    console.error('[referral] failed to create Stripe coupons', err)
+    console.error('[referral] failed to create free-month coupon', err)
     // Roll back to pending so it can retry on next webhook
     await prisma.referral.update({
       where: { id: referral.id },
@@ -225,23 +233,14 @@ export async function qualifyReferral(
     return
   }
 
-  // ── Apply coupons to Stripe customers ────────────────────────────────────
-  const customerUpdates: Promise<unknown>[] = [
-    stripe.customers.update(refereeStripeCustomerId, { coupon: refereeCouponId }),
-  ]
+  // ── Apply the coupon to the referrer's Stripe customer (if they have one) ──
   if (referral.referrer.stripeCustomerId) {
-    customerUpdates.push(
-      stripe.customers.update(referral.referrer.stripeCustomerId, {
-        coupon: referrerCouponId,
-      }),
-    )
-  }
-
-  try {
-    await Promise.all(customerUpdates)
-  } catch (err) {
-    // Non-fatal — log and continue. Coupons are created; support can apply manually.
-    console.error('[referral] failed to apply coupons to Stripe customers', err)
+    try {
+      await stripe.customers.update(referral.referrer.stripeCustomerId, { coupon: referrerCouponId })
+    } catch (err) {
+      // Non-fatal — coupon exists; support/code can apply it when they subscribe.
+      console.error('[referral] failed to apply free-month coupon to referrer', err)
+    }
   }
 
   // ── Mark rewarded, update counters ────────────────────────────────────────
@@ -251,7 +250,6 @@ export async function qualifyReferral(
       data: {
         status: 'rewarded',
         stripeCouponReferrerId: referrerCouponId,
-        stripeCouponRefereeId: refereeCouponId,
         rewardedAt: new Date(),
       },
     }),
@@ -259,18 +257,18 @@ export async function qualifyReferral(
       where: { id: referral.referrer.id },
       data: {
         referralCount: { increment: 1 },
-        referralEarned: { increment: REFERRAL_CREDIT_CENTS / 100 },
+        referralEarned: { increment: PRO_MONTHLY_VALUE_USD },
       },
     }),
   ])
 
-  // ── Send referrer the "you earned $20" email ──────────────────────────────
+  // ── Send the referrer the "you earned a free month of Pro" email ──────────
   if (referral.referrer.email) {
     try {
       await sendReferralQualifiedEmail({
         to: referral.referrer.email,
         referrerName: referral.referrer.name,
-        creditAmount: REFERRAL_CREDIT_CENTS / 100,
+        freeMonths: REFERRAL_FREE_MONTHS,
       })
     } catch (err) {
       console.error('[referral] failed to send referral-qualified email', err)
@@ -316,7 +314,7 @@ export async function clawbackReferral(refereeStripeCustomerId: string): Promise
       where: { id: referral.referrer.id },
       data: {
         referralCount: { decrement: 1 },
-        referralEarned: { decrement: REFERRAL_CREDIT_CENTS / 100 },
+        referralEarned: { decrement: PRO_MONTHLY_VALUE_USD },
       },
     }),
   ])
