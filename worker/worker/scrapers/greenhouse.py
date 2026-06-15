@@ -98,6 +98,11 @@ _COMPANIES: list[str] = [
     # Phase D expansion (2026-06-15) — more high-volume employers (support/CX/ops
     # heavy) to widen the fresh eligible pool. Verified live with open roles.
     "anthropic", "verkada", "pinterest", "lyft", "smartsheet", "chime", "udemy",
+    # Phase E expansion (2026-06-15) — fintech/edtech/health with support+ops
+    # volume. Verified live. (Lever/Ashby candidates this pass were all already
+    # in the lists — supply now spans ~95 direct-ATS companies.)
+    "duolingo", "fireblocks", "carta", "marqeta", "betterment", "consensys",
+    "guild", "coursera", "masterclass", "cerebral", "cameo", "calm",
 ]
 
 
