@@ -510,6 +510,9 @@ async function runCampaigns(
     remoteok: 'source_remoteok', himalayas: 'source_himalayas', wwr: 'source_wwr',
     lever: 'source_lever', ashby: 'source_ashby', recruitee: 'source_recruitee',
     personio: 'source_personio',
+    // Workable GLOBAL search — large FILLABLE supply (apply form revealed inline
+    // on jobs.workable.com/view; see careerops.apply_workable_view).
+    workable: 'source_workable',
   }
   const enabledSources = new Set<string>()
   for (const [board, flag] of Object.entries(SOURCE_FLAGS)) {
@@ -940,10 +943,11 @@ async function runCampaigns(
       // ATS feeders → direct apply URLs CareerOps can fill (Lever/Ashby handlers,
       // generic for Recruitee/Personio). Remote boards → mostly redirect/board
       // URLs that are sourced + funneled but skipped at apply time.
-      ...(['lever', 'ashby', 'himalayas', 'wwr', 'recruitee', 'personio'] as const)
+      // workable = GLOBAL search, large FILLABLE supply (apply_workable_view).
+      ...(['workable', 'lever', 'ashby', 'himalayas', 'wwr', 'recruitee', 'personio'] as const)
         .filter((board) => enabledSources.has(board))
         .map((board) =>
-          scrapeBoard(workerUrl, workerSecret, board, keyword, location)
+          scrapeBoard(workerUrl, workerSecret, board, keyword, location, board === 'workable' ? 22_000 : undefined, board === 'workable' ? 200 : undefined)
             .then((j) => j.map((x) => ({ ...x, board })))
         ),
     ])

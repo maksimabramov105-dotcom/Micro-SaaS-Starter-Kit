@@ -34,7 +34,7 @@ from worker.config import settings
 from worker.deps import verify_bearer
 from worker.scrapers import (
     adzuna, arbeitnow, greenhouse, remoteok, themuse,
-    himalayas, wwr, lever, ashby, recruitee, personio,
+    himalayas, wwr, lever, ashby, recruitee, personio, workable,
 )
 from worker.scrapers.resolve import resolve_many
 
@@ -543,6 +543,7 @@ _SCRAPER_MAP = {
     "ashby": ashby.search,
     "recruitee": recruitee.search,
     "personio": personio.search,
+    "workable": workable.search,
 }
 
 
