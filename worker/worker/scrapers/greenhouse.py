@@ -46,6 +46,8 @@ _COMPANIES: list[str] = [
     # Global-remote-first / EOR (hire from anywhere incl APAC/NZ) — best eligible
     # pool for non-US candidates.
     "canonical", "remotecom", "remote", "grafanalabs",
+    # More mid-market support/ops (non-elite), verified live.
+    "getyourguide", "current", "mercari",
 ]
 
 
