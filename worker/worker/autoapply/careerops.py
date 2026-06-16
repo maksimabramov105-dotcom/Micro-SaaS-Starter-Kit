@@ -1394,6 +1394,17 @@ class CareerOpsApplicator:
         Never raises — returns an error dict on unhandled exception.
         """
         ats = detect_ats(job_url)
+        # Workable GLOBAL search jobs are jobs.workable.com/view/{id} — the apply
+        # form is revealed inline by an "Apply now" click (not apply.workable.com),
+        # so route them to the dedicated handler.
+        if "jobs.workable.com/view" in job_url:
+            ats = "workable"
+            logger.info("careerops.apply.routing", url=job_url, ats="workable_view")
+            try:
+                return await self.apply_workable_view(job_url, user_data)
+            except Exception as exc:
+                logger.exception("careerops.apply.unhandled_error", url=job_url, error=str(exc))
+                return {"status": "error", "url": job_url, "ats": ats, "error": str(exc)}
         logger.info("careerops.apply.routing", url=job_url, ats=ats)
         try:
             if ats == "greenhouse":
@@ -1872,6 +1883,117 @@ class CareerOpsApplicator:
 
                 if not advanced:
                     break  # No button found — bail out
+
+            return {"status": "form_not_found", "url": job_url, "ats": "workable"}
+        finally:
+            await page.close()
+
+    # ── Workable GLOBAL search (jobs.workable.com/view) ────────────────────────
+
+    async def apply_workable_view(self, job_url: str, user_data: dict) -> dict:
+        """
+        Workable global-search jobs (jobs.workable.com/view/{id}). The apply form
+        is revealed INLINE by an "Apply now" click — no redirect to
+        apply.workable.com. We dismiss any consent banner, click Apply, then fill
+        the revealed form with the same field map + screening/required-field
+        filler + resume upload as the standard Workable wizard.
+        """
+        page = await self.context.new_page()
+        try:
+            await page.goto(job_url, wait_until="domcontentloaded", timeout=30000)
+            await page.wait_for_timeout(random.randint(1500, 2500))
+
+            # Dismiss cookie / consent overlays that intercept the Apply click.
+            for t in ("Accept", "Accept all", "Accept cookies", "Got it", "I agree", "Allow all"):
+                bt = page.locator(f"button:has-text('{t}')").first
+                if await bt.count() > 0:
+                    try:
+                        await bt.click(timeout=1500)
+                        break
+                    except Exception:
+                        pass
+
+            # Reveal the inline application form.
+            for t in ("Apply now", "Apply for this job", "Apply"):
+                ab = page.locator(f"a:has-text('{t}'), button:has-text('{t}')").first
+                if await ab.count() > 0:
+                    try:
+                        await ab.scroll_into_view_if_needed(timeout=2000)
+                    except Exception:
+                        pass
+                    try:
+                        await ab.click(timeout=4000)
+                    except Exception:
+                        try:
+                            await ab.click(timeout=4000, force=True)
+                        except Exception:
+                            pass
+                    break
+            await page.wait_for_timeout(1800)
+
+            try:
+                await page.wait_for_selector(
+                    'input[name="firstname"], input[name="name"], input[type="email"]', timeout=12000
+                )
+            except Exception:
+                return {"status": "form_not_found", "url": job_url, "ats": "workable"}
+
+            full_name = f"{user_data.get('first_name', '')} {user_data.get('last_name', '')}".strip()
+            field_map = {
+                'input[name="firstname"]': user_data.get("first_name", ""),
+                'input[name="lastname"]': user_data.get("last_name", ""),
+                'input[name="name"]': full_name,
+                'input[name="email"]': user_data.get("email", ""),
+                'input[name="phone"]': user_data.get("phone", ""),
+                'input[name="address"]': user_data.get("location", ""),
+            }
+            for sel, val in field_map.items():
+                if val:
+                    await _fill(page, sel, val)
+
+            resume_text = user_data.get("resume_text", "")
+            if resume_text:
+                for sel in (
+                    'input[type="file"][name*="resume" i]',
+                    'input[type="file"][accept*="pdf"]',
+                    'input[type="file"]',
+                ):
+                    if await page.locator(sel).count() > 0:
+                        if await _upload_resume(page, sel, resume_text):
+                            break
+
+            cover_letter = user_data.get("cover_letter", "")
+            for sel in ('textarea[name*="cover"]', 'textarea[name*="comment"]', 'textarea'):
+                if cover_letter and await _fill(page, sel, cover_letter[:2000]):
+                    break
+
+            screening: list = []
+            await _check_required_boxes(page)
+            await _fill_unanswered_required(page, user_data, screening)
+            await _check_required_boxes(page)
+
+            for sel in (
+                'button:has-text("Submit application")',
+                'button:has-text("Submit Application")',
+                'button:has-text("Submit")',
+                'button[type="submit"]',
+            ):
+                btn = page.locator(sel).first
+                if await btn.count() > 0:
+                    try:
+                        await btn.scroll_into_view_if_needed(timeout=3000)
+                    except Exception:
+                        pass
+                    await btn.click()
+                    try:
+                        await page.wait_for_load_state("networkidle", timeout=12000)
+                    except Exception:
+                        pass
+                    if await _verify_submitted(page):
+                        logger.info("careerops.workable_view.submitted", url=job_url)
+                        return {"status": "submitted", "url": job_url, "ats": "workable", "answers": screening}
+                    logger.warning("careerops.workable_view.submit_unconfirmed", url=job_url, selector=sel)
+                    return {"status": "error", "url": job_url, "ats": "workable", "error": "submission not confirmed"}
 
             return {"status": "form_not_found", "url": job_url, "ats": "workable"}
         finally:
