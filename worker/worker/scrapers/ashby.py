@@ -38,6 +38,8 @@ _COMPANIES: list[str] = [
     "wealthsimple", "pleo", "patreon", "substack", "maven",
     # ANZ/APAC (eligible pool for NZ/AU-resident candidates)
     "airwallex", "xero", "auror",
+    # More mid-market support/ops/fintech (non-elite), verified live.
+    "newfront", "method", "found", "keep",
 ]
 
 
