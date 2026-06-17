@@ -1972,28 +1972,38 @@ class CareerOpsApplicator:
             await _fill_unanswered_required(page, user_data, screening)
             await _check_required_boxes(page)
 
+            # The inline form has TWO "Submit application" buttons — a non-actionable
+            # type=null one and the real type=submit one. Target the actionable
+            # submit first, and bound every click so a stray match can't hang 30s.
             for sel in (
-                'button:has-text("Submit application")',
-                'button:has-text("Submit Application")',
-                'button:has-text("Submit")',
+                'button[type="submit"]:has-text("Submit")',
                 'button[type="submit"]',
+                'button:visible:has-text("Submit application")',
+                'button:has-text("Submit application")',
             ):
                 btn = page.locator(sel).first
-                if await btn.count() > 0:
+                if await btn.count() == 0:
+                    continue
+                try:
+                    await btn.scroll_into_view_if_needed(timeout=3000)
+                except Exception:
+                    pass
+                try:
+                    await btn.click(timeout=6000)
+                except Exception:
                     try:
-                        await btn.scroll_into_view_if_needed(timeout=3000)
+                        await btn.click(timeout=6000, force=True)
                     except Exception:
-                        pass
-                    await btn.click()
-                    try:
-                        await page.wait_for_load_state("networkidle", timeout=12000)
-                    except Exception:
-                        pass
-                    if await _verify_submitted(page):
-                        logger.info("careerops.workable_view.submitted", url=job_url)
-                        return {"status": "submitted", "url": job_url, "ats": "workable", "answers": screening}
-                    logger.warning("careerops.workable_view.submit_unconfirmed", url=job_url, selector=sel)
-                    return {"status": "error", "url": job_url, "ats": "workable", "error": "submission not confirmed"}
+                        continue
+                try:
+                    await page.wait_for_load_state("networkidle", timeout=12000)
+                except Exception:
+                    pass
+                if await _verify_submitted(page):
+                    logger.info("careerops.workable_view.submitted", url=job_url)
+                    return {"status": "submitted", "url": job_url, "ats": "workable", "answers": screening}
+                logger.warning("careerops.workable_view.submit_unconfirmed", url=job_url, selector=sel)
+                return {"status": "error", "url": job_url, "ats": "workable", "error": "submission not confirmed"}
 
             return {"status": "form_not_found", "url": job_url, "ats": "workable"}
         finally:
