@@ -1900,8 +1900,15 @@ class CareerOpsApplicator:
         """
         page = await self.context.new_page()
         try:
+            # Wait for the SPA to fully load — clicking "Apply now" before its JS
+            # is wired up silently no-ops, which surfaced as form_not_found under
+            # concurrent load.
             await page.goto(job_url, wait_until="domcontentloaded", timeout=30000)
-            await page.wait_for_timeout(random.randint(1500, 2500))
+            try:
+                await page.wait_for_load_state("networkidle", timeout=15000)
+            except Exception:
+                pass
+            await page.wait_for_timeout(1500)
 
             # Dismiss cookie / consent overlays that intercept the Apply click.
             for t in ("Accept", "Accept all", "Accept cookies", "Got it", "I agree", "Allow all"):
@@ -1913,29 +1920,40 @@ class CareerOpsApplicator:
                     except Exception:
                         pass
 
-            # Reveal the inline application form.
-            for t in ("Apply now", "Apply for this job", "Apply"):
-                ab = page.locator(f"a:has-text('{t}'), button:has-text('{t}')").first
-                if await ab.count() > 0:
-                    try:
-                        await ab.scroll_into_view_if_needed(timeout=2000)
-                    except Exception:
-                        pass
-                    try:
-                        await ab.click(timeout=4000)
-                    except Exception:
+            form_sel = 'input[name="firstname"], input[name="name"], input[type="email"]'
+            # Reveal the inline application form — retry the Apply click until the
+            # form actually appears (the SPA can need a beat to mount it).
+            form_ready = False
+            for _attempt in range(3):
+                if await page.locator(form_sel).first.count() > 0:
+                    form_ready = True
+                    break
+                clicked = False
+                for t in ("Apply now", "Apply for this job", "Apply"):
+                    ab = page.locator(f"a:has-text('{t}'), button:has-text('{t}')").first
+                    if await ab.count() > 0:
                         try:
-                            await ab.click(timeout=4000, force=True)
+                            await ab.scroll_into_view_if_needed(timeout=2000)
                         except Exception:
                             pass
+                        try:
+                            await ab.click(timeout=4000)
+                        except Exception:
+                            try:
+                                await ab.click(timeout=4000, force=True)
+                            except Exception:
+                                pass
+                        clicked = True
+                        break
+                try:
+                    await page.wait_for_selector(form_sel, timeout=8000)
+                    form_ready = True
                     break
-            await page.wait_for_timeout(1800)
-
-            try:
-                await page.wait_for_selector(
-                    'input[name="firstname"], input[name="name"], input[type="email"]', timeout=12000
-                )
-            except Exception:
+                except Exception:
+                    if not clicked:
+                        break
+                    await page.wait_for_timeout(1000)
+            if not form_ready:
                 return {"status": "form_not_found", "url": job_url, "ats": "workable"}
 
             full_name = f"{user_data.get('first_name', '')} {user_data.get('last_name', '')}".strip()
