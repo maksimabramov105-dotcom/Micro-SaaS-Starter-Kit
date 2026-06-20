@@ -12,7 +12,18 @@ import { testimonials, replyScreenshots } from '@/lib/proof'
 export const revalidate = 3600
 
 // Self-referencing canonical for the homepage (resolved against metadataBase).
-export const metadata = { alternates: { canonical: '/' } }
+export const metadata = {
+  title: 'ResumeAI-Bot — Auto-apply only where you can win',
+  description:
+    'Honest auto-apply: applies only where you’re eligible, tailors your resume per role, and verifies every application actually submitted. No spam.',
+  alternates: { canonical: '/' },
+  openGraph: {
+    title: 'ResumeAI-Bot — Every application is one you can actually win',
+    description:
+      'Eligibility-checked, tailored, and verified-submitted job applications — the opposite of spray-and-pray bots. Replies land in one inbox.',
+    url: '/',
+  },
+}
 
 // Real funnel proof (D2) — aggregate, anonymized. Only shown once there's a
 // meaningful volume so early/empty numbers never undersell the product.
@@ -106,15 +117,16 @@ export default async function HomePage() {
           {/* Left — message + CTA */}
           <div className="text-center lg:text-left">
             <p className="mb-4 text-sm font-semibold uppercase tracking-wide text-emerald-600">
-              AI resume builder + auto-apply · 50+ countries
+              Honest auto-apply · eligibility-checked · verified submitted
             </p>
             <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
-              Your dream job abroad &mdash; applied for while you sleep.
+              Every application is one you can actually win.
             </h1>
             <p className="mt-5 max-w-xl text-lg text-slate-600 lg:mx-0 mx-auto">
-              ResumeAI tailors your resume to every role and auto-applies across 50+ countries
-              &mdash; only where you&apos;re genuinely eligible, so you get real replies instead of
-              auto-rejections. Wake up to confirmed applications and recruiter messages in one inbox.
+              Spray-and-pray bots blast your resume at jobs you can&apos;t get &mdash; and many never
+              actually submit. ResumeAI applies <strong>only where you&apos;re genuinely eligible</strong>,
+              tailors your resume to each role, and <strong>confirms every application truly went
+              through</strong>. Recruiter replies land in one inbox. No spam, no fake &ldquo;applied.&rdquo;
             </p>
             <div className="mt-8 flex flex-col items-center gap-3 lg:items-start">
               <Link
@@ -311,8 +323,9 @@ export default async function HomePage() {
         <div className="mx-auto max-w-4xl">
           <h2 className="mb-2 text-center text-3xl font-bold text-slate-900">Why we&apos;re different</h2>
           <p className="mb-8 text-center text-slate-600">
-            Most auto-apply tools are US / LinkedIn-only and assume you can work anywhere.
-            We only apply where you&apos;re actually eligible — and track the replies.
+            Most auto-apply tools brag about volume — and quietly send applications you can&apos;t win,
+            many of which never actually submit. We do the opposite: apply only where you&apos;re
+            eligible, prove each one went through, and put every reply in your inbox.
           </p>
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-left text-sm">
@@ -326,6 +339,7 @@ export default async function HomePage() {
               </thead>
               <tbody className="text-slate-700">
                 {[
+                  ['Verified actually submitted (not fake “applied”)', '✓', '✕', '✕'],
                   ['Eligibility-aware (only applies where you can work)', '✓', '✕', '✕'],
                   ['Captures employer replies in an inbox', '✓', '✕', '✕'],
                   ['Countries covered', '50+', 'shut down (2024)', 'US-focused'],
@@ -434,11 +448,11 @@ export default async function HomePage() {
       {/* Final CTA band (HOMEPAGE_COPY.md §8) */}
       <section className="px-4 py-20 text-center">
         <h2 className="mx-auto max-w-3xl text-3xl font-bold text-slate-900">
-          Your next job could be in any of 50+ countries. Let&apos;s go find it.
+          Stop spraying. Start applying where you can actually win.
         </h2>
         <p className="mx-auto mt-4 max-w-2xl text-slate-600">
-          Start free — 3 applications a day, no credit card. Upgrade when you see confirmed
-          applications and replies land in your inbox.
+          Start free — 3 applications a day, no credit card. Every one eligibility-checked, tailored,
+          and verified submitted. Upgrade when you see confirmed applications and replies land in your inbox.
         </p>
         <div className="mt-8">
           <Link
