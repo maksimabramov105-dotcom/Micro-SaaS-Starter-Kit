@@ -18,6 +18,7 @@ import sys
 
 import httpx
 import redis.asyncio as aioredis
+import redis.exceptions as redis_exc
 import sentry_sdk
 import structlog
 
@@ -138,29 +139,71 @@ async def handle_event(
 
 # ── Main loop ─────────────────────────────────────────────────────────────────
 
+async def _close_pubsub(pubsub) -> None:
+    """Close a PubSub defensively across redis-py 5.x variants (aclose/close)."""
+    try:
+        await pubsub.aclose()
+    except AttributeError:
+        try:
+            await pubsub.close()
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+
 async def run() -> None:
     log.info("notifier.starting", channel=CHANNEL)
 
     pool = await get_pool()
-    redis = aioredis.from_url(settings.redis_url, decode_responses=True)
-    pubsub = redis.pubsub()
-    await pubsub.subscribe(CHANNEL)
+    # health_check_interval + TCP keepalive keep the long-lived pub/sub
+    # connection alive across idle periods (notifier traffic is sparse) and
+    # surface a dropped socket promptly instead of on a stale blocking read.
+    redis = aioredis.from_url(
+        settings.redis_url,
+        decode_responses=True,
+        health_check_interval=30,
+        socket_keepalive=True,
+        socket_connect_timeout=10,
+    )
 
     async with httpx.AsyncClient() as http:
-        log.info("notifier.ready", channel=CHANNEL)
-        async for message in pubsub.listen():
-            if message["type"] != "message":
-                continue
+        backoff = 1
+        # Outer reconnect loop: a transient Redis read timeout or a dropped
+        # connection must NOT kill the process. Previously the TimeoutError
+        # raised by pubsub.listen() propagated out of run() and crash-looped
+        # the container; now we log, back off, and re-subscribe.
+        while True:
+            pubsub = redis.pubsub()
             try:
-                event = json.loads(message["data"])
-            except json.JSONDecodeError as exc:
-                log.warning("event.json_decode_error", error=str(exc))
-                continue
-
-            try:
-                await handle_event(event, pool, redis, http)
-            except Exception as exc:
-                log.error("event.handler_error", error=str(exc), event=event)
+                await pubsub.subscribe(CHANNEL)
+                log.info("notifier.ready", channel=CHANNEL)
+                backoff = 1  # reset after a healthy (re)subscribe
+                while True:
+                    # timeout returns None on idle (and drives the health-check
+                    # PING) — a normal "no message" tick, not a fatal error.
+                    message = await pubsub.get_message(
+                        ignore_subscribe_messages=True, timeout=20
+                    )
+                    if not message or message.get("type") != "message":
+                        continue
+                    try:
+                        event = json.loads(message["data"])
+                    except (json.JSONDecodeError, TypeError) as exc:
+                        log.warning("event.json_decode_error", error=str(exc))
+                        continue
+                    try:
+                        await handle_event(event, pool, redis, http)
+                    except Exception as exc:
+                        log.error("event.handler_error", error=str(exc), event=event)
+            except asyncio.CancelledError:
+                raise
+            except (redis_exc.ConnectionError, redis_exc.TimeoutError, OSError) as exc:
+                log.warning("notifier.redis_reconnect", error=str(exc), backoff=backoff)
+                await asyncio.sleep(backoff)
+                backoff = min(backoff * 2, 30)
+            finally:
+                await _close_pubsub(pubsub)
 
 
 def main() -> None:
