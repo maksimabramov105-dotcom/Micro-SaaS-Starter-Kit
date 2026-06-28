@@ -40,6 +40,9 @@ _COMPANIES: list[str] = [
     "airwallex", "xero", "auror",
     # More mid-market support/ops/fintech (non-elite), verified live.
     "newfront", "method", "found", "keep",
+    # 2026-06-28 supply expansion — verified dev-tool/remote boards w/ AU-eligible roles.
+    "railway", "workos", "baseten", "neon", "inngest", "watershed", "dovetail",
+    "vanta", "replit",
 ]
 
 

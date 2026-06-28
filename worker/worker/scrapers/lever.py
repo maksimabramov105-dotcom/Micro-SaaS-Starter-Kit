@@ -31,6 +31,8 @@ _COMPANIES: list[str] = [
     "pipedrive", "aircall", "outreach", "qonto", "lyrahealth", "15five",
     # ANZ/APAC employers (eligible pool for NZ/AU-resident candidates).
     "deputy", "immutable",
+    # 2026-06-28 supply expansion — verified boards with AU-eligible/global-remote roles.
+    "contentsquare", "ledger",
 ]
 
 
