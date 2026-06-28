@@ -284,6 +284,47 @@ async function careeropsApply(
   }
 }
 
+// ── Cover-letter generation (per-job, tailored) ────────────────────────────────
+// The careerops auto-apply path otherwise ships an EMPTY cover letter. A tailored
+// letter (candidate's real wins → why this role) is the single biggest response-
+// rate lever for non-traditional candidates. Best-effort: any failure returns ''
+// so the apply still proceeds with no cover letter (no regression).
+async function generateCoverLetter(
+  workerUrl: string,
+  workerSecret: string,
+  userId: string,
+  resumeText: string,
+  jobTitle: string,
+  company: string,
+  jobDescription: string,
+  timeoutMs = 25_000,
+): Promise<string> {
+  if (!resumeText || !jobTitle) return ''
+  try {
+    const res = await fetch(`${workerUrl}/jobs/cover-letter`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${workerSecret}` },
+      body: JSON.stringify({
+        user_id: userId,
+        resume_text: resumeText.slice(0, 6000),
+        job_title: jobTitle,
+        company,
+        job_description: (jobDescription ?? '').slice(0, 4000),
+      }),
+      signal: AbortSignal.timeout(timeoutMs),
+    })
+    if (!res.ok) {
+      console.warn('[run-campaigns] cover-letter returned', res.status)
+      return ''
+    }
+    const data = (await res.json()) as { result?: { cover_letter_text?: string } }
+    return data.result?.cover_letter_text ?? ''
+  } catch (err) {
+    console.warn('[run-campaigns] cover-letter error:', err instanceof Error ? err.message : String(err))
+    return ''
+  }
+}
+
 // ── Job-fit scoring call (Phase 3) ─────────────────────────────────────────────
 
 interface FitScore { score: number; reasons: string[] }
@@ -1305,6 +1346,14 @@ async function runCampaigns(
       // Mark URL as applied to prevent duplicates in this run
       appliedUrls.add(applyUrl)
 
+      // Generate a tailored cover letter for THIS role before applying — the
+      // careerops path otherwise sends none, and a bare resume from a
+      // non-traditional candidate is a top reason recruiters skip. Best-effort.
+      const coverLetter = await generateCoverLetter(
+        workerUrl, workerSecret, user.id, resumeText,
+        job.title, job.company, job.description ?? '',
+      )
+
       // Call the CareerOps worker (timeout dynamically capped to remaining budget).
       // Pass the company so the worker can match Greenhouse's emailed security
       // code ("Security code for your application to {company}") precisely.
@@ -1312,6 +1361,7 @@ async function runCampaigns(
         workerUrl, workerSecret, applyUrl,
         {
           ...userData,
+          cover_letter: coverLetter,
           _company: job.company,
           eligibility,
           job_country: jobLoc.country ?? '',
