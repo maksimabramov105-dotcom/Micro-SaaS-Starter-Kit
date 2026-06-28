@@ -210,33 +210,72 @@ async def _fill_phone(page: Page, value: str) -> bool:
 
 def _render_resume_pdf(resume_text: str) -> str:
     """
-    Render resume_text to a real PDF and return the temp file path.
+    Render resume_text to a clean, professional PDF and return the temp file path.
 
-    Most ATS (Greenhouse, Lever, Workable…) validate the uploaded file is a
-    real document — a .txt is silently rejected, which was a key reason
-    submissions never completed (P19).  Falls back to .txt only if reportlab
-    is unavailable.
+    Uses the SAME SimpleDocTemplate/Paragraph layout as the /resume-pdf download
+    endpoint — bold name header, bold section headings, real word-wrapping and
+    markdown cleanup — so the file a recruiter receives matches the polished
+    resume the user sees in-app. (Previously this path emitted a crude
+    fixed-position text dump while the download looked professional.)
+
+    Most ATS (Greenhouse, Lever, Workable…) validate the uploaded file is a real
+    document — a .txt is silently rejected, which was a key reason submissions
+    never completed (P19). Falls back to .txt only if reportlab is unavailable.
     """
     try:
+        import re as _re
+
+        from reportlab.lib.enums import TA_LEFT
         from reportlab.lib.pagesizes import letter
-        from reportlab.pdfgen import canvas as _canvas
+        from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+        from reportlab.lib.units import inch
+        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
 
         fd, path = tempfile.mkstemp(suffix=".pdf")
         os.close(fd)
-        c = _canvas.Canvas(path, pagesize=letter)
-        width, height = letter
-        y = height - 72
+        doc = SimpleDocTemplate(
+            path, pagesize=letter,
+            rightMargin=inch, leftMargin=inch, topMargin=inch, bottomMargin=inch,
+        )
+        styles = getSampleStyleSheet()
+        name_style = ParagraphStyle(
+            "ResumeName", parent=styles["Normal"], fontSize=17, leading=20,
+            spaceAfter=2, fontName="Helvetica-Bold", alignment=TA_LEFT,
+        )
+        heading_style = ParagraphStyle(
+            "ResumeHeading", parent=styles["Normal"], fontSize=12, leading=16,
+            spaceBefore=8, spaceAfter=2, fontName="Helvetica-Bold", alignment=TA_LEFT,
+        )
+        body_style = ParagraphStyle(
+            "ResumeBody", parent=styles["Normal"], fontSize=10, leading=14, alignment=TA_LEFT,
+        )
+
+        def _clean_line(text: str) -> str:
+            if _re.match(r"^[-=_]{2,}\s*$", text):
+                return ""
+            text = _re.sub(r"^#{1,6}\s+", "", text)
+            text = _re.sub(r"\*{1,3}(.*?)\*{1,3}", r"\1", text)
+            text = _re.sub(r"_{1,2}(.*?)_{1,2}", r"\1", text)
+            text = _re.sub(r"\[End of Resume\].*", "", text, flags=_re.IGNORECASE)
+            text = _re.sub(r"\[.*?\]", "", text)
+            return text.strip()
+
+        elements: list = []
+        first_done = False
         for raw_line in resume_text.split("\n"):
-            # naive wrap at ~95 chars so long lines don't overflow the page
-            line = raw_line if raw_line else " "
-            while line:
-                chunk, line = line[:95], line[95:]
-                c.drawString(72, y, chunk)
-                y -= 15
-                if y < 72:
-                    c.showPage()
-                    y = height - 72
-        c.save()
+            cleaned = _clean_line(raw_line.strip())
+            if not cleaned:
+                elements.append(Spacer(1, 4))
+                continue
+            safe = cleaned.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            if not first_done:
+                elements.append(Paragraph(safe, name_style))  # candidate name
+                first_done = True
+            elif cleaned.isupper() and len(cleaned) < 60:
+                elements.append(Paragraph(safe, heading_style))
+            else:
+                elements.append(Paragraph(safe, body_style))
+        doc.build(elements)
         return path
     except Exception as exc:  # reportlab missing or render error → .txt fallback
         logger.warning("careerops.pdf_render_failed", error=str(exc))
