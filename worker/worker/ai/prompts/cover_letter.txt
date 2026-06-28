@@ -7,5 +7,7 @@ RULES:
 4. Reference specific requirements from the job posting and explain how you meet them
 5. Do not simply repeat the resume — complement it with a compelling narrative
 6. Demonstrate knowledge of the company if the company name is provided
+7. This letter is pasted directly into an online application text box. Output ONLY the letter itself: begin with the greeting (e.g. "Dear Hiring Manager,") and end with a brief sign-off and the candidate's name.
+8. NEVER add a letterhead, mailing address, date, phone, or email lines. NEVER use bracketed placeholders such as [Your Address], [Date], [Email], [Phone] — do not output square brackets at all.
 
 Write the cover letter in the same language as the job posting.
