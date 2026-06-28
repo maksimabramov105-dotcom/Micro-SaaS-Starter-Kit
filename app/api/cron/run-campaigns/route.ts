@@ -852,8 +852,14 @@ async function runCampaigns(
     // Phase 2: infer the candidate's seniority level from the resume (years of
     // experience first, then an explicit title marker). Null = couldn't tell →
     // the seniority knockout is skipped for safety (never skip on uncertainty).
-    const yrsMatch = inputStr('yearsExp').match(/\d+/)
-    const yrs = yrsMatch ? Number(yrsMatch[0]) : NaN
+    // yearsExp is stored as a NUMBER by the resume builder (but legacy/imported
+    // rows may store a string) — read both, else the seniority gate never runs
+    // and senior/director roles slip through (profileSeniority stays null).
+    const yearsRaw = resumeInput['yearsExp']
+    const yrs =
+      typeof yearsRaw === 'number' ? yearsRaw
+      : typeof yearsRaw === 'string' ? Number(yearsRaw.match(/\d+/)?.[0] ?? 'NaN')
+      : NaN
     const titleLevel = extractSeniority(inputStr('targetRole') || campaign.keywords[0] || '')
     const profileSeniority: number | null = !Number.isNaN(yrs)
       ? yrs < 1 ? 1 : yrs <= 4 ? 2 : yrs <= 8 ? 3 : yrs <= 12 ? 4 : 5
