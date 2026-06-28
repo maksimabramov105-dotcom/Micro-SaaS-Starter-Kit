@@ -48,6 +48,8 @@ _COMPANIES: list[str] = [
     "canonical", "remotecom", "remote", "grafanalabs",
     # More mid-market support/ops (non-elite), verified live.
     "getyourguide", "current", "mercari",
+    # 2026-06-28 supply expansion — verified boards with AU-eligible/global-remote roles.
+    "vercel", "nextiva", "eucalyptus",
 ]
 
 
