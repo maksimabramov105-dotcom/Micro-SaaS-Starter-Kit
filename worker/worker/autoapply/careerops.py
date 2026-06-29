@@ -1141,6 +1141,68 @@ async def _fill_location_autocomplete(page: Page, field_id: str, preferred: str)
     return False
 
 
+_COUNTRY_CITY = {
+    "australia": "Sydney", "new zealand": "Auckland", "united kingdom": "London",
+    "uk": "London", "canada": "Toronto", "germany": "Berlin", "ireland": "Dublin",
+    "india": "Bengaluru", "singapore": "Singapore", "netherlands": "Amsterdam",
+    "france": "Paris", "spain": "Madrid", "united states": "New York", "usa": "New York",
+}
+
+
+def _candidate_city(user_data: dict) -> str:
+    """Best-effort residence city for REQUIRED 'current location' fields. Prefer an
+    explicit city, then a real (non-generic) location, then the major city of the
+    candidate's authorized country (handles both eligibility key casings)."""
+    generic = {"", "remote", "anywhere", "worldwide", "global", "us", "usa", "united states"}
+    for key in ("city", "location"):
+        v = (user_data.get(key) or "").strip()
+        if v and v.lower() not in generic:
+            return v
+    elig = user_data.get("eligibility") or {}
+    countries = elig.get("authorizedCountries") or elig.get("authorized_countries") or []
+    for c in countries:
+        city = _COUNTRY_CITY.get((c or "").strip().lower())
+        if city:
+            return city
+    return ""
+
+
+async def _fill_lever_location(page: Page, city: str) -> bool:
+    """Lever's REQUIRED 'Current location' is a Google-Places geocomplete: a typed
+    value reverts on blur unless a suggestion is selected. Type the city, wait for
+    suggestions, then ArrowDown+Enter to accept the first (e.g. 'Sydney' ->
+    'Sydney, New South Wales, AUS'). A blank one silently blocks the submit."""
+    if not city:
+        return False
+    loc = page.locator('#location-input, input[name="location"]').first
+    try:
+        if await loc.count() == 0:
+            return False
+        if (await loc.input_value()).strip():
+            return True
+        # The geocomplete clears the typed text until a suggestion is accepted, so
+        # an empty value == not selected. Suggestions can be slow under load, so
+        # retry with progressively longer waits (timing is the only flake here).
+        for attempt in range(3):
+            await loc.click()
+            try:
+                await loc.press("Control+a")
+                await loc.press("Delete")
+            except Exception:
+                pass
+            await loc.type(city, delay=80)
+            await page.wait_for_timeout(1600 + attempt * 800)
+            await loc.press("ArrowDown")
+            await page.wait_for_timeout(450)
+            await loc.press("Enter")
+            await page.wait_for_timeout(550)
+            if (await loc.input_value()).strip():
+                return True
+        return False
+    except Exception:
+        return False
+
+
 async def _fill_questions_by_label(page: Page, mapping: list[tuple[list[str], str]]) -> None:
     """
     Fill per-job `question_*` text inputs by matching their label text.
@@ -1790,17 +1852,31 @@ class CareerOpsApplicator:
                 f"{user_data.get('first_name', '')} "
                 f"{user_data.get('last_name', '')}".strip()
             )
+            # Lever marks org / current-location / LinkedIn REQUIRED on many boards
+            # (e.g. Aircall) — a blank required field silently blocks the submit and
+            # is the dominant cause of "submission not confirmed". `location` was not
+            # filled at all, and org/LinkedIn were skipped when empty. Fall back to
+            # honest non-empty values so the form can actually submit: freelancers
+            # have no employer ("Independent"), and a candidate with no LinkedIn uses
+            # their portfolio/GitHub URL rather than leaving the field empty.
+            portfolio = user_data.get("portfolio_url", "") or user_data.get("website", "")
             field_map = {
                 'input[name="name"]': full_name,
                 'input[name="email"]': user_data.get("email", ""),
                 'input[name="phone"]': user_data.get("phone", ""),
-                'input[name="org"]': user_data.get("current_company", ""),
-                'input[name="urls[LinkedIn]"]': user_data.get("linkedin_url", ""),
-                'input[name="urls[Portfolio]"]': user_data.get("portfolio_url", ""),
+                'input[name="org"]': user_data.get("current_company", "") or "Independent",
+                'input[name="urls[LinkedIn]"]': user_data.get("linkedin_url", "") or portfolio,
+                'input[name="urls[GitHub]"]': portfolio if "github" in portfolio.lower() else "",
+                'input[name="urls[Portfolio]"]': portfolio,
             }
             for sel, val in field_map.items():
                 if val:
                     await _fill(page, sel, val)
+
+            # 'Current location' is a REQUIRED geocomplete on many Lever boards — a
+            # plain typed value reverts on blur, so select a suggestion via the
+            # geocomplete helper (the #1 remaining "submission not confirmed" cause).
+            await _fill_lever_location(page, _candidate_city(user_data))
 
             resume_text = user_data.get("resume_text", "")
             if resume_text:
