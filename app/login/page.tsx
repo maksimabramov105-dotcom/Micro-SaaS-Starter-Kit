@@ -30,6 +30,51 @@ const AUTH_ERRORS: Record<string, string> = {
 // state). We auto-retry the SAME provider once so users never see them.
 const RETRYABLE = new Set(['OAuthAccountNotLinked', 'OAuthCallback', 'Callback', 'OAuthSignin'])
 
+// Provider memory + one-shot retry guard.
+// sessionStorage alone silently broke the auto-retry in Safari Lockdown Mode and
+// partitioned-storage privacy modes — the transient OAuth error then surfaced to
+// the user. A short-lived cookie is now the primary store (survives Lockdown
+// Mode), with sessionStorage as a backup, so the auto-retry fires in every
+// browser and the flake stays invisible.
+const PROVIDER_KEY = 'li_last_provider'
+const RETRIED_KEY = 'li_autoretried'
+function readCookie(name: string): string | null {
+  try {
+    const m = document.cookie.match(new RegExp('(?:^|;\\s*)' + name + '=([^;]*)'))
+    return m ? decodeURIComponent(m[1]) : null
+  } catch {
+    return null
+  }
+}
+function writeCookie(name: string, value: string, maxAge = 300) {
+  try {
+    document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=${maxAge}; samesite=lax`
+  } catch {
+    /* ignore */
+  }
+}
+function rememberProvider(provider: string) {
+  writeCookie(PROVIDER_KEY, provider)
+  try { sessionStorage.setItem(PROVIDER_KEY, provider) } catch { /* ignore */ }
+}
+function recallProvider(): string | null {
+  const fromCookie = readCookie(PROVIDER_KEY)
+  if (fromCookie) return fromCookie
+  try { return sessionStorage.getItem(PROVIDER_KEY) } catch { return null }
+}
+function markRetried() {
+  writeCookie(RETRIED_KEY, '1')
+  try { sessionStorage.setItem(RETRIED_KEY, '1') } catch { /* ignore */ }
+}
+function hasRetried(): boolean {
+  if (readCookie(RETRIED_KEY) === '1') return true
+  try { return sessionStorage.getItem(RETRIED_KEY) === '1' } catch { return false }
+}
+function clearRetried() {
+  writeCookie(RETRIED_KEY, '', 0)
+  try { sessionStorage.removeItem(RETRIED_KEY) } catch { /* ignore */ }
+}
+
 function LoginButtons() {
   const searchParams = useSearchParams()
 
@@ -48,11 +93,7 @@ function LoginButtons() {
 
   // Remember which provider was used, then kick off sign-in.
   const go = (provider: 'google' | 'github') => {
-    try {
-      sessionStorage.setItem('li_last_provider', provider)
-    } catch {
-      /* ignore */
-    }
+    rememberProvider(provider)
     signIn(provider, { callbackUrl })
   }
 
@@ -61,29 +102,15 @@ function LoginButtons() {
   // fall through to the manual buttons.
   useEffect(() => {
     if (!errorCode) {
-      try {
-        sessionStorage.removeItem('li_autoretried')
-      } catch {
-        /* ignore */
-      }
+      clearRetried()
       return
     }
     if (!RETRYABLE.has(errorCode) || didRetry.current) return
-    let lastProvider: string | null = null
-    let alreadyRetried = false
-    try {
-      lastProvider = sessionStorage.getItem('li_last_provider')
-      alreadyRetried = sessionStorage.getItem('li_autoretried') === '1'
-    } catch {
-      /* ignore */
-    }
-    if (alreadyRetried || (lastProvider !== 'google' && lastProvider !== 'github')) return
+    if (hasRetried()) return
+    const lastProvider = recallProvider()
+    if (lastProvider !== 'google' && lastProvider !== 'github') return
     didRetry.current = true
-    try {
-      sessionStorage.setItem('li_autoretried', '1')
-    } catch {
-      /* ignore */
-    }
+    markRetried()
     setRetrying(true)
     signIn(lastProvider, { callbackUrl })
   }, [errorCode, callbackUrl])
