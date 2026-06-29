@@ -370,6 +370,20 @@ _ERROR_MARKERS = [
 ]
 
 
+async def _bounded_click(btn, timeout: int = 6000) -> bool:
+    """Click a control with a BOUNDED timeout (+ a force fallback) so a covered,
+    animating, or decoy submit button never burns Playwright's default 30s before
+    failing — historically the single biggest auto-apply failure bucket. Returns
+    True if a click landed; submission is still gated by _verify_submitted."""
+    for click_timeout, force in ((timeout, False), (min(timeout, 3000), True)):
+        try:
+            await btn.click(timeout=click_timeout, force=force)
+            return True
+        except Exception:
+            continue
+    return False
+
+
 async def _verify_submitted(page: Page) -> bool:
     """
     Return True only when the page shows real evidence the application was
@@ -1371,7 +1385,13 @@ async def _complete_greenhouse_verification(
 
         submit = page.locator('input[type="submit"], button[type="submit"]').first
         if await submit.count() > 0:
-            await submit.click()
+            try:
+                await submit.click(timeout=6000)
+            except Exception:
+                try:
+                    await submit.click(timeout=3000, force=True)
+                except Exception:
+                    return False
             try:
                 await page.wait_for_load_state("networkidle", timeout=12000)
             except Exception:
@@ -1633,9 +1653,17 @@ class CareerOpsApplicator:
                         await submit.scroll_into_view_if_needed(timeout=3000)
                     except Exception:
                         pass
-                    try:
-                        await submit.click()
-                    except Exception:
+                    # Bounded click (+ force fallback) so a covered/animating button
+                    # never burns the default 30s before the retry/verify path.
+                    clicked = False
+                    for click_timeout, force in ((6000, False), (3000, True)):
+                        try:
+                            await submit.click(timeout=click_timeout, force=force)
+                            clicked = True
+                            break
+                        except Exception:
+                            continue
+                    if not clicked:
                         break
                     try:
                         await page.wait_for_load_state("networkidle", timeout=12000)
@@ -1814,14 +1842,41 @@ class CareerOpsApplicator:
                 'input[type="submit"]',
                 'button[type="submit"]',
             ]
+            # Submit robustly. Each click is BOUNDED (never the default 30s hang on
+            # a non-actionable/decoy button — historically the #1 failure) with a
+            # force-click fallback, and we keep trying the next candidate AND the
+            # next selector whenever a click times out or submission isn't
+            # confirmed. Only give up once every candidate is exhausted, so one
+            # decoy "Submit application" button no longer dooms the whole apply.
+            found_button = False
             for sel in submit_selectors:
-                btn = page.locator(sel).first
-                if await btn.count() > 0:
+                loc = page.locator(sel)
+                try:
+                    count = await loc.count()
+                except Exception:
+                    count = 0
+                for i in range(min(count, 3)):
+                    btn = loc.nth(i)
                     try:
-                        await btn.scroll_into_view_if_needed(timeout=3000)
+                        if not await btn.is_visible():
+                            continue
                     except Exception:
                         pass
-                    await btn.click()
+                    found_button = True
+                    try:
+                        await btn.scroll_into_view_if_needed(timeout=2000)
+                    except Exception:
+                        pass
+                    clicked = False
+                    for click_timeout, force in ((6000, False), (3000, True)):
+                        try:
+                            await btn.click(timeout=click_timeout, force=force)
+                            clicked = True
+                            break
+                        except Exception:
+                            continue
+                    if not clicked:
+                        continue
                     try:
                         await page.wait_for_load_state("networkidle", timeout=12000)
                     except Exception:
@@ -1830,10 +1885,11 @@ class CareerOpsApplicator:
                         logger.info("careerops.lever.submitted", url=job_url, selector=sel)
                         return {"status": "submitted", "url": job_url, "ats": "lever",
                                 "answers": screening_answers}
-                    logger.warning("careerops.lever.submit_unconfirmed", url=job_url, selector=sel)
-                    return {"status": "error", "url": job_url, "ats": "lever",
-                            "error": "submission not confirmed"}
 
+            if found_button:
+                logger.warning("careerops.lever.submit_unconfirmed", url=job_url)
+                return {"status": "error", "url": job_url, "ats": "lever",
+                        "error": "submission not confirmed"}
             return {"status": "form_not_found", "url": job_url, "ats": "lever"}
         finally:
             await page.close()
@@ -2097,7 +2153,7 @@ class CareerOpsApplicator:
 
             submit = page.locator('button[type="submit"]').first
             if await submit.count() > 0:
-                await submit.click()
+                await _bounded_click(submit)
                 await page.wait_for_load_state("networkidle", timeout=15000)
                 if await _verify_submitted(page):
                     logger.info("careerops.smartrecruiters.submitted", url=job_url)
@@ -2164,7 +2220,7 @@ class CareerOpsApplicator:
                         f'input[type="submit"][value*="{txt}"]'
                     ).first
                     if await btn.count() > 0:
-                        await btn.click()
+                        await _bounded_click(btn)
                         await page.wait_for_load_state("networkidle", timeout=15000)
                         if await _verify_submitted(page):
                             logger.info("careerops.jobvite.submitted", url=job_url)
@@ -2178,7 +2234,7 @@ class CareerOpsApplicator:
                 for txt in ["Next", "Continue", "Next Step"]:
                     btn = page.locator(f'button:has-text("{txt}")').first
                     if await btn.count() > 0:
-                        await btn.click()
+                        await _bounded_click(btn)
                         await page.wait_for_load_state("networkidle", timeout=10000)
                         await page.wait_for_timeout(1500)
                         advanced = True
@@ -2255,7 +2311,7 @@ class CareerOpsApplicator:
                 'button[type="submit"], button:has-text("Submit Application"), button:has-text("Submit")'
             ).first
             if await submit.count() > 0:
-                await submit.click()
+                await _bounded_click(submit)
                 await page.wait_for_load_state("networkidle", timeout=15000)
                 if await _verify_submitted(page):
                     logger.info("careerops.ashby.submitted", url=job_url)
@@ -2376,7 +2432,7 @@ class CareerOpsApplicator:
                     f'input[type="submit"][value*="{txt}"]'
                 ).first
                 if await btn.count() > 0:
-                    await btn.click()
+                    await _bounded_click(btn)
                     await page.wait_for_load_state("networkidle", timeout=15000)
                     if await _verify_submitted(page):
                         logger.info(
@@ -2397,7 +2453,7 @@ class CareerOpsApplicator:
             # Last resort: any submit button
             fallback = page.locator('button[type="submit"], input[type="submit"]').first
             if await fallback.count() > 0:
-                await fallback.click()
+                await _bounded_click(fallback)
                 await page.wait_for_load_state("networkidle", timeout=15000)
                 if await _verify_submitted(page):
                     return {
