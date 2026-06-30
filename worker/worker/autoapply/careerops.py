@@ -742,8 +742,19 @@ async def _collect_unanswered_required(page: Page) -> list[dict]:
             const group = name
                 ? Array.from(document.querySelectorAll('input[type=radio]')).filter(x => x.name === name)
                 : [r];
+            // The question text + its required "✱" live in the parent question
+            // CARD (.application-question), not on the <input> or the <li> option
+            // wrapper. The old code labelled the group with the option text
+            // ("Yes / No") — so the answerer had NO question to reason about — and
+            // Lever marks required on the card, not the <input>. Both caused
+            // required radios to be skipped/unanswered and silently block submit.
+            const card = r.closest('.application-question, fieldset, [role=radiogroup]');
+            const cardLabel = card
+                ? (card.querySelector('.application-label, legend, label, .text')?.textContent || '')
+                : '';
             const required = group.some(g => g.required || g.getAttribute('aria-required') === 'true')
-                || (rg && rg.getAttribute('aria-required') === 'true');
+                || (rg && rg.getAttribute('aria-required') === 'true')
+                || /[✱*]/.test(cardLabel);
             if (!required) return;
             const gk = name || ('__' + i);
             if (seen[gk]) return; seen[gk] = true;
@@ -755,10 +766,9 @@ async def _collect_unanswered_required(page: Page) -> list[dict]:
                 if (!lt) lt = g.value || '';
                 return (lt || '').replace(/\s+/g, ' ').trim().slice(0, 90);
             }).filter(Boolean);
-            const wrap = rg || r.parentElement || r;
+            const wrap = rg || card || r.parentElement || r;
             const key = mark(wrap);
-            let glabel = '';
-            if (rg) { const lg = rg.querySelector('legend, label'); if (lg) glabel = lg.innerText; }
+            const glabel = cardLabel.replace(/[✱*]/g, '').trim();
             out.push({ key, kind: 'radio', label: (glabel || options.join(' / ')).replace(/\s+/g, ' ').trim().slice(0, 160), options });
         });
 
