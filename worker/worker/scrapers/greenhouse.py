@@ -50,6 +50,11 @@ _COMPANIES: list[str] = [
     "getyourguide", "current", "mercari",
     # 2026-06-28 supply expansion — verified boards with AU-eligible/global-remote roles.
     "vercel", "nextiva", "eucalyptus",
+    # 2026-07-09 US-remote unlock — high-volume US employers (support/CX/eng), now
+    # eligible after adding US to the candidate's authorized countries. Big fresh
+    # supply source once the AU-only list is dedup-exhausted.
+    "datadog", "sumup", "mongodb", "cloudflare", "newrelic", "fastly", "dropbox",
+    "pagerduty", "affirm", "instacart", "robinhood",
 ]
 
 

@@ -43,6 +43,8 @@ _COMPANIES: list[str] = [
     # 2026-06-28 supply expansion — verified dev-tool/remote boards w/ AU-eligible roles.
     "railway", "workos", "baseten", "neon", "inngest", "watershed", "dovetail",
     "vanta", "replit",
+    # 2026-07-09 US-remote unlock — high-volume US boards, eligible after adding US.
+    "notion", "ramp", "cursor", "mercor", "sardine",
 ]
 
 

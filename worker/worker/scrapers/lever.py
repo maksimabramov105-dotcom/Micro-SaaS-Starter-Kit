@@ -33,6 +33,8 @@ _COMPANIES: list[str] = [
     "deputy", "immutable",
     # 2026-06-28 supply expansion — verified boards with AU-eligible/global-remote roles.
     "contentsquare", "ledger",
+    # 2026-07-09 US-remote unlock — high-volume US board, eligible after adding US.
+    "spotify",
 ]
 
 
