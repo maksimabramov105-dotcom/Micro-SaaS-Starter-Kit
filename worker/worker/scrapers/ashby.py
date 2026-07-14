@@ -45,6 +45,8 @@ _COMPANIES: list[str] = [
     "vanta", "replit",
     # 2026-07-09 US-remote unlock — high-volume US boards, eligible after adding US.
     "notion", "ramp", "cursor", "mercor", "sardine",
+    # 2026-07-14 supply expansion #2 — verified fintech-infra boards (remote).
+    "column", "unit",
 ]
 
 

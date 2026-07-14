@@ -55,6 +55,8 @@ _COMPANIES: list[str] = [
     # supply source once the AU-only list is dedup-exhausted.
     "datadog", "sumup", "mongodb", "cloudflare", "newrelic", "fastly", "dropbox",
     "pagerduty", "affirm", "instacart", "robinhood",
+    # 2026-07-14 supply expansion #2 — verified support/CX-heavy SaaS (US/global remote).
+    "okta", "brex", "jfrog", "pendo", "mixpanel", "launchdarkly", "salesloft",
 ]
 
 
