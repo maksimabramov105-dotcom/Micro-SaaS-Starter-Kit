@@ -2174,36 +2174,43 @@ class CareerOpsApplicator:
             # The inline form has TWO "Submit application" buttons — a non-actionable
             # type=null one and the real type=submit one. Target the actionable
             # submit first, and bound every click so a stray match can't hang 30s.
+            found_button = False
             for sel in (
                 'button[type="submit"]:has-text("Submit")',
                 'button[type="submit"]',
                 'button:visible:has-text("Submit application")',
                 'button:has-text("Submit application")',
             ):
-                btn = page.locator(sel).first
-                if await btn.count() == 0:
-                    continue
+                loc = page.locator(sel)
                 try:
-                    await btn.scroll_into_view_if_needed(timeout=3000)
+                    count = await loc.count()
                 except Exception:
-                    pass
-                try:
-                    await btn.click(timeout=6000)
-                except Exception:
+                    count = 0
+                for i in range(min(count, 3)):
+                    btn = loc.nth(i)
                     try:
-                        await btn.click(timeout=6000, force=True)
+                        if not await btn.is_visible():
+                            continue
                     except Exception:
+                        pass
+                    found_button = True
+                    try:
+                        await btn.scroll_into_view_if_needed(timeout=3000)
+                    except Exception:
+                        pass
+                    if not await _bounded_click(btn):
                         continue
-                try:
-                    await page.wait_for_load_state("networkidle", timeout=12000)
-                except Exception:
-                    pass
-                if await _verify_submitted(page):
-                    logger.info("careerops.workable_view.submitted", url=job_url)
-                    return {"status": "submitted", "url": job_url, "ats": "workable", "answers": screening}
-                logger.warning("careerops.workable_view.submit_unconfirmed", url=job_url, selector=sel)
-                return {"status": "error", "url": job_url, "ats": "workable", "error": "submission not confirmed"}
+                    try:
+                        await page.wait_for_load_state("networkidle", timeout=12000)
+                    except Exception:
+                        pass
+                    if await _verify_submitted(page):
+                        logger.info("careerops.workable_view.submitted", url=job_url)
+                        return {"status": "submitted", "url": job_url, "ats": "workable", "answers": screening}
 
+            if found_button:
+                logger.warning("careerops.workable_view.submit_unconfirmed", url=job_url)
+                return {"status": "error", "url": job_url, "ats": "workable", "error": "submission not confirmed"}
             return {"status": "form_not_found", "url": job_url, "ats": "workable"}
         finally:
             await page.close()
