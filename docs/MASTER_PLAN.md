@@ -60,10 +60,11 @@ explicitly requires it.
       79 programmatic SEO pages), robots.txt correct — verified 2026-07-16.
       REMAINING (owner): GSC property access -> confirm indexation + record
       baseline impressions/clicks here.
-- [ ] **P0.4 Error alerting**: web+worker exceptions -> Telegram notifier
-      channel. Code merged (PR #127: admin_alert event, instrumentation.ts,
-      worker exception handler, ADMIN_TELEGRAM_CHAT_ID). Pending live
-      end-to-end test after deploy.
+- [x] **P0.4 Error alerting**: DONE 2026-07-16 (PR #127). Web
+      (instrumentation.ts onRequestError) + worker (FastAPI exception handler)
+      -> admin_alert on Redis -> founder Telegram. Live-verified end-to-end:
+      test alert published on prod, notifier logged admin_alert.sent
+      (Telegram accepted delivery).
 - [x] **P0.5 Weekly metrics snapshot**: DONE 2026-07-16 (PR #126).
       `funnel_report.ts` leads with acquisition funnel + week-2 retention;
       founder email Mondays 09-12 UTC via the hourly digest cron (deduped);
@@ -208,3 +209,6 @@ job -> sees it tracked in dashboard within 10 min of first visit.
   deploys live-verified (smoke green, digest cron 200, containers healthy).
   Learned: VPS rate-limits per-IP connection bursts (smoke.sh designed around
   it); deploy token lacks workflow scope (owner action #1).
+- 2026-07-16 — P0.4 live-verified: test admin_alert delivered to founder
+  Telegram on prod (notifier logged admin_alert.sent). Phase 0 code complete;
+  remaining Phase 0 items are owner actions (GSC numbers, workflow scope).
