@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getStripeSession } from '@/lib/stripe'
 import { prisma } from '@/lib/prisma'
-import { getPlanById, getPlanForCheckout, type BillingInterval } from '@/lib/pricing'
+import { getPlanById, getPlanForCheckout, isHiddenPlan, type BillingInterval } from '@/lib/pricing'
 import { trackEvent } from '@/lib/analytics-advanced'
 
 export async function POST(req: Request) {
@@ -26,17 +26,17 @@ export async function POST(req: Request) {
     // Price IDs are server-only env vars — never bundled into the client.
 
     const interval: BillingInterval = body.interval === 'year' ? 'year' : 'month'
-    let priceId: string | null = body.priceId ?? null
+    // Only plan slugs are accepted from the client — price IDs resolve
+    // server-side and hidden plans (e.g. Unlimited) are not purchasable.
+    let priceId: string | null = null
 
     if (body.planId) {
       const family = body.planId as 'pro' | 'unlimited'
-      // getPlanForCheckout works for known families; fall back to getPlanById
-      // for unknown slugs so existing behaviour is preserved.
       const plan =
         (family === 'pro' || family === 'unlimited')
           ? (getPlanForCheckout(family, interval) ?? getPlanById(body.planId))
           : getPlanById(body.planId)
-      priceId = plan.priceId ?? null
+      priceId = isHiddenPlan(plan) ? null : (plan.priceId ?? null)
     }
 
     if (!priceId) {

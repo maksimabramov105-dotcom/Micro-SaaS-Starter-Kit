@@ -65,7 +65,7 @@ const faqs = [
   {
     question: 'Can I use the API?',
     answer:
-      'API access is available on Pro and Unlimited plans. You can generate API keys from your dashboard settings to integrate with our platform programmatically.',
+      'API access is available on the Pro plan. You can generate API keys from your dashboard settings to integrate with our platform programmatically.',
   },
   {
     question: 'Do you offer support?',

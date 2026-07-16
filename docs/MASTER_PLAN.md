@@ -147,6 +147,37 @@ job -> sees it tracked in dashboard within 10 min of first visit.
 
 ---
 
+## REVENUE SPRINT (Session A — money path, inserted 2026-07-16)
+
+Goal: a stranger landing on any page can pay us money today, through a
+low-friction tripwire, and every step is measured.
+
+- [ ] **A1 Verify + fix the existing payment path**: audit stripe libs/routes;
+      Stripe LIVE mode + price reconciliation via API (read-only); fix pricing
+      inconsistency (final: Free / Pro $19 per month, annual $180 secondary,
+      Unlimited hidden until demand); funnel events checkout_started /
+      checkout_completed / checkout_abandoned; live $0-promo checkout test on
+      prod with evidence; auto-refund path N/A here (see A2).
+- [ ] **A2 Tripwire — "AI Resume Rescue" ($4.99 one-time)**: /resume-rescue
+      page -> paste job URL/title + upload resume -> Stripe Checkout (one-time,
+      guest ok, account auto-created from email) -> tailored resume (all 5
+      templates for this resume) + fit report (jobfit + critique) delivered
+      <5 min via result page + email; failure -> auto-refund + apology +
+      founder alert; post-purchase upsell "Pro first month $9" (single-use
+      coupon, 72h); events tripwire_view/paid/delivered/upsell_accepted;
+      cost guard: 1 regeneration max, cache by (resume_hash, job_hash).
+- [ ] **A3 CTA wiring**: contextual CTA block on all ~79 SEO pages + FAQ
+      (primary: "Fix my resume for this job — $4.99"; secondary "Start free");
+      Product+Offer JSON-LD on the tripwire page.
+- [ ] **A4 Trust minimum**: founder block (name, photo placeholder, why-note),
+      support email + /contact linked in footer, refund policy next to every
+      price, replace absolute live counters with /proof link + one real ATS
+      confirmation screenshot.
+
+**Exit:** watch a $0-promo live purchase of both Pro and the tripwire complete
+on prod with all funnel events recorded; failed generation auto-refunds; all
+deploys smoke-green.
+
 ## Economics guardrails
 
 - AI cost per user tracked; tailoring+cover letter per application < $0.05;

@@ -8,6 +8,7 @@ import { prisma } from '@/lib/prisma'
 import { getPlanByPriceId } from '@/lib/pricing'
 import { qualifyReferral, clawbackReferral } from '@/lib/referral'
 import { sendPaymentFailedEmail } from '@/lib/email'
+import { trackEvent } from '@/lib/analytics-advanced'
 
 export async function POST(req: Request) {
   const body = await req.text()
@@ -90,7 +91,27 @@ export async function POST(req: Request) {
             console.error('[webhook] referral qualification failed for user', userId, err)
           }
         }
+
+        // Funnel: checkout_completed (Revenue Sprint A1)
+        trackEvent({
+          event: 'checkout_completed',
+          userId,
+          properties: { priceId, planId: plan.id, sessionId: session.id },
+        }).catch((err: unknown) => console.warn('[webhook] checkout_completed track failed:', err))
       }
+      break
+    }
+
+    case 'checkout.session.expired': {
+      // Visitor started checkout but never paid — the abandonment signal for
+      // the funnel (fires ~24h after the session was created).
+      const expired = event.data.object as Stripe.Checkout.Session
+      const abandonedUserId = expired.client_reference_id || expired.metadata?.userId || undefined
+      trackEvent({
+        event: 'checkout_abandoned',
+        userId: abandonedUserId,
+        properties: { sessionId: expired.id, mode: expired.mode },
+      }).catch((err: unknown) => console.warn('[webhook] checkout_abandoned track failed:', err))
       break
     }
 

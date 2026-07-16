@@ -50,7 +50,7 @@ test.describe('Journey', () => {
   test('5a. pricing page shows the tiers and the guarantee', async ({ page }) => {
     await page.goto('/pricing')
     await expect(page.locator('body')).toContainText('Pro')
-    await expect(page.locator('body')).toContainText('Unlimited')
+    // Unlimited tier is hidden until demand exists (Revenue Sprint A1)
     await expect(page.locator('body')).toContainText(/30-day money-back|money-back guarantee/i)
   })
 

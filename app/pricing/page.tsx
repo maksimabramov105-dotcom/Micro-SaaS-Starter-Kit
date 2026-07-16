@@ -4,7 +4,7 @@ import { getOrAssignVariant } from '@/lib/experiments'
 import { Navbar } from '@/components/navbar'
 import { PricingCards } from '@/components/pricing-cards'
 import { LaunchBanner } from '@/components/launch-banner'
-import { PRICING_PLANS } from '@/lib/pricing'
+import { VISIBLE_PLANS } from '@/lib/pricing'
 
 const SITE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
 
@@ -21,7 +21,7 @@ const pricingJsonLd = {
   name: 'ResumeAI-Bot',
   description: 'AI resume builder + auto-apply to jobs across 50+ countries.',
   brand: { '@type': 'Brand', name: 'ResumeAI-Bot' },
-  offers: PRICING_PLANS.filter((p) => p.intervalKey !== 'year').map((p) => ({
+  offers: VISIBLE_PLANS.filter((p) => p.intervalKey !== 'year').map((p) => ({
     '@type': 'Offer',
     name: `${p.name} plan`,
     price: p.price,

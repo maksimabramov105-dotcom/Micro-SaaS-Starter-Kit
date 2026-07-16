@@ -54,7 +54,7 @@ export default function ComparePage() {
               <td style={td}>✅</td>
               <td style={td}>✅ 3/day</td>
               <td style={td}>✅</td>
-              <td style={td}>$19.99/mo</td>
+              <td style={td}>$19/mo</td>
               <td style={td}>Active</td>
             </tr>
             {competitors.map((c) => (
