@@ -43,16 +43,31 @@ explicitly requires it.
 
 ## PHASE 0 — Baseline, measurement, safety net (~2-3 days)
 
-- [ ] **P0.1 Smoke script** (`scripts/smoke.sh` + post-deploy CI job): homepage
+- [x] **P0.1 Smoke script** (`scripts/smoke.sh` + post-deploy CI job): homepage
       200, pricing 200, login 200, containers up, no recent web errors.
-- [ ] **P0.2 Product analytics** (Plausible self-hosted or PostHog Cloud free):
-      landing view -> signup -> onboarding complete -> first application ->
-      subscription. Funnel definition in `lib/pmf/`.
-- [ ] **P0.3 Google Search Console + sitemap** verified; ~79 SEO pages indexed;
-      baseline impressions/clicks recorded here.
-- [ ] **P0.4 Error alerting**: web+worker exceptions -> Telegram notifier channel.
-- [ ] **P0.5 Weekly metrics snapshot**: extend `scripts/funnel_report.ts` to
-      output signups, activations, D7 retention, MRR; wire to digest cron.
+      DONE 2026-07-16 (PR #125; `npm run smoke`; also placed on VPS at
+      /opt/resumeai/scripts/smoke.sh). NOTE: the deploy.yml wiring (scp sync +
+      external verify job) is parked on local branch `ci/smoke-verify-job-local`
+      — the deploy token lacks the GitHub `workflow` scope (see OWNER ACTIONS).
+      Until then deploys keep using the embedded legacy heredoc checks.
+- [x] **P0.2 Product analytics**: DONE 2026-07-16 (PR #126) via the existing
+      first-party layer (AnalyticsEvent + page_view tracker) instead of adding
+      Plausible/PostHog — VPS is memory/disk-tight and the in-house layer
+      already tracks pageviews/UTM/visitors. Funnel defined once in
+      `lib/pmf/user-funnel.ts` (+ `signup` event in auth). Revisit PostHog at
+      scale per docs/ARCHITECTURE.md ($5k MRR).
+- [ ] **P0.3 Google Search Console + sitemap**: sitemap live (102 URLs incl.
+      79 programmatic SEO pages), robots.txt correct — verified 2026-07-16.
+      REMAINING (owner): GSC property access -> confirm indexation + record
+      baseline impressions/clicks here.
+- [ ] **P0.4 Error alerting**: web+worker exceptions -> Telegram notifier
+      channel. Code merged (PR #127: admin_alert event, instrumentation.ts,
+      worker exception handler, ADMIN_TELEGRAM_CHAT_ID). Pending live
+      end-to-end test after deploy.
+- [x] **P0.5 Weekly metrics snapshot**: DONE 2026-07-16 (PR #126).
+      `funnel_report.ts` leads with acquisition funnel + week-2 retention;
+      founder email Mondays 09-12 UTC via the hourly digest cron (deduped);
+      needs ADMIN_EMAILS env (present in prod).
 
 **Exit:** every funnel step measurable; one-command smoke test; alerts on errors.
 
@@ -169,7 +184,27 @@ job -> sees it tracked in dashboard within 10 min of first visit.
 - Web error logs (12h): clean. Worker (12h): benign scraper fetch warnings only.
 - SEO baseline (GSC impressions/clicks): TBD in P0.3.
 
+## OWNER ACTIONS (blocked on Maxim)
+
+1. **GitHub workflow scope** — run `gh auth refresh -h github.com -s workflow`
+   (interactive browser flow), then push branch `ci/smoke-verify-job-local`
+   and open/merge its PR. Unblocks: deploy gate using canonical smoke.sh +
+   external post-deploy verify job (P0.1 tail).
+2. **Google Search Console** — confirm the resumeai-bot.ru property, submit
+   /sitemap.xml if not already, and share baseline impressions/clicks for the
+   P0.3 checkbox.
+3. **Telegram alerts** — ADMIN_TELEGRAM_CHAT_ID is set to your chat id
+   (6246429438). If you have never pressed Start on the ResumeAI bot, do it
+   once or Telegram refuses bot-initiated messages (403).
+4. **Phase 1 prep** — buy the .com/.ai domain (P1.1).
+
 ## LOG
 
 - 2026-07-16 — Plan created. Baseline: 0 real users, $0 MRR, 72 submitted / 0
   interviews, dogfood only. Prod verified healthy before starting Phase 0.
+- 2026-07-16 — Phase 0 built in one session: P0.1 smoke.sh (PR #125), P0.2
+  acquisition funnel + P0.5 weekly snapshot (PR #126), P0.4 error alerting
+  (PR #127). P0.3 technical checks green; GSC numbers await owner. All
+  deploys live-verified (smoke green, digest cron 200, containers healthy).
+  Learned: VPS rate-limits per-IP connection bursts (smoke.sh designed around
+  it); deploy token lacks workflow scope (owner action #1).

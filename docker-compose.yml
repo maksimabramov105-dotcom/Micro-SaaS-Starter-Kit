@@ -183,6 +183,8 @@ services:
       REDIS_URL: redis://redis:6379
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-}
+      # Founder chat for admin_alert error notifications (P0.4)
+      ADMIN_TELEGRAM_CHAT_ID: ${ADMIN_TELEGRAM_CHAT_ID:-}
       APP_URL: ${NEXT_PUBLIC_APP_URL:-https://resumeai-bot.ru}
       # Sentry — optional; leave unset to disable error reporting.
       SENTRY_DSN: ${SENTRY_DSN_NOTIFIER:-}

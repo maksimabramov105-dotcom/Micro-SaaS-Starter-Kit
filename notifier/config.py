@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     # Rate-limit: max notifications per user per hour
     rate_limit_per_hour: int = 30
 
+    # Founder/admin chat for `admin_alert` events (P0.4 error alerting).
+    # Leave empty to drop admin alerts silently.
+    admin_telegram_chat_id: str = ""
+
     # Sentry — optional; leave empty to disable.
     sentry_dsn: str = ""
     environment: str = "production"
