@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { CheckCircle2, Globe, Inbox, ShieldCheck, FileCheck2 } from 'lucide-react'
-import { PRICING_PLANS, getMonthlyEquivalent } from '@/lib/pricing'
+import { VISIBLE_PLANS, getMonthlyEquivalent } from '@/lib/pricing'
 import { LaunchBanner } from '@/components/launch-banner'
 import { Logo } from '@/components/logo'
 import { HeroDemo } from '@/components/hero-demo'
@@ -64,16 +64,15 @@ const jsonLd = {
     'AI resume builder that tailors your resume to each role and auto-applies to jobs across 50+ countries.',
   offers: [
     { '@type': 'Offer', name: 'Free', price: '0', priceCurrency: 'USD' },
-    { '@type': 'Offer', name: 'Pro (monthly)', price: '19.99', priceCurrency: 'USD' },
-    { '@type': 'Offer', name: 'Pro (yearly)', price: '199', priceCurrency: 'USD' },
-    { '@type': 'Offer', name: 'Unlimited (monthly)', price: '29.99', priceCurrency: 'USD' },
+    { '@type': 'Offer', name: 'Pro (monthly)', price: '19', priceCurrency: 'USD' },
+    { '@type': 'Offer', name: 'Pro (yearly)', price: '180', priceCurrency: 'USD' },
   ],
 }
 
 // Homepage pricing: show Free + the YEARLY plans by default so the first price a
 // visitor sees is the better-value annual plan (HOMEPAGE_COPY.md §6). Kept as a
 // static server-rendered list so prices stay in the raw HTML for SEO.
-const HOMEPAGE_PLANS = PRICING_PLANS.filter(
+const HOMEPAGE_PLANS = VISIBLE_PLANS.filter(
   (p) => p.intervalKey === null || p.intervalKey === 'year',
 )
 
@@ -346,7 +345,7 @@ export default async function HomePage() {
                   ['AI resume per role', '✓', 'limited', 'limited'],
                   ['Free tier', '✓ 3/day', '✕', '✕'],
                   ['30-day money-back', '✓', '—', '✕'],
-                  ['Price', '$19.99/mo', '—', 'from $99 one-time'],
+                  ['Price', '$19/mo', '—', 'from $99 one-time'],
                 ].map(([label, ...cells]) => (
                   <tr key={label} className="border-b border-slate-100">
                     <td className="py-3 pr-4 font-medium text-slate-900">{label}</td>
@@ -380,7 +379,7 @@ export default async function HomePage() {
             Start for free. Upgrade when you need more power — 30-day money-back guarantee on every
             paid plan.
           </p>
-          <div className="grid gap-6 md:grid-cols-3">
+          <div className="mx-auto grid max-w-3xl gap-6 md:grid-cols-2">
             {HOMEPAGE_PLANS.map((plan) => {
               const isPro = plan.id === 'pro_yearly'
               const isYearly = plan.intervalKey === 'year'

@@ -28,7 +28,7 @@ import { sendReferralQualifiedEmail, sendReferralReceivedEmail } from './emails'
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 export const REFERRAL_FREE_MONTHS = 1        // reward: 1 free month of Pro
-export const PRO_MONTHLY_VALUE_USD = 19.99   // value of the free month (referralEarned tracking)
+export const PRO_MONTHLY_VALUE_USD = 19   // value of the free month (referralEarned tracking)
 export const MAX_REFERRALS = 10              // max rewarded referrals per user per lifetime
 export const REFERRAL_COOKIE = 'referral_code'
 export const CLAWBACK_WINDOW_DAYS = 30

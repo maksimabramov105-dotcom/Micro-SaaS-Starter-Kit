@@ -14,7 +14,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Check, Lock } from 'lucide-react'
-import { PRICING_PLANS, getMonthlyEquivalent, type BillingInterval } from '@/lib/pricing'
+import { VISIBLE_PLANS, getMonthlyEquivalent, type BillingInterval } from '@/lib/pricing'
 
 // ── Analytics helper (fire-and-forget; never throws) ─────────────────────────
 async function trackClientEvent(event: string, properties: Record<string, unknown>) {
@@ -29,9 +29,9 @@ async function trackClientEvent(event: string, properties: Record<string, unknow
   }
 }
 
-// Savings copy per plan family
+// Savings copy per plan family ($19 x 12 = $228 vs $180 annual)
 const SAVINGS = {
-  pro: { amount: 40, label: 'Save $40/year' },
+  pro: { amount: 48, label: 'Save $48/year' },
   unlimited: { amount: 60, label: 'Save $60/year' },
 }
 
@@ -45,7 +45,7 @@ export function PricingCards() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   // Plans visible in the current interval (always show Free)
-  const visiblePlans = PRICING_PLANS.filter(
+  const visiblePlans = VISIBLE_PLANS.filter(
     (p) => p.intervalKey === null || p.intervalKey === interval,
   )
 
@@ -130,7 +130,7 @@ export function PricingCards() {
           >
             Yearly
             <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800 dark:bg-green-900 dark:text-green-200">
-              Save 17%
+              Save 21%
             </span>
           </button>
         </div>
@@ -142,8 +142,8 @@ export function PricingCards() {
         </div>
       )}
 
-      {/* ── Plan cards ─────────────────────────────────────────────────── */}
-      <div className="grid gap-8 md:grid-cols-3">
+      {/* ── Plan cards (Free + Pro; Unlimited hidden until demand exists) ── */}
+      <div className="mx-auto grid max-w-3xl gap-8 md:grid-cols-2">
         {visiblePlans.map((plan) => {
           const isFree = plan.id === 'free'
           const isPro = plan.id === 'pro' || plan.id === 'pro_yearly'

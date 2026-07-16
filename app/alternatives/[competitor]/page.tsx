@@ -98,7 +98,7 @@ export default async function Page({ params }: { params: Promise<Params> }) {
           <tr><td>AI resume tailored per role</td><td>✅</td><td>Limited</td></tr>
           <tr><td>Free tier</td><td>✅ (3 apps/day)</td><td>{c.slug === "loopcv" || c.slug === "jobright" ? "✅" : "❌"}</td></tr>
           <tr><td>30-day money-back guarantee</td><td>✅ 30-day</td><td>—</td></tr>
-          <tr><td>Price</td><td>$19.99/mo</td><td>{features ? features.price : c.theirPrice}</td></tr>
+          <tr><td>Price</td><td>$19/mo</td><td>{features ? features.price : c.theirPrice}</td></tr>
           <tr><td>Status</td><td>Active</td><td>{c.status === "shut down" ? "Shut down" : "Active"}</td></tr>
         </tbody>
       </table>
