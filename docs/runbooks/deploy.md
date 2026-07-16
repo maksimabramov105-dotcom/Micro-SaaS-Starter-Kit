@@ -136,7 +136,7 @@ bash /opt/resumeai/scripts/deploy.sh
 ## Smoke test (manual)
 
 ```bash
-BASE_URL=https://resumeai-bot.ru bash /opt/resumeai/scripts/smoke_test.sh
+BASE_URL=https://resumeai-bot.ru bash /opt/resumeai/scripts/smoke.sh
 ```
 
 Expected output:
