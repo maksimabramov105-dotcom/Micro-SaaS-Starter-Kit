@@ -7,6 +7,7 @@ import { cookies } from 'next/headers'
 import { prisma } from './prisma'
 import { mintInboxHandle } from './auth/handle-mint'
 import { captureReferral, REFERRAL_COOKIE } from './referral'
+import { trackEvent } from './analytics-advanced'
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -127,6 +128,13 @@ export const authOptions: NextAuthOptions = {
         } catch (err) {
           // Non-fatal — user can still sign in; handle can be minted later
           console.error('[auth] failed to mint inboxHandle for', user.id, err)
+        }
+
+        // Acquisition-funnel telemetry (lib/pmf/user-funnel.ts step 2)
+        try {
+          await trackEvent({ event: 'signup', userId: user.id })
+        } catch (err) {
+          console.error('[auth] signup event failed for', user.id, err)
         }
 
         // Capture referral: read the referral_code cookie set by /r/[code]

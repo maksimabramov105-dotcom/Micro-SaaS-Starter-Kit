@@ -14,6 +14,7 @@
  * With --json it prints ONLY a JSON object (for export/piping). Plain Prisma +
  * the Stripe SDK — no new services, read-only.
  */
+import { getUserFunnel, getWeek2Retention } from '../lib/pmf/user-funnel'
 import { prisma } from '../lib/prisma'
 import { getPlanByPriceId } from '../lib/pricing'
 import { stripe } from '../lib/stripe'
@@ -128,11 +129,13 @@ async function main() {
   const now = new Date()
   const since = daysAgo(DAYS)
 
-  const [funnel, revenue, weekly, stripeMrrCents] = await Promise.all([
+  const [funnel, revenue, weekly, stripeMrrCents, acquisition, week2] = await Promise.all([
     getFunnel(since, now),
     getRevenue(now),
     getWeeklyTrends(),
     getStripeMrrCents().catch(() => null),
+    getUserFunnel(since),
+    getWeek2Retention(),
   ])
 
   const reconciliation =
@@ -145,7 +148,7 @@ async function main() {
           reconciles: Math.abs(revenue.mrrCents - stripeMrrCents) <= 100,
         }
 
-  const report = { generatedAt: now.toISOString(), days: DAYS, funnel, revenue, reconciliation, weeklyTrends: weekly }
+  const report = { generatedAt: now.toISOString(), days: DAYS, funnel, acquisition, week2Retention: week2, revenue, reconciliation, weeklyTrends: weekly }
 
   if (JSON_ONLY) {
     console.log(JSON.stringify(report, null, 2))
@@ -153,7 +156,14 @@ async function main() {
   }
 
   const $ = (c: number) => `$${(c / 100).toFixed(2)}`
+  const pctOrDash = (x: number | null) => (x === null ? '-' : `${Math.round(x * 100)}%`)
   const rows: [string, string | number][] = [
+    [`Unique visitors (last ${DAYS}d)`, acquisition.landing_view],
+    ['  visit -> signup', pctOrDash(acquisition.conversion.visitToSignup)],
+    ['Activated users (G1 definition)', acquisition.first_application],
+    ['  signup -> activated', pctOrDash(acquisition.conversion.signupToActivated)],
+    ['Week-2 retention (14-28d cohort)', `${week2.retained}/${week2.cohortSize} (${pctOrDash(week2.rate)})`],
+    ['---', '---'],
     [`Signups (last ${DAYS}d)`, funnel.signups],
     ['  created a resume', funnel.resumeUsers],
     ['  created a campaign', funnel.campaignUsers],
