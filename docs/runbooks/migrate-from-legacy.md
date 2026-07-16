@@ -146,10 +146,10 @@ and the check name — investigate those rows before proceeding.
 
 ```bash
 # Full end-to-end smoke test against the live URL:
-BASE_URL=https://resumeai-bot.ru bash scripts/smoke_test.sh
+BASE_URL=https://resumeai-bot.ru bash scripts/smoke.sh
 
 # Or against a locally running stack:
-BASE_URL=http://localhost:3000 bash scripts/smoke_test.sh
+BASE_URL=http://localhost:3000 bash scripts/smoke.sh
 ```
 
 Log in with a migrated user's email and verify:

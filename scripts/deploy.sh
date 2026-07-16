@@ -51,6 +51,6 @@ sleep 15
 
 # ── 5. Smoke tests ────────────────────────────────────────────────────────────
 log "Running smoke tests…"
-bash "${DEPLOY_DIR}/scripts/smoke_test.sh"
+bash "${DEPLOY_DIR}/scripts/smoke.sh"
 
 log "✅ Deploy complete — tag=${IMAGE_TAG}"
