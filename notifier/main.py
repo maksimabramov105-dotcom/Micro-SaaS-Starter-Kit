@@ -12,6 +12,7 @@ Event types handled:
 Rate limit: 30 msgs / user / hour (per-chat Redis counter).
 """
 import asyncio
+import html as html_lib
 import json
 import signal
 import sys
@@ -86,6 +87,24 @@ async def handle_event(
 ) -> None:
     event_type = event.get("type")
     user_id = event.get("userId")
+
+    # Admin error alerts (P0.4): routed to the founder chat, not a user chat.
+    # No per-user toggle; own rate-limit bucket so alert storms can't starve
+    # user notifications (publishers also dedupe, see lib/alerts.ts).
+    if event_type == "admin_alert":
+        chat_id = settings.admin_telegram_chat_id
+        if not chat_id:
+            log.warning("admin_alert.no_chat_configured")
+            return
+        if not await is_allowed(redis, f"admin:{chat_id}", limit=settings.rate_limit_per_hour):
+            log.info("admin_alert.rate_limited")
+            return
+        text = html_lib.escape(str(event.get("text") or "")[:3800])
+        if not text:
+            return
+        ok = await send_message(http, chat_id, f"\N{POLICE CARS REVOLVING LIGHT} <b>ResumeAI alert</b>\n\n<pre>{text}</pre>")
+        log.info("admin_alert.sent" if ok else "admin_alert.send_failed")
+        return
 
     if not event_type or not user_id:
         log.warning("event.invalid", event=event)

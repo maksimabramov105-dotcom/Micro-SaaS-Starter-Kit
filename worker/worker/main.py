@@ -8,6 +8,7 @@ Lifespan:
 Run locally:
     uvicorn worker.main:app --reload --port 8000
 """
+import json
 import time
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
@@ -16,6 +17,7 @@ import sentry_sdk
 import structlog
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from worker.config import settings
 from worker.db import close_pool, init_pool
@@ -105,6 +107,43 @@ async def log_requests(request: Request, call_next) -> Response:
         duration_ms=duration_ms,
     )
     return response
+
+
+# ── Founder error alerting (P0.4) ─────────────────────────────────────────────
+# Unhandled exceptions -> `admin_alert` on the notifier's Redis channel ->
+# founder Telegram. Redis-deduped per exception+path per hour so a crash loop
+# can't flood the chat. Fire-and-forget: alerting must never mask the 500.
+
+async def _publish_admin_alert(text: str, dedupe_key: str) -> None:
+    try:
+        import redis.asyncio as aioredis  # lazy import — only if Redis configured
+
+        redis_url = getattr(settings, "redis_url", "")
+        if not redis_url:
+            return
+        async with aioredis.from_url(redis_url, decode_responses=True) as r:
+            first = await r.set(f"alert:dedupe:{dedupe_key}", "1", ex=3600, nx=True)
+            if not first:
+                return
+            await r.publish(
+                "application_events",
+                json.dumps({"type": "admin_alert", "text": text}),
+            )
+    except Exception as exc:
+        logger.warning("admin_alert.publish_failed", error=str(exc))
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_alert(request: Request, exc: Exception) -> Response:
+    logger.error(
+        "http.unhandled_exception",
+        path=request.url.path,
+        error=str(exc),
+        exc_info=exc,
+    )
+    summary = f"worker error\n{request.method} {request.url.path}\n{type(exc).__name__}: {str(exc)[:400]}"
+    await _publish_admin_alert(summary, f"worker:{request.url.path}:{type(exc).__name__}")
+    return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
 
 
 # ── Routers ───────────────────────────────────────────────────────────────────
