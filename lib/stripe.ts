@@ -33,6 +33,9 @@ export const getStripeSession = async ({
     ],
     mode: 'subscription',
     allow_promotion_codes: true,
+    // Skip card collection when the total is $0 (e.g. a 100%-off promo code).
+    // Normal checkouts always have a nonzero total, so they still collect a card.
+    payment_method_collection: 'if_required',
     subscription_data: {
       metadata: {
         userId,
