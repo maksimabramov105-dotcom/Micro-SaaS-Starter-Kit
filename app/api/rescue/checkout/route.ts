@@ -113,6 +113,7 @@ export async function POST(req: Request) {
       payment_method_types: ['card'],
       customer_email: email,
       line_items: [{ price: priceId, quantity: 1 }],
+      allow_promotion_codes: true,
       metadata: { rescueOrderId: order.id, kind: 'resume_rescue' },
       payment_intent_data: { metadata: { rescueOrderId: order.id } },
       success_url: `${APP_URL}/resume-rescue/result?order=${order.id}`,
