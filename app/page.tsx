@@ -4,10 +4,9 @@ import { VISIBLE_PLANS, getMonthlyEquivalent } from '@/lib/pricing'
 import { LaunchBanner } from '@/components/launch-banner'
 import { Logo } from '@/components/logo'
 import { HeroDemo } from '@/components/hero-demo'
-import { prisma } from '@/lib/prisma'
 import { testimonials, replyScreenshots } from '@/lib/proof'
 
-// ISR: regenerated hourly so the outcomes band shows real, fresh numbers while
+// ISR: regenerated hourly so proof/testimonial content stays fresh while
 // the page stays fully server-rendered + indexable.
 export const revalidate = 3600
 
@@ -25,32 +24,6 @@ export const metadata = {
   },
 }
 
-// Real funnel proof (D2) — aggregate, anonymized. Only shown once there's a
-// meaningful volume so early/empty numbers never undersell the product.
-// Single source of truth for the homepage proof counters. Definitions are
-// EXACT and must match the caption:
-//   sent      = our system completed the application (JobApplication SUBMITTED+)
-//   confirmed = the employer's ATS acknowledged receipt (ApplicationEvent 'confirmed')
-async function getOutcomes(): Promise<{
-  sent: number
-  sentThisWeek: number
-  confirmed: number
-} | null> {
-  try {
-    const SENT = ['SUBMITTED', 'INTERVIEW', 'REJECTED', 'OFFER'] as const
-    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-    const [sent, sentThisWeek, confirmed] = await Promise.all([
-      prisma.jobApplication.count({ where: { status: { in: [...SENT] } } }),
-      prisma.jobApplication.count({ where: { status: { in: [...SENT] }, createdAt: { gte: weekAgo } } }),
-      prisma.applicationEvent.count({ where: { type: 'confirmed' } }),
-    ])
-    if (sent < 200) return null // hold until the number is impressive
-    return { sent, sentThisWeek, confirmed }
-  } catch {
-    return null
-  }
-}
-
 // SoftwareApplication structured data for rich results (HOMEPAGE_COPY.md §9).
 // No aggregateRating until we have real reviews — never fake ratings.
 const jsonLd = {
@@ -61,7 +34,7 @@ const jsonLd = {
   operatingSystem: 'Web',
   url: 'https://resumeai-bot.ru',
   description:
-    'AI resume builder that tailors your resume to each role and auto-applies to jobs across 50+ countries.',
+    'AI resume builder that tailors your resume to each role, auto-applies where you are genuinely eligible, and verifies every submission.',
   offers: [
     { '@type': 'Offer', name: 'Free', price: '0', priceCurrency: 'USD' },
     { '@type': 'Offer', name: 'Pro (monthly)', price: '19', priceCurrency: 'USD' },
@@ -77,7 +50,6 @@ const HOMEPAGE_PLANS = VISIBLE_PLANS.filter(
 )
 
 export default async function HomePage() {
-  const outcomes = await getOutcomes()
   return (
     <main className="flex min-h-screen flex-col bg-white">
       <script
@@ -160,42 +132,31 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Real funnel proof (D2) — only renders once volume is meaningful. */}
-      {outcomes && (
-        <section className="border-y border-slate-100 bg-emerald-50/40 px-4 py-12">
-          <div className="mx-auto flex max-w-4xl flex-col items-center gap-3 text-center">
-            <p className="inline-flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-emerald-700">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
-              </span>
-              Live activity on ResumeAI-Bot
-            </p>
-            <div className="flex flex-wrap items-center justify-center gap-x-14 gap-y-4">
-              <div>
-                <div className="text-4xl font-bold text-slate-900">{outcomes.sent.toLocaleString()}</div>
-                <div className="text-sm text-slate-600">applications sent</div>
-                {outcomes.sentThisWeek > 0 && (
-                  <div className="mt-0.5 text-xs font-medium text-emerald-700">
-                    +{outcomes.sentThisWeek.toLocaleString()} this week
-                  </div>
-                )}
-              </div>
-              {outcomes.confirmed > 0 && (
-                <div>
-                  <div className="text-4xl font-bold text-slate-900">{outcomes.confirmed.toLocaleString()}</div>
-                  <div className="text-sm text-slate-600">confirmed by employer ATS</div>
-                </div>
-              )}
-            </div>
-            <p className="mt-1 text-xs text-slate-600">
-              Live totals across all users, updated hourly. &ldquo;Sent&rdquo; means our system
-              completed the application; &ldquo;confirmed&rdquo; means the employer&apos;s ATS
-              acknowledged receipt.
-            </p>
-          </div>
-        </section>
-      )}
+      {/* Verified-submission proof (A4): no absolute counters — small numbers
+          read as an empty room. The differentiator is VERIFIABILITY, so we
+          link the live ledger instead. */}
+      <section className="border-y border-slate-100 bg-emerald-50/40 px-4 py-12">
+        <div className="mx-auto flex max-w-4xl flex-col items-center gap-3 text-center">
+          <p className="inline-flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-emerald-700">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+            </span>
+            Every application, verified
+          </p>
+          <p className="max-w-2xl text-slate-700">
+            We never mark a job &ldquo;applied&rdquo; unless the employer&apos;s ATS actually
+            acknowledged the submission — and we publish the live ledger so you can check us.
+            No inflated counters, no &ldquo;we clicked a button&rdquo; applications.
+          </p>
+          <Link
+            href="/proof"
+            className="mt-1 inline-block rounded-lg border-2 border-emerald-700 px-5 py-2.5 text-sm font-semibold text-emerald-800 hover:bg-emerald-100"
+          >
+            See the live verified ledger &rarr;
+          </Link>
+        </div>
+      </section>
 
       {/* Real testimonials / reply screenshots (D2). Empty by default — we never
           ship fabricated proof. Fill lib/proof.ts with genuine content. */}
@@ -466,10 +427,42 @@ export default async function HomePage() {
         </div>
       </section>
 
+      {/* Founder note (A4 trust block) — a real human answers for this product. */}
+      <section className="border-t border-slate-100 bg-white px-4 py-14">
+        <div className="mx-auto flex max-w-2xl flex-col items-center gap-4 text-center sm:flex-row sm:text-left">
+          <div
+            aria-hidden="true"
+            className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-slate-200 text-2xl font-bold text-slate-600"
+          >
+            MA
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Built by Maxim Abramov</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              I built ResumeAI after watching auto-apply tools spray applications that never
+              reached a human — and honest applicants lose to the noise. This product only sends
+              applications you can actually win, and proves every single one was delivered.
+            </p>
+            <p className="mt-2 text-sm text-slate-600">
+              Questions? Email me:{' '}
+              <a href="mailto:support@resumeai-bot.ru" className="font-medium underline">
+                support@resumeai-bot.ru
+              </a>{' '}
+              — answered within 24 hours.
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="border-t border-slate-100 bg-slate-50 px-4 py-8">
         <div className="mx-auto flex max-w-5xl flex-col items-center gap-4 text-sm text-slate-600 sm:flex-row sm:justify-between">
-          <span>&copy; {new Date().getFullYear()} ResumeAI. All rights reserved.</span>
+          <span>
+            &copy; {new Date().getFullYear()} ResumeAI ·{' '}
+            <a href="mailto:support@resumeai-bot.ru" className="hover:text-slate-900">
+              support@resumeai-bot.ru
+            </a>
+          </span>
           <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">
             <Link href="/faq" className="hover:text-slate-900">
               FAQ

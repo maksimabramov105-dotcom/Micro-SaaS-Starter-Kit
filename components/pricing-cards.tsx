@@ -246,7 +246,12 @@ export function PricingCards() {
                 </Button>
                 {!isFree && (
                   <div className="space-y-1 text-center text-xs text-muted-foreground">
-                    <p>30-day money-back guarantee · cancel anytime</p>
+                    <p>
+                      <a href="/refund-policy" className="underline hover:text-foreground">
+                        30-day money-back guarantee
+                      </a>{' '}
+                      · cancel anytime
+                    </p>
                     <p className="flex items-center justify-center gap-1">
                       <Lock className="h-3 w-3" aria-hidden="true" />
                       Secured by Stripe · no card details touch our servers
