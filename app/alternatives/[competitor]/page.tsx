@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import seo from "@/lib/seo-data.json"; // <-- adjust path if needed
+import { RescueCtaBlock } from "@/components/rescue-cta-block";
 
 const SITE = seo._meta.site;
 const competitors = seo.competitors;
@@ -122,6 +123,8 @@ export default async function Page({ params }: { params: Promise<Params> }) {
       <p>Import your resume, choose your target countries, and ResumeAI-Bot starts applying for you.
         Start on the free plan — no card required — and upgrade only when you see results.</p>
       <p><Link href="/?ref=seo-alt" style={{ fontWeight: 600 }}>Try the {c.name} alternative free →</Link></p>
+
+      <RescueCtaBlock refTag="seo-alt" />
 
       <h2>Frequently asked questions</h2>
       {faq.map((f) => (<div key={f.q}><h3>{f.q}</h3><p>{f.a}</p></div>))}

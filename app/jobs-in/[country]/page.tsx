@@ -10,6 +10,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import seo from "@/lib/seo-data.json"; // <-- adjust path if needed
+import { RescueCtaBlock } from "@/components/rescue-cta-block";
 
 const SITE = seo._meta.site;
 const countries = seo.countries;
@@ -146,6 +147,8 @@ export default async function Page({ params }: { params: Promise<Params> }) {
           Start applying to {c.name} jobs free →
         </Link>
       </p>
+
+      <RescueCtaBlock context={`a ${c.name} job`} refTag="seo-jobs-in" />
 
       <h2>Frequently asked questions</h2>
       {faq.map((f) => (

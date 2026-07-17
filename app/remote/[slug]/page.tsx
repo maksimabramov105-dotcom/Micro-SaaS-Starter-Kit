@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import seo from "@/lib/seo-data.json";
 import { REMOTE_GUIDES, getRemoteGuide } from "@/lib/remote-guides";
+import { RescueCtaBlock } from "@/components/rescue-cta-block";
 
 const SITE = seo._meta.site;
 
@@ -66,6 +67,8 @@ export default async function Page({ params }: { params: Promise<Params> }) {
         the employer&apos;s ATS.
       </p>
       <p><Link href="/?ref=seo-remote" style={{ fontWeight: 600 }}>Start free — 3 applications/day →</Link></p>
+
+      <RescueCtaBlock context="a remote job" refTag="seo-remote" />
 
       <h2>Frequently asked questions</h2>
       {g.faqs.map((f) => (<div key={f.q}><h3>{f.q}</h3><p>{f.a}</p></div>))}
