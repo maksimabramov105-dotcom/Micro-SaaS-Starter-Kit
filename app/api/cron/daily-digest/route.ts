@@ -26,6 +26,7 @@ import { sendEmail } from '@/lib/email'
 import DailyDigestEmail from '@/lib/notifications/templates/daily-digest'
 import { createUnsubscribeToken } from '@/lib/notifications/unsubscribe-token'
 import { maybeSendWeeklySnapshot } from '@/lib/pmf/weekly-snapshot'
+import { maybeRunSeoAutomation } from '@/lib/seo/health'
 
 // Local hour at which we send the digest
 const SEND_HOUR = 8
@@ -50,6 +51,14 @@ export async function POST(req: Request) {
     if (snapshotResult === 'sent') console.log('[daily-digest] weekly admin snapshot sent')
   } catch (err) {
     console.error('[daily-digest] weekly snapshot failed', err)
+  }
+
+  // ── Daily SEO health + weekly IndexNow push (B1) — self-gates + dedupes ──
+  try {
+    const seoResult = await maybeRunSeoAutomation()
+    if (seoResult === 'ran') console.log('[daily-digest] seo automation ran')
+  } catch (err) {
+    console.error('[daily-digest] seo automation failed', err)
   }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
