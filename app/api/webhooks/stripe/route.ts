@@ -8,6 +8,7 @@ import { prisma } from '@/lib/prisma'
 import { getPlanByPriceId } from '@/lib/pricing'
 import { qualifyReferral, clawbackReferral } from '@/lib/referral'
 import { sendPaymentFailedEmail } from '@/lib/email'
+import { mintInboxHandle } from '@/lib/auth/handle-mint'
 import { trackEvent } from '@/lib/analytics-advanced'
 
 export async function POST(req: Request) {
@@ -98,6 +99,72 @@ export async function POST(req: Request) {
           userId,
           properties: { priceId, planId: plan.id, sessionId: session.id },
         }).catch((err: unknown) => console.warn('[webhook] checkout_completed track failed:', err))
+
+        // Rescue upsell conversion ("Pro first month $9") — A2
+        if (session.metadata?.upsellOrderId) {
+          trackEvent({
+            event: 'upsell_accepted',
+            userId,
+            properties: { orderId: session.metadata.upsellOrderId, sessionId: session.id },
+          }).catch((err: unknown) => console.warn('[webhook] upsell_accepted track failed:', err))
+        }
+      }
+
+      // ── Resume Rescue one-time payment (Revenue Sprint A2) ────────────────
+      if (session.mode === 'payment' && session.metadata?.rescueOrderId) {
+        const orderId = session.metadata.rescueOrderId
+        const order = await prisma.rescueOrder.findUnique({ where: { id: orderId } })
+        if (!order) {
+          console.error('[webhook] rescue order not found:', orderId)
+          break
+        }
+        if (order.status !== 'PENDING_PAYMENT') break // replay — already handled
+
+        const buyerEmail =
+          session.customer_details?.email?.toLowerCase() ?? order.email.toLowerCase()
+
+        // Auto-create the account so the deliverable (a Resume row + template
+        // picker) has a home. Magic-link login works for it immediately.
+        let rescueUserId = order.userId
+        if (!rescueUserId) {
+          const existing = await prisma.user.findUnique({ where: { email: buyerEmail } })
+          if (existing) {
+            rescueUserId = existing.id
+          } else {
+            const created = await prisma.user.create({ data: { email: buyerEmail } })
+            rescueUserId = created.id
+            try {
+              await mintInboxHandle(created.id, buyerEmail)
+            } catch (err) {
+              console.error('[webhook] rescue inbox handle mint failed:', err)
+            }
+            trackEvent({
+              event: 'signup',
+              userId: created.id,
+              properties: { source: 'resume_rescue' },
+            }).catch(() => {})
+          }
+        }
+
+        await prisma.rescueOrder.update({
+          where: { id: orderId },
+          data: {
+            status: 'PAID',
+            userId: rescueUserId,
+            email: buyerEmail,
+            paymentIntentId:
+              typeof session.payment_intent === 'string'
+                ? session.payment_intent
+                : session.payment_intent?.id ?? null,
+            paidAt: new Date(),
+          },
+        })
+
+        trackEvent({
+          event: 'tripwire_paid',
+          userId: rescueUserId ?? undefined,
+          properties: { orderId, amountTotal: session.amount_total },
+        }).catch((err: unknown) => console.warn('[webhook] tripwire_paid track failed:', err))
       }
       break
     }
