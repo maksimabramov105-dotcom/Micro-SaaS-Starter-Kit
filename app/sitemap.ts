@@ -25,6 +25,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const marketing: MetadataRoute.Sitemap = [
     { url: `${baseUrl}/compare`, lastModified: now, changeFrequency: 'monthly', priority: 0.8 },
     { url: `${baseUrl}/free-resume-teardown`, lastModified: now, changeFrequency: 'monthly', priority: 0.8 },
+    { url: `${baseUrl}/resume-rescue`, lastModified: now, changeFrequency: 'monthly', priority: 0.9 },
   ]
 
   // ── Programmatic SEO routes (driven by lib/seo-data.json) ─────────────────
