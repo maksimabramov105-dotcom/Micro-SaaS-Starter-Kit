@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import seo from "@/lib/seo-data.json"; // <-- adjust path
+import { RescueCtaBlock } from "@/components/rescue-cta-block";
 
 const SITE = seo._meta.site;
 const boards = seo.jobBoards;
