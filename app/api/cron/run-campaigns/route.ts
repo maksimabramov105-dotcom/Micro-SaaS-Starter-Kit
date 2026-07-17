@@ -30,6 +30,7 @@ import { prisma } from '@/lib/prisma'
 import { canSendApplication, consumeQuota } from '@/lib/quota'
 import { trackEvent } from '@/lib/analytics-advanced'
 import { recordFunnel } from '@/lib/funnel'
+import { processStaleRescueOrders } from '@/lib/rescue/generate'
 import { publishEvent, getRedis } from '@/lib/redis'
 import { isResumeQualityV2, isFlagEnabled } from '@/lib/flags'
 import {
@@ -411,6 +412,16 @@ export async function POST(req: Request) {
       console.error('[run-campaigns] background run crashed', err)
     } finally {
       if (lockAcquired) await releaseLock(getRedis())
+    }
+
+    // Resume Rescue safety net (A2): deliver paid orders whose buyer closed
+    // the tab before the result page could drive generation. Has its own
+    // per-order lock; never interferes with the campaign run above.
+    try {
+      const delivered = await processStaleRescueOrders()
+      if (delivered > 0) console.log('[run-campaigns] rescued stale orders:', delivered)
+    } catch (err) {
+      console.error('[run-campaigns] stale rescue processing failed', err)
     }
   })
 

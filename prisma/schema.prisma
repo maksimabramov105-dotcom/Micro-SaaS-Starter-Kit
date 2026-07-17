@@ -99,6 +99,7 @@ model User {
   // Resume domain relations
   resumes      Resume[]
   applications JobApplication[]
+  rescueOrders RescueOrder[]
   campaigns    AutoApplyCampaign[]
   surveys      Survey[]
 
@@ -395,6 +396,54 @@ model Resume {
 
   @@index([userId])
   @@index([userId, isDefault])
+}
+
+// ── AI Resume Rescue — $4.99 tripwire (Revenue Sprint A2) ────────────────────
+
+enum RescueOrderStatus {
+  PENDING_PAYMENT // order created, Stripe Checkout not completed yet
+  PAID            // payment confirmed by webhook, generation not started
+  GENERATING      // a worker/cron is holding the generation lock
+  DELIVERED       // resume + fit report ready, delivery email sent
+  FAILED          // generation failed after max attempts, refund NOT yet done
+  REFUNDED        // auto-refund issued + apology email sent
+}
+
+model RescueOrder {
+  id              String            @id @default(cuid())
+  email           String
+  userId          String?
+  user            User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  status          RescueOrderStatus @default(PENDING_PAYMENT)
+
+  // What the buyer submitted
+  jobTitle        String
+  jobCompany      String?
+  jobUrl          String?
+  jobDescription  String?
+  resumeText      String            // extracted/pasted resume plain text
+
+  // Payment
+  stripeSessionId String?           @unique
+  paymentIntentId String?
+
+  // Deliverables
+  resumeId        String?           // delivered Resume row (all templates unlocked)
+  fitReport       Json?
+
+  // Post-purchase upsell: "Pro, first month $9" (single-use, 72h)
+  upsellPromoId   String?
+  upsellExpiresAt DateTime?
+
+  attempts        Int               @default(0) // generation attempts (max 2 = 1 regen)
+  error           String?
+  paidAt          DateTime?
+  deliveredAt     DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([status, paidAt])
+  @@index([email])
 }
 
 model JobApplication {

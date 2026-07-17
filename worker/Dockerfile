@@ -36,6 +36,7 @@ RUN pip install uv && uv pip install --system \
       "redis[hiredis]>=5.0" \
       "weasyprint>=62.0" \
       "jinja2>=3.1.4" \
+      "pypdf>=4.0" \
       "sentry-sdk[fastapi]>=2.0.0"
 
 # Download Chromium browser to a fixed, world-readable path.

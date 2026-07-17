@@ -192,6 +192,19 @@ class ResumePdfRequest(BaseModel):
     title: str = "Resume"
 
 
+class ResumeRescueRequest(BaseModel):
+    """POST /jobs/resume-rescue — the $4.99 tripwire bundle (A2)."""
+    resume_text: str
+    job: dict                   # {title, company?, description?, url?}
+    order_id: str = ""          # for log correlation only
+
+
+class ExtractResumeRequest(BaseModel):
+    """POST /jobs/extract-resume — PDF upload -> plain text."""
+    pdf_base64: str
+    filename: str = "resume.pdf"
+
+
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @router.post("/resume/generate", dependencies=[Depends(verify_bearer)])
@@ -377,6 +390,73 @@ async def autoapply_prepare(body: TailorRequest) -> dict:
 
     await _redis_save(job)
     return job.model_dump()
+
+
+@router.post("/resume-rescue", dependencies=[Depends(verify_bearer)])
+async def resume_rescue(body: ResumeRescueRequest) -> dict:
+    """
+    Generate the paid Resume Rescue bundle: tailored resume + fit report.
+    Synchronous (~30-90s). Raises 500 on hard failure — the web side
+    interprets that as a failed order and auto-refunds after max attempts.
+    """
+    from worker.ai.rescue import build_rescue_bundle
+
+    logger.info(
+        "job.resume_rescue.started",
+        order_id=body.order_id,
+        title=body.job.get("title"),
+        resume_chars=len(body.resume_text),
+    )
+    if not body.resume_text.strip() or not body.job.get("title"):
+        raise HTTPException(status_code=422, detail="resume_text and job.title are required")
+
+    try:
+        result = await build_rescue_bundle(resume_text=body.resume_text, job=body.job)
+    except Exception as exc:
+        logger.error("job.resume_rescue.error", order_id=body.order_id, error=str(exc))
+        raise HTTPException(status_code=500, detail=f"generation failed: {exc}") from exc
+
+    logger.info(
+        "job.resume_rescue.done",
+        order_id=body.order_id,
+        cached=result.get("cached"),
+        tokens=result.get("tokens_used"),
+    )
+    return result
+
+
+@router.post("/extract-resume", dependencies=[Depends(verify_bearer)])
+async def extract_resume(body: ExtractResumeRequest) -> dict:
+    """
+    Extract plain text from an uploaded PDF resume (pre-payment step, so an
+    unreadable file is rejected BEFORE the buyer is charged).
+    """
+    import base64
+
+    from pypdf import PdfReader
+
+    logger.info("job.extract_resume.started", filename=body.filename)
+    try:
+        raw = base64.b64decode(body.pdf_base64, validate=True)
+        if len(raw) > 5 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="PDF larger than 5 MB")
+        reader = PdfReader(BytesIO(raw))
+        if len(reader.pages) > 15:
+            raise HTTPException(status_code=422, detail="PDF has more than 15 pages")
+        text = "\n".join((page.extract_text() or "") for page in reader.pages).strip()
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.warning("job.extract_resume.error", filename=body.filename, error=str(exc))
+        raise HTTPException(status_code=422, detail="could not read PDF") from exc
+
+    if len(text) < 200:
+        raise HTTPException(
+            status_code=422,
+            detail="PDF contains too little extractable text (is it a scan?)",
+        )
+    logger.info("job.extract_resume.done", chars=len(text))
+    return {"text": text[:20000]}
 
 
 @router.post("/autoapply/linkedin", dependencies=[Depends(verify_bearer)])
