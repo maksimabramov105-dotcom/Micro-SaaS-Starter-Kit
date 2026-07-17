@@ -41,7 +41,9 @@ async function createUpsellPromo(orderId: string): Promise<{ id: string; expires
       amount_off: 1000,
       currency: 'usd',
       duration: 'once',
-      name: 'Resume Rescue upsell — Pro first month $9',
+      // Stripe caps coupon names at 40 chars — the original 42-char name made
+      // every upsell-promo creation fail (found in the A2 live test).
+      name: 'Rescue upsell: Pro month 1 for $9',
     })
     const promo = await stripe.promotionCodes.create({
       coupon: coupon.id,
