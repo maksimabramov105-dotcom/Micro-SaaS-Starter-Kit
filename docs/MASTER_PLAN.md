@@ -95,24 +95,72 @@ low-friction tripwire, and every step is measured.
         recorded -> sub canceled, coupon deleted, promo deactivated
       - Found + fixed live: invoice.payment_succeeded read the invoice id
         as a subscription id and crashed on every renewal (PR #130)
-- [ ] **A2 Tripwire product — "AI Resume Rescue" ($4.99 one-time).**
-      /resume-rescue: paste job URL/title + upload resume -> Stripe Checkout
-      (one-time, guest, auto-account) -> tailored resume (all 5 templates)
-      + fit report -> result page + email <5 min; auto-refund + apology +
-      founder alert on generation failure; upsell "Pro first month $9"
-      (single-use coupon, 72h); events tripwire_view/paid/delivered,
-      upsell_accepted; cost guard: 1 regen max, cache (resume_hash, job_hash).
-- [ ] **A3 CTA wiring.** Contextual CTA on all ~79 SEO pages + FAQ/blog:
-      primary "Fix my resume for this job — $4.99", secondary "Start free".
-      Product+Offer JSON-LD on /resume-rescue.
-- [ ] **A4 Trust minimum.** Founder block (real name, photo placeholder,
-      why-note), support email + /contact, refund policy linked next to every
-      price, replace "321 live totals" with /proof link + real ATS
-      confirmation screenshot.
+- [x] **A2 Tripwire product — "AI Resume Rescue" ($4.99 one-time).**
+      SHIPPED 2026-07-17 (PRs #131 backend, #132 frontend, #135 promo codes).
+      Full pipeline: guest checkout (paste/PDF, pre-payment extraction) ->
+      webhook PAID + auto-account -> Redis-locked generation (cached tailor +
+      fit report) -> Resume row (all 5 templates) + result page + delivery
+      email; max 2 attempts then AUTO-REFUND + apology + founder alert; cron
+      safety net; 72h "Pro first month $9" upsell; events
+      tripwire_view/paid/delivered + upsell_accepted. Stripe live: product
+      prod_UtnBdGNiLmTJ2Y, price price_1TtzbE... $4.99. Live $0 purchase
+      verification: see LOG.
+- [x] **A3 CTA wiring.** DONE 2026-07-17 (PR #133). RescueCtaBlock on all 4
+      programmatic templates (~79 pages) + FAQ; StickyCta (all pages)
+      repointed from the retired "50+ countries/LAUNCH40" claim to the
+      tripwire; Product+Offer JSON-LD live on /resume-rescue (#132).
+- [x] **A4 Trust minimum.** DONE 2026-07-17 (PR #134). Absolute counters
+      replaced with the /proof verified-ledger block; founder note (name,
+      initials avatar, why, support email <24h); footer email; refund policy
+      linked next to every price; JSON-LD claim cleanup. OWNER assets still
+      wanted: founder photo + one permissioned real ATS-confirmation
+      screenshot (lib/proof.ts stays empty until then — no fake proof).
 
 **Exit:** watch a $0-promo live purchase of both Pro and the tripwire complete
 on prod with all funnel events recorded; failed generation auto-refunds; all
 deploys smoke-green.
+
+## SESSION B — SEO flywheel: autonomous page factory + indexing (~1-2 days)
+
+Goal: the site autonomously grows indexable, conversion-wired pages targeting
+long-tail job-search intent, and actively pushes them to search engines.
+seo_health gate applies to every page (title <=65, description <=160).
+
+- [x] **B1 Indexing automation.** DONE 2026-07-17. IndexNow key served from
+      /public + lib/seo/indexnow.ts (full-sitemap push weekly, Mondays);
+      daily seo-health check (all sitemap URLs fetched, founder Telegram
+      alert on 404/5xx or broken sitemap) — both self-gated in the hourly
+      digest cron (no new workflow possible: token lacks workflow scope) +
+      manual POST /api/cron/seo-health; sitemap lastmod now a stable content
+      date instead of request-time `now` (only /proof stays live); robots +
+      canonical audit: all page types already correct, no fixes needed.
+      NOTE: Google has no ping API since 2023 — Google discovery = sitemap
+      lastmod + GSC (owner action).
+- [ ] **B2 Programmatic page factory v2.**
+      - "{Competitor} alternative": LazyApply, Simplify, Jobright, AIApply,
+        Teal, Jobscan, Careerflow, JobCopilot, Sonara (shut down — free
+        traffic). Honest comparison rows we truly win only. FAQ schema +
+        tripwire CTA.
+      - "How to apply to jobs at {Company}" from the curated ATS lists
+        (~150 companies): ATS used, live open-roles count from scraper cache
+        (auto-fresh via existing crons), per-company tailoring tips, tripwire
+        CTA prefilled with company context.
+      - "Resume keywords for {role}" for ~50 roles from ai/keywords.py,
+        static-rendered, refreshed monthly by cron.
+      - All: internal linking mesh (hubs, breadcrumbs, related blocks), OG
+        images, HowTo/FAQ JSON-LD. Quality bar: >=300 words of genuinely
+        useful, non-duplicative, data-driven copy per page.
+- [ ] **B3 Data-driven blog engine.** /blog + 2 launch posts computed from
+      OUR telemetry (verified-application stats; auto-apply failure modes),
+      numbers pulled from JobApplication + funnel tables at build time
+      (anonymized aggregate); monthly cron refreshes stats; tripwire CTA.
+- [ ] **B4 Performance & crawl budget.** Lighthouse >=90 (perf+SEO) on
+      landing, tripwire, and each programmatic template; static-render all
+      public pages.
+
+**Exit:** ~102 -> 300+ high-quality URLs, auto-pinged, conversion-wired,
+Lighthouse green, seo-health cron alerting. New data-file entries become
+pages with zero manual work.
 
 ## PHASE 1 — Trust & positioning (~1 week)
 
@@ -285,3 +333,21 @@ deploys smoke-green.
 - 2026-07-16 — P0.4 live-verified: test admin_alert delivered to founder
   Telegram on prod (notifier logged admin_alert.sent). Phase 0 code complete;
   remaining Phase 0 items are owner actions (GSC numbers, workflow scope).
+- 2026-07-17 — A2 LIVE $0 PURCHASE VERIFIED on prod: RESCUE100B (100% off,
+  single-use) -> guest checkout completed card-free -> webhook marked PAID +
+  auto-created account -> generation DELIVERED IN 22 SECONDS (budget: 5 min)
+  -> result page rendered fit report 55/100 (breakdown, keywords, fixes) +
+  all-5-template picker -> guest PDF download 200/17.7KB valid. Full event
+  chain recorded: tripwire_view -> signup -> tripwire_paid ->
+  tripwire_delivered. Found+fixed live: upsell coupon name exceeded Stripe's
+  40-char cap, so no upsell promo was ever created (PR #136). Test promos
+  deactivated, coupon deleted. $0 orders have no payment intent -> refund
+  path no-ops correctly.
+- 2026-07-17 — Webhook alert from the founder-Telegram screenshot resolved:
+  the invoice.payment_succeeded crash (PR #130) was the pre-fix occurrence;
+  Stripe's retry after deploy processed clean (pending_webhooks: 0, event id
+  in StripeEvent). Dependabot: #104/#105/#106 merged (cryptography,
+  form-data, dompurify); #109 rebasing; HELD for owner: #107 (nodemailer
+  8->9 major — next-auth peer risk), #102 (starlette — CI runs no worker
+  tests), #98 (sentry/otel — re-evaluating after rebase). js-yaml security
+  job fails by design: advisory has no patched release yet.
