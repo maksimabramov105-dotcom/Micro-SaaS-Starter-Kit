@@ -39,16 +39,22 @@ export function StickyCta() {
     <div className="fixed inset-x-0 bottom-0 z-50 border-t border-emerald-800 bg-emerald-700/95 backdrop-blur">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3 text-white">
         <p className="text-sm">
-          <span className="font-semibold">Land a job abroad</span> — AI applies for you in 50+
-          countries. <span className="hidden sm:inline">Free to start · 40% off your first year with </span>
-          <span className="font-mono">LAUNCH40</span>.
+          <span className="font-semibold">Found a job you want?</span> Get your resume rewritten
+          for that exact posting + a fit report.{' '}
+          <span className="hidden sm:inline">$4.99 one-time, delivered in minutes.</span>
         </p>
         <div className="flex shrink-0 items-center gap-2">
           <a
-            href="/login?ref=sticky-cta"
+            href="/resume-rescue?ref=sticky-cta"
             className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
           >
-            Start free →
+            Fix my resume — $4.99
+          </a>
+          <a
+            href="/login?ref=sticky-cta"
+            className="hidden text-sm font-semibold text-white underline sm:inline"
+          >
+            Start free
           </a>
           <button
             type="button"

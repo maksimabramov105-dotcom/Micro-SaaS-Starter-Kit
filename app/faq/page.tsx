@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Navbar } from '@/components/navbar'
+import { RescueCtaBlock } from '@/components/rescue-cta-block'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 const SITE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
@@ -111,6 +112,10 @@ export default function FaqPage() {
                 </CardContent>
               </Card>
             ))}
+          </div>
+
+          <div className="mt-12">
+            <RescueCtaBlock refTag="faq-cta" />
           </div>
 
           <Card className="mt-12">

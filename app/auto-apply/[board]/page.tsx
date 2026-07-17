@@ -49,6 +49,8 @@ export default async function Page({ params }: { params: Promise<Params> }) {
       <h2>Start free</h2>
       <p>{seo._meta.freeTier}. Paid plans add a {seo._meta.guarantee}.</p>
       <p><Link href="/?ref=seo-board" style={{ fontWeight: 600 }}>Auto-apply to {b.name} jobs free →</Link></p>
+      <RescueCtaBlock context={`a ${b.name} posting`} refTag="seo-board" />
+
       <h2>Frequently asked questions</h2>
       {faq.map((f) => (<div key={f.q}><h3>{f.q}</h3><p>{f.a}</p></div>))}
       <hr style={{ margin: "2rem 0" }} />
