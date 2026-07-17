@@ -116,7 +116,19 @@ export async function POST(req: Request) {
     }
 
     case 'invoice.payment_succeeded': {
-      const invoiceSubscriptionId = subscription.id
+      // The event object here is an INVOICE, not a subscription — reading .id
+      // off the subscription cast passed 'in_...' to subscriptions.retrieve,
+      // which threw on every renewal invoice and made Stripe retry the event
+      // forever (found during the A1 live $0 checkout test).
+      const paidInvoice = event.data.object as Stripe.Invoice
+      const invoiceSubscriptionId =
+        typeof paidInvoice.subscription === 'string'
+          ? paidInvoice.subscription
+          : paidInvoice.subscription?.id
+      if (!invoiceSubscriptionId) {
+        // One-off (non-subscription) invoices have nothing to sync.
+        break
+      }
       const stripeSubscription = await stripe.subscriptions.retrieve(invoiceSubscriptionId)
       const priceId = stripeSubscription.items.data[0].price.id
       const plan = getPlanByPriceId(priceId)

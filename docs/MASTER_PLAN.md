@@ -72,6 +72,48 @@ explicitly requires it.
 
 **Exit:** every funnel step measurable; one-command smoke test; alerts on errors.
 
+## REVENUE SPRINT (Session A — money path, runs before Phase 1)
+
+Goal: a stranger landing on any page can pay us money today, through a
+low-friction tripwire, and every step is measured.
+
+- [x] **A1 Verify + fix the existing payment path.** DONE 2026-07-17.
+      - Audited stripe libs/routes; deleted legacy raw-priceId checkout route;
+        create-checkout-session accepts plan slug + interval only (PR #129)
+      - Stripe reconciled LIVE: sk_live key; Pro $19/mo
+        (price_1TtnFH...jK8Np3qf) + $180/yr (price_1TtnFH...DCWqdAM6) active
+        and wired via env; pricing page/FAQ/JSON-LD unified to $19/$180;
+        Unlimited hidden (PR #129); stale Stripe product description
+        replaced with honest copy (API, 2026-07-17)
+      - Funnel events live: checkout_started, checkout_completed,
+        checkout_abandoned (checkout.session.expired subscribed)
+      - LIVE $0-promo checkout evidence (2026-07-17): promo A1VERIFY (100%
+        off, single-use) -> real prod checkout completed with no card
+        (payment_method_collection if_required) -> webhook processed ->
+        User row: sub sub_1TtzTk..., $19 price, dailyApplicationLimit 25,
+        firstPaidAt set -> events signup/checkout_started/checkout_completed
+        recorded -> sub canceled, coupon deleted, promo deactivated
+      - Found + fixed live: invoice.payment_succeeded read the invoice id
+        as a subscription id and crashed on every renewal (PR #130)
+- [ ] **A2 Tripwire product — "AI Resume Rescue" ($4.99 one-time).**
+      /resume-rescue: paste job URL/title + upload resume -> Stripe Checkout
+      (one-time, guest, auto-account) -> tailored resume (all 5 templates)
+      + fit report -> result page + email <5 min; auto-refund + apology +
+      founder alert on generation failure; upsell "Pro first month $9"
+      (single-use coupon, 72h); events tripwire_view/paid/delivered,
+      upsell_accepted; cost guard: 1 regen max, cache (resume_hash, job_hash).
+- [ ] **A3 CTA wiring.** Contextual CTA on all ~79 SEO pages + FAQ/blog:
+      primary "Fix my resume for this job — $4.99", secondary "Start free".
+      Product+Offer JSON-LD on /resume-rescue.
+- [ ] **A4 Trust minimum.** Founder block (real name, photo placeholder,
+      why-note), support email + /contact, refund policy linked next to every
+      price, replace "321 live totals" with /proof link + real ATS
+      confirmation screenshot.
+
+**Exit:** watch a $0-promo live purchase of both Pro and the tripwire complete
+on prod with all funnel events recorded; failed generation auto-refunds; all
+deploys smoke-green.
+
 ## PHASE 1 — Trust & positioning (~1 week)
 
 - [ ] **P1.1 Domain migration to .com/.ai** (owner buys domain; prep checklist in
