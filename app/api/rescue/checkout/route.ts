@@ -20,6 +20,16 @@ import { callWorker, WorkerError } from '@/lib/worker-client'
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
 const RATE_LIMIT_PER_HOUR = 10
 
+// Linear-time email shape check (no regex — user-provided input, ReDoS-safe).
+function isValidEmail(email: string): boolean {
+  if (email.length < 5 || email.length > 254 || email.includes(' ')) return false
+  const at = email.indexOf('@')
+  if (at <= 0 || at !== email.lastIndexOf('@')) return false
+  const domain = email.slice(at + 1)
+  const dot = domain.lastIndexOf('.')
+  return dot > 0 && dot < domain.length - 1
+}
+
 async function rateLimited(ip: string): Promise<boolean> {
   try {
     const key = `rl:rescue:${ip}`
@@ -47,7 +57,7 @@ export async function POST(req: Request) {
     const jobDescription =
       typeof body.jobDescription === 'string' ? body.jobDescription.trim().slice(0, 12000) : ''
 
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    if (!isValidEmail(email)) {
       return NextResponse.json({ error: 'A valid email is required.' }, { status: 400 })
     }
     if (jobTitle.length < 3 || jobTitle.length > 200) {
