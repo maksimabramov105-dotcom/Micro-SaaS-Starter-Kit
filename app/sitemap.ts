@@ -77,6 +77,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'weekly' as const,
       priority: 0.6,
     })),
+    // Telemetry blog (B3) — stats sections update daily via ISR.
+    { url: `${baseUrl}/blog`, lastModified: CONTENT_UPDATED, changeFrequency: 'weekly' as const, priority: 0.7 },
+    { url: `${baseUrl}/blog/how-many-applications-reach-a-human`, lastModified: now, changeFrequency: 'daily' as const, priority: 0.7 },
+    { url: `${baseUrl}/blog/auto-apply-failure-modes`, lastModified: now, changeFrequency: 'daily' as const, priority: 0.7 },
     // Role keyword pages (B2) — corpus-backed only; grows with the crawler.
     { url: `${baseUrl}/resume-keywords`, lastModified: CONTENT_UPDATED, changeFrequency: 'monthly' as const, priority: 0.7 },
     ...ROLE_KEYWORDS.map((r) => ({

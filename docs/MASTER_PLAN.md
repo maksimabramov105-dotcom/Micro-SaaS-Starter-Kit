@@ -136,24 +136,27 @@ seo_health gate applies to every page (title <=65, description <=160).
       canonical audit: all page types already correct, no fixes needed.
       NOTE: Google has no ping API since 2023 — Google discovery = sitemap
       lastmod + GSC (owner action).
-- [ ] **B2 Programmatic page factory v2.**
-      - "{Competitor} alternative": LazyApply, Simplify, Jobright, AIApply,
-        Teal, Jobscan, Careerflow, JobCopilot, Sonara (shut down — free
-        traffic). Honest comparison rows we truly win only. FAQ schema +
-        tripwire CTA.
-      - "How to apply to jobs at {Company}" from the curated ATS lists
-        (~150 companies): ATS used, live open-roles count from scraper cache
-        (auto-fresh via existing crons), per-company tailoring tips, tripwire
-        CTA prefilled with company context.
-      - "Resume keywords for {role}" for ~50 roles from ai/keywords.py,
-        static-rendered, refreshed monthly by cron.
-      - All: internal linking mesh (hubs, breadcrumbs, related blocks), OG
-        images, HowTo/FAQ JSON-LD. Quality bar: >=300 words of genuinely
-        useful, non-duplicative, data-driven copy per page.
-- [ ] **B3 Data-driven blog engine.** /blog + 2 launch posts computed from
-      OUR telemetry (verified-application stats; auto-apply failure modes),
-      numbers pulled from JobApplication + funnel tables at build time
-      (anonymized aggregate); monthly cron refreshes stats; tripwire CTA.
+- [x] **B2 Programmatic page factory v2.** DONE 2026-07-18 (PRs #139, #140).
+      - Competitor pages: +jobscan +careerflow (10 total; all 9 targets
+        covered). Honest rows only.
+      - /apply-to/{company} x168 from the curated scraper lists (single
+        source exported to lib/seo/apply-companies.json): per-ATS
+        hand-written walkthroughs + tips, live open-roles from scraper
+        cache via ISR 6h, HowTo/FAQ/Breadcrumb JSON-LD, contextual
+        tripwire CTA, related-companies mesh, /apply-to hub.
+      - /resume-keywords/{role} x12 + hub: keywords extracted by
+        ai/keywords.py from REAL JobListing descriptions; roles ship only
+        with >=2 genuine postings (grows automatically with the corpus —
+        honest provenance over 50 recycled listicles; regen script:
+        rolekw.py pattern documented in LOG).
+      - REMAINDER: OG images for new templates (existing opengraph-image
+        pattern) — with B4.
+- [x] **B3 Data-driven blog engine.** DONE 2026-07-18. /blog + 2 posts whose
+      stats sections compute LIVE from JobApplication/ApplicationEvent/
+      InboxMessage under daily ISR (beats the planned monthly cron — zero
+      cron needed); failure modes bucketed from real errorMessage data;
+      graceful degradation if the DB blips (no 500s on marketing pages);
+      Article JSON-LD + tripwire CTA + /proof cross-link.
 - [ ] **B4 Performance & crawl budget.** Lighthouse >=90 (perf+SEO) on
       landing, tripwire, and each programmatic template; static-render all
       public pages.
