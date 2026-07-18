@@ -30,10 +30,13 @@ export async function submitIndexNow(urls: string[]): Promise<IndexNowResult> {
     const res = await fetch(ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      // NOTE: no keyLocation — our key file sits at the default root path
+      // ({key}.txt), and including the explicit keyLocation param made
+      // api.indexnow.org reject the submission with 403 (verified live);
+      // without it both api.indexnow.org and bing.com return 200.
       body: JSON.stringify({
         host,
         key: INDEXNOW_KEY,
-        keyLocation: `${appUrl}/${INDEXNOW_KEY}.txt`,
         urlList: list,
       }),
     })
