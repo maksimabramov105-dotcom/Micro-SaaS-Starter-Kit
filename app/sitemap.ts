@@ -1,6 +1,7 @@
 import { MetadataRoute } from 'next'
 import seo from '@/lib/seo-data.json'
 import { REMOTE_GUIDES } from '@/lib/remote-guides'
+import { APPLY_COMPANIES } from '@/lib/seo/apply-companies'
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
@@ -66,6 +67,14 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: CONTENT_UPDATED,
       changeFrequency: 'monthly' as const,
       priority: 0.7,
+    })),
+    // Per-company application guides (B2) — hub + one page per curated company.
+    { url: `${baseUrl}/apply-to`, lastModified: CONTENT_UPDATED, changeFrequency: 'weekly' as const, priority: 0.8 },
+    ...APPLY_COMPANIES.map((c) => ({
+      url: `${baseUrl}/apply-to/${c.slug}`,
+      lastModified: CONTENT_UPDATED,
+      changeFrequency: 'weekly' as const,
+      priority: 0.6,
     })),
   ]
 
