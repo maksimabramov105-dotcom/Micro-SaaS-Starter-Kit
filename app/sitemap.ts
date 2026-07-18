@@ -2,6 +2,7 @@ import { MetadataRoute } from 'next'
 import seo from '@/lib/seo-data.json'
 import { REMOTE_GUIDES } from '@/lib/remote-guides'
 import { APPLY_COMPANIES } from '@/lib/seo/apply-companies'
+import ROLE_KEYWORDS from '@/lib/seo/role-keywords.json'
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
@@ -74,6 +75,14 @@ export default function sitemap(): MetadataRoute.Sitemap {
       url: `${baseUrl}/apply-to/${c.slug}`,
       lastModified: CONTENT_UPDATED,
       changeFrequency: 'weekly' as const,
+      priority: 0.6,
+    })),
+    // Role keyword pages (B2) — corpus-backed only; grows with the crawler.
+    { url: `${baseUrl}/resume-keywords`, lastModified: CONTENT_UPDATED, changeFrequency: 'monthly' as const, priority: 0.7 },
+    ...ROLE_KEYWORDS.map((r) => ({
+      url: `${baseUrl}/resume-keywords/${r.slug}`,
+      lastModified: CONTENT_UPDATED,
+      changeFrequency: 'monthly' as const,
       priority: 0.6,
     })),
   ]
