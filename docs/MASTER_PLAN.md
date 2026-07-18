@@ -157,9 +157,13 @@ seo_health gate applies to every page (title <=65, description <=160).
       cron needed); failure modes bucketed from real errorMessage data;
       graceful degradation if the DB blips (no 500s on marketing pages);
       Article JSON-LD + tripwire CTA + /proof cross-link.
-- [ ] **B4 Performance & crawl budget.** Lighthouse >=90 (perf+SEO) on
-      landing, tripwire, and each programmatic template; static-render all
-      public pages.
+- [x] **B4 Performance & crawl budget.** DONE 2026-07-18. Lighthouse
+      (prod, mobile-throttled): landing 92/100, /resume-rescue 100/100,
+      apply-to 92-100, resume-keywords 98/100, jobs-in 99/100 — SEO
+      category 100 everywhere. All public pages static/ISR-rendered, no
+      client-side data fetching. (Post-deploy cold-ISR runs can read
+      ~85 until caches warm — re-measure warm.) REMAINDER (with a later
+      pass): OG images for the new template families.
 
 **Exit:** ~102 -> 300+ high-quality URLs, auto-pinged, conversion-wired,
 Lighthouse green, seo-health cron alerting. New data-file entries become
@@ -321,7 +325,15 @@ deploys smoke-green.
 3. **Telegram alerts** — ADMIN_TELEGRAM_CHAT_ID is set to your chat id
    (6246429438). If you have never pressed Start on the ResumeAI bot, do it
    once or Telegram refuses bot-initiated messages (403).
-4. **Phase 1 prep** — buy the .com/.ai domain (P1.1).
+4. **Phase 1 prep** — buy the .com/.ai domain (P1.1). Now urgent: 290 URLs
+   of SEO equity are accruing to resumeai-bot.ru — every week of delay is
+   equity to migrate later.
+5. **Dependabot holds** — decide on PR #107 (nodemailer 8->9 major; the
+   magic-link login depends on nodemailer via next-auth — test sign-in
+   after merging) and #102 (starlette bump; CI runs no worker tests, so
+   merge + watch worker health or add a worker test job first).
+6. **Trust assets** — founder photo for the landing block + one
+   permissioned real ATS-confirmation screenshot for lib/proof.ts.
 
 ## LOG
 
@@ -346,6 +358,15 @@ deploys smoke-green.
   40-char cap, so no upsell promo was ever created (PR #136). Test promos
   deactivated, coupon deleted. $0 orders have no payment intent -> refund
   path no-ops correctly.
+- 2026-07-18 — SESSION B COMPLETE. Sitemap 103 -> 290 URLs, every one
+  conversion-wired with the tripwire CTA. B1 seo-health ran autonomously on
+  its first cron cycle (103 URLs, 0 failures, no false alerts); after the
+  keyLocation fix (PR #142, found live) IndexNow accepted the full 290-URL
+  submission (200). B2: 168 /apply-to company guides + 12 corpus-backed
+  /resume-keywords roles + 2 new competitor pages. B3: telemetry blog with
+  live self-updating stats. B4: Lighthouse green everywhere (see checkbox).
+  Dependabot: 6 of 8 stale PRs merged; #107 nodemailer major + #102
+  starlette held for owner. All deploys smoke-green.
 - 2026-07-17 — Webhook alert from the founder-Telegram screenshot resolved:
   the invoice.payment_succeeded crash (PR #130) was the pre-fix occurrence;
   Stripe's retry after deploy processed clean (pending_webhooks: 0, event id
