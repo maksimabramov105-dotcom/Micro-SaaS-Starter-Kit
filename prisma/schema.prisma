@@ -436,6 +436,7 @@ model RescueOrder {
   upsellExpiresAt DateTime?
 
   attempts        Int               @default(0) // generation attempts (max 2 = 1 regen)
+  abandonedEmailAt DateTime?        // the ONE abandoned-checkout email (C2)
   error           String?
   paidAt          DateTime?
   deliveredAt     DateTime?
@@ -734,6 +735,24 @@ model Lead {
   source    String   @default("unknown") // which lander captured it
   createdAt DateTime @default(now())
 
+  // ── Nurture sequence state (Session C) ────────────────────────────────────
+  consentAt      DateTime? // explicit email-consent timestamp (C4)
+  nurtureStage   Int       @default(0) // sequence steps already sent
+  nurtureNextAt  DateTime? // when the next step is due; null = not enrolled/done
+  convertedAt    DateTime? // purchase detected -> sequence stopped
+  unsubscribedAt DateTime?
+  lastScore      Int?      // latest fit-check score (personalizes emails)
+  lastJobTitle   String?   // latest fit-check job title
+
   @@index([createdAt])
   @@index([email])
+  @@index([nurtureNextAt])
+}
+
+/// Global email suppression (C4): once here, NO marketing/nurture email is
+/// ever sent to the address again, regardless of which table captured it.
+model EmailSuppression {
+  email     String   @id
+  reason    String   @default("unsubscribe")
+  createdAt DateTime @default(now())
 }

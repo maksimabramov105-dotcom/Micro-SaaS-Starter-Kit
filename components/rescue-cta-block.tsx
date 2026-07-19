@@ -40,8 +40,8 @@ export function RescueCtaBlock({ context, refTag }: { context?: string; refTag: 
         >
           Fix my resume for this job — $4.99
         </Link>
-        <Link href={`/login?ref=${refTag}`} style={{ fontWeight: 600 }}>
-          or start free →
+        <Link href={`/ats-check?ref=${refTag}`} style={{ fontWeight: 600 }}>
+          or get a free fit score first →
         </Link>
       </p>
     </div>

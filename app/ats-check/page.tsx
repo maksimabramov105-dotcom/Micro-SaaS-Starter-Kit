@@ -7,11 +7,11 @@ const SITE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
 export const metadata: Metadata = {
   title: 'Free ATS Resume Checker — Score Your Match | ResumeAI',
   description:
-    'Free ATS resume checker: paste your resume and a job description to get an instant match score and 3 specific fixes. No sign-up needed.',
+    'Free ATS resume checker: paste your resume and a job description for an instant match score. Unlock the full report with 3 specific fixes — free.',
   alternates: { canonical: `${SITE}/ats-check` },
   openGraph: {
     title: 'Free ATS Resume Checker — Score Your Match | ResumeAI',
-    description: 'Paste your resume + a job posting and get an instant ATS match score with 3 specific fixes. Free, no sign-up.',
+    description: 'Paste your resume + a job posting for an instant ATS match score. Full report with 3 specific fixes is free.',
     url: `${SITE}/ats-check`,
     siteName: 'ResumeAI-Bot',
     type: 'website',
@@ -46,8 +46,9 @@ export default function AtsCheckPage() {
               Will your resume pass the ATS?
             </h1>
             <p className="mx-auto mt-4 max-w-2xl text-lg text-slate-600">
-              Paste your resume and the job description. Get an instant match score and 3 specific
-              fixes — the same scoring engine our auto-apply system uses to target the right jobs.
+              Paste your resume and the job description for an instant match score — the same
+              scoring engine our auto-apply system uses to target the right jobs. Unlock the full
+              report with 3 specific fixes, free.
             </p>
           </div>
 
