@@ -27,6 +27,7 @@ import DailyDigestEmail from '@/lib/notifications/templates/daily-digest'
 import { createUnsubscribeToken } from '@/lib/notifications/unsubscribe-token'
 import { maybeSendWeeklySnapshot } from '@/lib/pmf/weekly-snapshot'
 import { maybeRunSeoAutomation } from '@/lib/seo/health'
+import { processAbandonedCheckouts, processNurtureQueue } from '@/lib/nurture'
 
 // Local hour at which we send the digest
 const SEND_HOUR = 8
@@ -59,6 +60,16 @@ export async function POST(req: Request) {
     if (seoResult === 'ran') console.log('[daily-digest] seo automation ran')
   } catch (err) {
     console.error('[daily-digest] seo automation failed', err)
+  }
+
+  // ── Lead nurture + abandoned checkouts (Session C) — due-based, hourly ──
+  try {
+    const nurtured = await processNurtureQueue()
+    const reminded = await processAbandonedCheckouts()
+    if (nurtured + reminded > 0)
+      console.log('[daily-digest] nurture sent:', nurtured, 'abandoned reminders:', reminded)
+  } catch (err) {
+    console.error('[daily-digest] nurture processing failed', err)
   }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'

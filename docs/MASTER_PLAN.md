@@ -169,6 +169,38 @@ seo_health gate applies to every page (title <=65, description <=160).
 Lighthouse green, seo-health cron alerting. New data-file entries become
 pages with zero manual work.
 
+## SESSION C — Autonomous funnel: capture -> nurture -> convert (~1 day)
+
+Goal: visitors who don't buy immediately are captured and converted
+automatically, zero manual action.
+
+- [x] **C1 Lead magnet — gated fit check.** DONE 2026-07-18. /ats-check
+      (aliased /fit-check) two-phase: instant score + 2 findings free, then
+      email + explicit consent unlocks the full report (3 fixes) and enrolls
+      the lead. Reuses ai/jobfit via the rate-limited public /api/ats-check
+      (3/IP/day, worker secret server-side). RescueCtaBlock on all ~290 SEO
+      pages links to it ("get a free fit score first"). Events:
+      fitcheck_started, lead_captured.
+- [x] **C2 Email nurture (Resend, founder voice, unsubscribe).** DONE.
+      lib/nurture: t0 full report (inline at capture) -> +2d "3 fixes" ->
+      +5d tripwire offer -> +9d data post + goodbye; stops on purchase
+      (paid RescueOrder or paying User) or unsubscribe. Abandoned checkout:
+      PENDING_PAYMENT 4-28h -> ONE reminder with the live Stripe session
+      link. All due-based, driven from the hourly digest cron.
+- [x] **C3 Funnel dashboard.** DONE. lib/pmf/revenue-funnel.ts:
+      seo_visit -> fitcheck_started -> lead_captured -> tripwire_paid ->
+      pro_subscribed + revenue split (tripwire one-time gross vs
+      subscription MRR) + leads-in-nurture/suppressed. Wired into /admin/pmf
+      (new section) and the Monday founder email.
+- [x] **C4 Compliance minimum.** DONE. Explicit consent checkbox required
+      before any email (server-enforced); privacy-policy link at capture;
+      global EmailSuppression table honored everywhere (nurture, abandoned,
+      re-capture); one-click HMAC unsubscribe -> /unsubscribed.
+
+**Exit:** a cold visitor can be captured, nurtured, and converted to
+tripwire -> Pro with zero manual action; every stage visible in the funnel
+report. (Live $0 gated-capture + nurture-tick verification: see LOG.)
+
 ## PHASE 1 — Trust & positioning (~1 week)
 
 - [ ] **P1.1 Domain migration to .com/.ai** (owner buys domain; prep checklist in

@@ -13,6 +13,7 @@ import {
   getWeeklyTrends,
   getLastUpdated,
 } from '@/lib/pmf/queries'
+import { getRevenueFunnel } from '@/lib/pmf/revenue-funnel'
 import sitemap from '@/app/sitemap'
 
 // ── helpers ──────────────────────────────────────────────────────────────
@@ -138,16 +139,18 @@ export default async function PmfDashboardPage() {
     redirect('/dashboard')
   }
 
-  const [today, last30, cohort, referral, exitReasons, funnel, revenue, weekly] = await Promise.all([
-    getTodayMetrics(),
-    getLast30DaysMetrics(),
-    getCohortRetention(),
-    getReferralMetrics(),
-    getExitReasonHistogram(),
-    getFunnelReport(),
-    getRevenueMetrics(),
-    getWeeklyTrends(),
-  ])
+  const [today, last30, cohort, referral, exitReasons, funnel, revenue, weekly, revenueFunnel] =
+    await Promise.all([
+      getTodayMetrics(),
+      getLast30DaysMetrics(),
+      getCohortRetention(),
+      getReferralMetrics(),
+      getExitReasonHistogram(),
+      getFunnelReport(),
+      getRevenueMetrics(),
+      getWeeklyTrends(),
+      getRevenueFunnel(),
+    ])
 
   const updatedAt = getLastUpdated()
 
@@ -209,6 +212,50 @@ export default async function PmfDashboardPage() {
             value={usd(revenue.churnedMrrCents)}
             accent={revenue.churnedMrrCents > 0 ? 'red' : undefined}
             sub="cancellations in last 30 days"
+          />
+        </Section>
+
+        {/* REVENUE SPRINT FUNNEL (capture → nurture → convert) — Session C3 */}
+        <Section title="Revenue Sprint funnel (last 30 days · capture → convert)">
+          <Tile title="SEO visits (unique)" value={revenueFunnel.seoVisit} sub="distinct page_view sessions" />
+          <Tile
+            title="Fit checks started"
+            value={revenueFunnel.fitcheckStarted}
+            sub={`${pctStr(revenueFunnel.conversion.visitToFitcheck)} of visits`}
+          />
+          <Tile
+            title="Leads captured"
+            value={revenueFunnel.leadCaptured}
+            sub={`${pctStr(revenueFunnel.conversion.fitcheckToLead)} of fit checks`}
+            accent={revenueFunnel.leadCaptured > 0 ? 'green' : undefined}
+          />
+          <Tile
+            title="Tripwire paid ($4.99)"
+            value={revenueFunnel.tripwirePaid}
+            sub={`${pctStr(revenueFunnel.conversion.leadToTripwire)} of leads`}
+            accent={revenueFunnel.tripwirePaid > 0 ? 'green' : undefined}
+          />
+          <Tile
+            title="Pro subscribed"
+            value={revenueFunnel.proSubscribed}
+            sub={`${pctStr(revenueFunnel.conversion.tripwireToPro)} of tripwire buyers`}
+            accent={revenueFunnel.proSubscribed > 0 ? 'green' : undefined}
+          />
+          <Tile
+            title="Tripwire gross (30d)"
+            value={usd(revenueFunnel.revenue.tripwireGrossCents)}
+            sub={`${revenueFunnel.revenue.tripwirePaidCount} × $4.99 one-time`}
+            accent={revenueFunnel.revenue.tripwireGrossCents > 0 ? 'green' : undefined}
+          />
+          <Tile
+            title="Subscription MRR"
+            value={usd(revenueFunnel.revenue.subscriptionMrrCents)}
+            sub="recurring, normalized monthly"
+          />
+          <Tile
+            title="Leads in nurture"
+            value={revenueFunnel.revenue.activeLeadsInNurture}
+            sub={`${revenueFunnel.revenue.suppressed} unsubscribed/suppressed`}
           />
         </Section>
 

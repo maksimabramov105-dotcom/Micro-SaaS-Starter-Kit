@@ -1,17 +1,22 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { trackEvent } from '@/lib/analytics-advanced'
+import { enrollLead, isSuppressed, sendFitReportEmail } from '@/lib/nurture'
 import { getRedis } from '@/lib/redis'
-import { sendEmail } from '@/lib/email'
 
 /**
- * POST /api/ats-check — free, UNAUTHENTICATED ATS/job-fit check (lead magnet).
+ * POST /api/ats-check — free, UNAUTHENTICATED fit check (lead magnet, C1).
  *
- * Body: { resumeText, jobDescription, email? }
- * Returns: { score, hints[], remaining }
+ * Body: { resumeText, jobDescription, jobTitle?, email?, consent? }
  *
- * Safeguards (public endpoint): input size caps, 3 checks/IP/day via Redis,
- * worker call is server-side only (Bearer WORKER_SECRET never leaves the server),
- * email capture creates a Lead + sends ONE follow-up (no sequence).
+ * Tiers:
+ *   no email          → { score, findings: first 2, locked: {...}, remaining }
+ *   email + consent   → full report returned + emailed (t0) + nurture
+ *                       sequence enrollment (t+2d / t+5d / t+9d, stops on
+ *                       purchase or unsubscribe) + lead_captured event
+ *
+ * Safeguards: input caps, 3 checks/IP/day via Redis, worker secret stays
+ * server-side, explicit consent required for any email (C4), suppression
+ * list honored.
  */
 export const dynamic = 'force-dynamic'
 
@@ -25,7 +30,11 @@ function clientIp(req: Request): string {
 }
 
 function isEmail(s: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)
+  if (s.length < 5 || s.length > 254 || s.includes(' ')) return false
+  const at = s.indexOf('@')
+  if (at <= 0 || at !== s.lastIndexOf('@')) return false
+  const dot = s.slice(at + 1).lastIndexOf('.')
+  return dot > 0 && dot < s.slice(at + 1).length - 1
 }
 
 // Deterministic, honest improvement hints — prioritises the weak areas the
@@ -46,7 +55,13 @@ function buildHints(reasons: string[], score: number): string[] {
 }
 
 export async function POST(req: Request) {
-  let body: { resumeText?: string; jobDescription?: string; email?: string }
+  let body: {
+    resumeText?: string
+    jobDescription?: string
+    jobTitle?: string
+    email?: string
+    consent?: boolean
+  }
   try {
     body = await req.json()
   } catch {
@@ -55,7 +70,9 @@ export async function POST(req: Request) {
 
   const resumeText = String(body.resumeText ?? '').trim()
   const jobDescription = String(body.jobDescription ?? '').trim()
-  const email = String(body.email ?? '').trim()
+  const jobTitle = String(body.jobTitle ?? '').trim().slice(0, 200)
+  const email = String(body.email ?? '').trim().toLowerCase()
+  const consent = body.consent === true
 
   if (resumeText.length < MIN || jobDescription.length < MIN) {
     return NextResponse.json(
@@ -65,6 +82,16 @@ export async function POST(req: Request) {
   }
   if (resumeText.length > MAX || jobDescription.length > MAX) {
     return NextResponse.json({ error: 'That’s too long — please trim to under 20,000 characters each.' }, { status: 400 })
+  }
+  if (email && !isEmail(email)) {
+    return NextResponse.json({ error: 'Please enter a valid email address.' }, { status: 400 })
+  }
+  // C4: no email processing without explicit consent.
+  if (email && !consent) {
+    return NextResponse.json(
+      { error: 'Please tick the consent box so we’re allowed to email you the report.' },
+      { status: 400 },
+    )
   }
 
   // ── Rate limit: 3 / IP / day ──────────────────────────────────────────────
@@ -76,12 +103,11 @@ export async function POST(req: Request) {
     count = await redis.incr(key)
     if (count === 1) await redis.expire(key, 86_400)
   } catch {
-    // Redis down — fail open (don't block a real user), but don't loop email.
     count = 1
   }
   if (count > DAILY_LIMIT) {
     return NextResponse.json(
-      { error: 'You’ve used your 3 free checks today. Come back tomorrow — or start free to auto-apply with a tailored resume.' },
+      { error: 'You’ve used your 3 free checks today. Come back tomorrow — or get the full rescue for one job now.' },
       { status: 429 },
     )
   }
@@ -98,7 +124,7 @@ export async function POST(req: Request) {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${workerSecret}` },
       body: JSON.stringify({
         resume_text: resumeText.slice(0, 6000),
-        jobs: [{ id: 'ats', title: '', description: jobDescription.slice(0, 6000), location: '', remote: true, country: '' }],
+        jobs: [{ id: 'ats', title: jobTitle, description: jobDescription.slice(0, 6000), location: '', remote: true, country: '' }],
         eligibility: {},
         languages: [],
       }),
@@ -117,23 +143,40 @@ export async function POST(req: Request) {
 
   const hints = buildHints(reasons, score)
 
-  // ── Optional email capture → Lead + ONE follow-up (best-effort) ────────────
-  if (email && isEmail(email)) {
-    prisma.lead.create({ data: { email, source: 'ats-check' } }).catch(() => {})
-    const list = hints.map((h) => `<li style="margin-bottom:8px">${h}</li>`).join('')
-    sendEmail({
-      to: email,
-      subject: `Your ATS match score: ${score}/100`,
-      html: `<div style="font-family:system-ui,sans-serif;max-width:560px">
-        <h2 style="color:#065f46">Your ATS match score: ${score}/100</h2>
-        <p>Here are your top 3 fixes to improve the match:</p>
-        <ol>${list}</ol>
-        <p style="margin-top:16px">Want this done for you? ResumeAI tailors your resume to every role and
-        auto-applies only where you’re eligible — <a href="https://resumeai-bot.ru/login">start free</a>.</p>
-        <p style="color:#94a3b8;font-size:12px">You got this email because you ran a free ATS check on resumeai-bot.ru.</p>
-      </div>`,
+  // Funnel: every scored check counts, captured or not (C3).
+  trackEvent({
+    event: 'fitcheck_started',
+    properties: { score, hasEmail: Boolean(email), source: 'ats-check' },
+  }).catch(() => {})
+
+  // ── Free tier: score + 2 findings; the rest is the capture incentive ──────
+  if (!email) {
+    return NextResponse.json({
+      score,
+      findings: reasons.slice(0, 2),
+      locked: { findings: Math.max(0, reasons.length - 2), hints: hints.length },
+      unlocked: false,
+      remaining,
+    })
+  }
+
+  // ── Capture: lead + nurture enrollment + t0 report email ──────────────────
+  if (await isSuppressed(email)) {
+    // Previously unsubscribed: honor it — return the full report on-page but
+    // never email or re-enroll (C4).
+    return NextResponse.json({ score, findings: reasons, hints, unlocked: true, remaining })
+  }
+
+  const lead = await enrollLead({ email, source: 'ats-check', score, jobTitle: jobTitle || undefined })
+  if (lead) {
+    sendFitReportEmail({ email, score, findings: reasons, hints, jobTitle: jobTitle || undefined }).catch(
+      (err) => console.error('[ats-check] report email failed:', err),
+    )
+    trackEvent({
+      event: 'lead_captured',
+      properties: { leadId: lead.id, score, source: 'ats-check' },
     }).catch(() => {})
   }
 
-  return NextResponse.json({ score, hints, remaining })
+  return NextResponse.json({ score, findings: reasons, hints, unlocked: true, remaining })
 }

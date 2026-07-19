@@ -9,6 +9,7 @@
 import { trackEvent } from '@/lib/analytics-advanced'
 import { sendEmail } from '@/lib/email'
 import { getRevenueMetrics } from '@/lib/pmf/queries'
+import { getRevenueFunnel } from '@/lib/pmf/revenue-funnel'
 import { getUserFunnel, getWeek2Retention } from '@/lib/pmf/user-funnel'
 import { prisma } from '@/lib/prisma'
 
@@ -28,10 +29,11 @@ export interface WeeklySnapshot {
 }
 
 export async function buildWeeklySnapshot(): Promise<WeeklySnapshot> {
-  const [week, retention, revenue] = await Promise.all([
+  const [week, retention, revenue, sprint] = await Promise.all([
     getUserFunnel(new Date(Date.now() - WEEK_MS)),
     getWeek2Retention(),
     getRevenueMetrics(),
+    getRevenueFunnel(new Date(Date.now() - WEEK_MS)),
   ])
 
   const lines = [
@@ -53,8 +55,17 @@ export async function buildWeeklySnapshot(): Promise<WeeklySnapshot> {
     `  cohort (signed up 14-28d ago)  ${retention.cohortSize}`,
     `  active in their week 2        ${retention.retained} (${pctOrDash(retention.rate)})`,
     '',
+    'Revenue Sprint funnel (7d · capture -> convert):',
+    `  SEO visits             ${sprint.seoVisit}`,
+    `  Fit checks started     ${sprint.fitcheckStarted}`,
+    `  Leads captured         ${sprint.leadCaptured}`,
+    `  Tripwire paid ($4.99)  ${sprint.tripwirePaid}`,
+    `  Pro subscribed         ${sprint.proSubscribed}`,
+    `  Leads in nurture (now) ${sprint.revenue.activeLeadsInNurture}`,
+    '',
     'Revenue (now):',
-    `  MRR                    ${dollars(revenue.mrrCents)} (G3 target $10k)`,
+    `  Subscription MRR       ${dollars(revenue.mrrCents)} (G3 target $10k)`,
+    `  Tripwire gross (7d)    ${dollars(sprint.revenue.tripwireGrossCents)} (${sprint.tripwirePaid} orders)`,
     `  Paying customers       ${revenue.payingCustomers} (G2 target 10)`,
     `  Churned MRR (30d)      ${dollars(revenue.churnedMrrCents)}`,
     '',
