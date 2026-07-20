@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import seo from "@/lib/seo-data.json"; // <-- adjust path
 import { RescueCtaBlock } from "@/components/rescue-cta-block";
+import { SiteHeader } from "@/components/site-header";
+import { SiteFooter } from "@/components/site-footer";
 
 const SITE = seo._meta.site;
 const boards = seo.jobBoards;
@@ -39,7 +41,9 @@ export default async function Page({ params }: { params: Promise<Params> }) {
     { "@type": "FAQPage", mainEntity: faq.map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })) },
   ]};
   return (
-    <article style={{ maxWidth: 760, margin: "0 auto", padding: "2rem 1rem", lineHeight: 1.7 }}>
+    <>
+      <SiteHeader />
+      <article style={{ maxWidth: 760, margin: "0 auto", padding: "2rem 1rem", lineHeight: 1.7 }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <h1>Auto-Apply to Jobs on {b.name} with AI (2026)</h1>
       <p>{b.note} Applying manually to {b.name} listings one by one is slow — ResumeAI-Bot does it for you, tailoring your resume to each role so you stay relevant while covering far more ground.</p>
@@ -57,5 +61,7 @@ export default async function Page({ params }: { params: Promise<Params> }) {
       <hr style={{ margin: "2rem 0" }} />
       <p style={{ fontSize: 14 }}>More: {boards.filter((x) => x.slug !== b.slug).slice(0, 5).map((x) => (<Link key={x.slug} href={`/auto-apply/${x.slug}`} style={{ marginRight: 8 }}>Auto-apply {x.name}</Link>))}</p>
     </article>
+      <SiteFooter />
+    </>
   );
 }

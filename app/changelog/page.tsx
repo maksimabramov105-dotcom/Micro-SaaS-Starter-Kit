@@ -1,4 +1,5 @@
-import { Navbar } from '@/components/navbar'
+import { SiteHeader } from '@/components/site-header'
+import { SiteFooter } from '@/components/site-footer'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 
@@ -24,7 +25,7 @@ const changelog = [
 export default function ChangelogPage() {
   return (
     <div className="flex min-h-screen flex-col">
-      <Navbar />
+      <SiteHeader />
       <main className="flex-1">
         <div className="container mx-auto max-w-4xl px-4 py-12">
           <div className="mb-8">
@@ -70,6 +71,7 @@ export default function ChangelogPage() {
           </div>
         </div>
       </main>
+      <SiteFooter />
     </div>
   )
 }

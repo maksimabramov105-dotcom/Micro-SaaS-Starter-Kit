@@ -13,6 +13,8 @@ import {
   jobUrlMatcher,
 } from '@/lib/seo/apply-companies'
 import { prisma } from '@/lib/prisma'
+import { SiteHeader } from '@/components/site-header'
+import { SiteFooter } from '@/components/site-footer'
 
 const SITE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
 
@@ -105,7 +107,9 @@ export default async function ApplyToCompanyPage({
   }
 
   return (
-    <article style={{ maxWidth: 760, margin: '0 auto', padding: '2rem 1rem', lineHeight: 1.7 }}>
+    <>
+      <SiteHeader />
+      <article style={{ maxWidth: 760, margin: '0 auto', padding: '2rem 1rem', lineHeight: 1.7 }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <p style={{ fontSize: 14 }}>
         <Link href="/apply-to">Apply-to guides</Link> › {c.name}
@@ -165,5 +169,7 @@ export default async function ApplyToCompanyPage({
         · <Link href="/apply-to">All {APPLY_COMPANIES.length} companies</Link>
       </p>
     </article>
+      <SiteFooter />
+    </>
   )
 }

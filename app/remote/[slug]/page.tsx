@@ -6,6 +6,8 @@ import Link from "next/link";
 import seo from "@/lib/seo-data.json";
 import { REMOTE_GUIDES, getRemoteGuide } from "@/lib/remote-guides";
 import { RescueCtaBlock } from "@/components/rescue-cta-block";
+import { SiteHeader } from "@/components/site-header";
+import { SiteFooter } from "@/components/site-footer";
 
 const SITE = seo._meta.site;
 
@@ -46,7 +48,9 @@ export default async function Page({ params }: { params: Promise<Params> }) {
   };
 
   return (
-    <article style={{ maxWidth: 760, margin: "0 auto", padding: "2rem 1rem", lineHeight: 1.7 }}>
+    <>
+      <SiteHeader />
+      <article style={{ maxWidth: 760, margin: "0 auto", padding: "2rem 1rem", lineHeight: 1.7 }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
       <h1>{g.h1}</h1>
@@ -82,5 +86,7 @@ export default async function Page({ params }: { params: Promise<Params> }) {
         · <Link href="/pricing">Pricing →</Link>
       </p>
     </article>
+      <SiteFooter />
+    </>
   );
 }

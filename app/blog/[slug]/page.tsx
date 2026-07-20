@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { RescueCtaBlock } from '@/components/rescue-cta-block'
 import { getVerificationStatsSafe, type VerificationStats } from '@/lib/blog/stats'
+import { SiteHeader } from '@/components/site-header'
+import { SiteFooter } from '@/components/site-footer'
 
 const SITE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
 
@@ -165,7 +167,9 @@ export default async function BlogPost({ params }: { params: Promise<{ slug: str
   }
 
   return (
-    <article style={{ maxWidth: 760, margin: '0 auto', padding: '2rem 1rem', lineHeight: 1.7 }}>
+    <>
+      <SiteHeader />
+      <article style={{ maxWidth: 760, margin: '0 auto', padding: '2rem 1rem', lineHeight: 1.7 }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <p style={{ fontSize: 14 }}>
         <Link href="/blog">Blog</Link>
@@ -190,5 +194,7 @@ export default async function BlogPost({ params }: { params: Promise<{ slug: str
         See the numbers yourself: <Link href="/proof">the live verified ledger</Link>.
       </p>
     </article>
+      <SiteFooter />
+    </>
   )
 }

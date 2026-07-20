@@ -4,6 +4,8 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import seo from '@/lib/seo-data.json'
 import { PRICE } from '@/lib/pricing'
+import { SiteHeader } from '@/components/site-header'
+import { SiteFooter } from '@/components/site-footer'
 
 const SITE = seo._meta.site
 const competitors = seo.competitors
@@ -27,7 +29,9 @@ export default function ComparePage() {
   const th: React.CSSProperties = { textAlign: 'left', padding: '10px 12px', borderBottom: '2px solid #e2e8f0' }
   const td: React.CSSProperties = { padding: '10px 12px', borderBottom: '1px solid #f1f5f9' }
   return (
-    <article style={{ maxWidth: 920, margin: '0 auto', padding: '2rem 1rem', lineHeight: 1.7 }}>
+    <>
+      <SiteHeader />
+      <article style={{ maxWidth: 920, margin: '0 auto', padding: '2rem 1rem', lineHeight: 1.7 }}>
       <h1>Compare AI Auto-Apply Tools (2026)</h1>
       <p>
         Most auto-apply tools are built for US / LinkedIn job seekers. ResumeAI-Bot is built for
@@ -98,5 +102,7 @@ export default function ComparePage() {
         ))}
       </p>
     </article>
+      <SiteFooter />
+    </>
   )
 }

@@ -1,8 +1,9 @@
 import Link from 'next/link'
 import { CheckCircle2, Globe, Inbox, ShieldCheck, FileCheck2 } from 'lucide-react'
-import { VISIBLE_PLANS, getMonthlyEquivalent } from '@/lib/pricing'
+import { PRICE, VISIBLE_PLANS, getMonthlyEquivalent } from '@/lib/pricing'
 import { LaunchBanner } from '@/components/launch-banner'
-import { Logo } from '@/components/logo'
+import { SiteHeader } from '@/components/site-header'
+import { SiteFooter } from '@/components/site-footer'
 import { HeroDemo } from '@/components/hero-demo'
 import { testimonials, replyScreenshots } from '@/lib/proof'
 
@@ -12,15 +13,22 @@ export const revalidate = 3600
 
 // Self-referencing canonical for the homepage (resolved against metadataBase).
 export const metadata = {
-  title: 'ResumeAI-Bot — Auto-apply only where you can win',
+  title: 'ResumeAI — a resume built for the job you actually want',
   description:
-    'Honest auto-apply: applies only where you’re eligible, tailors your resume per role, and verifies every application actually submitted. No spam.',
+    'Paste a job posting and get your resume rewritten for that exact role, plus a fit report. Verified applications, replies in one inbox. Free check.',
   alternates: { canonical: '/' },
   openGraph: {
-    title: 'ResumeAI-Bot — Every application is one you can actually win',
+    title: 'ResumeAI — a resume built for the job you actually want',
     description:
-      'Eligibility-checked, tailored, and verified-submitted job applications — the opposite of spray-and-pray bots. Replies land in one inbox.',
+      'Your resume rewritten for one specific job, with a fit report showing what got you filtered out. Verified applications, replies in one inbox.',
     url: '/',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'ResumeAI — a resume built for the job you actually want',
+    description:
+      'Your resume rewritten for one specific job, with a fit report. Verified applications, replies in one inbox.',
   },
 }
 
@@ -59,28 +67,7 @@ export default async function HomePage() {
 
       <LaunchBanner />
 
-      {/* Navbar */}
-      <nav className="sticky top-0 z-50 border-b border-slate-100 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
-          <Link href="/" aria-label="ResumeAI home">
-            <Logo />
-          </Link>
-          <div className="flex items-center gap-6">
-            <Link href="#how" className="hidden text-sm text-slate-600 hover:text-slate-900 sm:block">
-              How it works
-            </Link>
-            <Link href="#pricing" className="text-sm text-slate-600 hover:text-slate-900">
-              Pricing
-            </Link>
-            <Link
-              href="/login"
-              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors"
-            >
-              Sign in
-            </Link>
-          </div>
-        </div>
-      </nav>
+      <SiteHeader />
 
       {/* Hero — split layout: message left, product proof right (P2.9) */}
       <section className="px-4 py-16 sm:py-20">
@@ -88,26 +75,40 @@ export default async function HomePage() {
           {/* Left — message + CTA */}
           <div className="text-center lg:text-left">
             <p className="mb-4 text-sm font-semibold uppercase tracking-wide text-emerald-600">
-              Honest auto-apply · eligibility-checked · verified submitted
+              Tailored per role · verified submitted · replies in one inbox
             </p>
             <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
-              Every application is one you can actually win.
+              A resume built for the job you actually want.
             </h1>
             <p className="mt-5 max-w-xl text-lg text-slate-600 lg:mx-0 mx-auto">
-              Spray-and-pray bots blast your resume at jobs you can&apos;t get &mdash; and many never
-              actually submit. ResumeAI applies <strong>only where you&apos;re genuinely eligible</strong>,
-              tailors your resume to each role, and <strong>confirms every application truly went
-              through</strong>. Recruiter replies land in one inbox. No spam, no fake &ldquo;applied.&rdquo;
+              Paste a job posting and get your resume rewritten for <strong>that specific
+              role</strong>, with a fit report showing what was getting you filtered out. Every
+              application we send is <strong>confirmed by the employer&apos;s ATS</strong>, and
+              every reply lands in <strong>one inbox</strong>. Optional auto-apply handles the
+              volume &mdash; only where you&apos;re genuinely eligible.
             </p>
+
+            {/* Two money paths + free signup, all ref-tagged for attribution */}
             <div className="mt-8 flex flex-col items-center gap-3 lg:items-start">
               <Link
-                href="/login"
+                href="/ats-check?ref=home"
                 className="rounded-lg bg-emerald-600 px-8 py-3 text-lg font-semibold text-white hover:bg-emerald-700 transition-colors"
               >
-                Start free &mdash; 3 applications/day &rarr;
+                Check your resume against a job &mdash; free &rarr;
               </Link>
+              <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 lg:justify-start">
+                <Link
+                  href="/resume-rescue?ref=home"
+                  className="rounded-lg border-2 border-emerald-600 px-5 py-2.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
+                >
+                  Fix my resume for this job &mdash; {PRICE.rescue}
+                </Link>
+                <Link href="/login?ref=home" className="text-sm font-semibold text-slate-700 underline">
+                  or start free
+                </Link>
+              </div>
               <p className="text-sm text-slate-600">
-                No credit card · 30-day money-back guarantee on paid plans
+                No credit card to try · 30-day money-back guarantee on paid plans
               </p>
             </div>
 
@@ -117,7 +118,7 @@ export default async function HomePage() {
                 <CheckCircle2 className="h-4 w-4 text-brand" aria-hidden="true" /> Only where you&apos;re eligible
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <Globe className="h-4 w-4 text-brand" aria-hidden="true" /> Remote &amp; 50+ countries
+                <Globe className="h-4 w-4 text-brand" aria-hidden="true" /> Remote-first roles · AU/NZ/US/EU
               </span>
               <span className="inline-flex items-center gap-1.5">
                 <Inbox className="h-4 w-4 text-brand" aria-hidden="true" /> Confirmed by the ATS — no fake &ldquo;applied&rdquo;
@@ -276,56 +277,57 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Comparison (HOMEPAGE_COPY.md §5). Competitor facts verified Jun 2026:
-          Sonara shut down Feb 2024 (since acquired by BOLD); LazyApply is a
-          one-time "lifetime" purchase from $99, not an annual fee. */}
+      {/* Comparison — the full, maintained table lives on /compare (10 tools).
+          The homepage carried a divergent 3-tool copy that drifted out of sync,
+          so we link the single source instead (E2). */}
       <section className="px-4 py-20">
-        <div className="mx-auto max-w-4xl">
-          <h2 className="mb-2 text-center text-3xl font-bold text-slate-900">Why we&apos;re different</h2>
-          <p className="mb-8 text-center text-slate-600">
-            Most auto-apply tools brag about volume — and quietly send applications you can&apos;t win,
-            many of which never actually submit. We do the opposite: apply only where you&apos;re
-            eligible, prove each one went through, and put every reply in your inbox.
+        <div className="mx-auto max-w-4xl text-center">
+          <h2 className="mb-2 text-3xl font-bold text-slate-900">Why we&apos;re different</h2>
+          <p className="mx-auto mb-8 max-w-2xl text-slate-600">
+            Most auto-apply tools brag about volume — and quietly send applications you
+            can&apos;t win, many of which never actually submit. We do the opposite: apply only
+            where you&apos;re eligible, prove each one went through, and put every reply in your
+            inbox.
           </p>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 text-slate-600">
-                  <th className="py-3 pr-4 font-medium"></th>
-                  <th className="py-3 px-4 font-bold text-emerald-700">ResumeAI-Bot</th>
-                  <th className="py-3 px-4 font-medium">Sonara</th>
-                  <th className="py-3 px-4 font-medium">LazyApply</th>
-                </tr>
-              </thead>
-              <tbody className="text-slate-700">
-                {[
-                  ['Verified actually submitted (not fake “applied”)', '✓', '✕', '✕'],
-                  ['Eligibility-aware (only applies where you can work)', '✓', '✕', '✕'],
-                  ['Captures employer replies in an inbox', '✓', '✕', '✕'],
-                  ['Countries covered', '50+', 'shut down (2024)', 'US-focused'],
-                  ['AI resume per role', '✓', 'limited', 'limited'],
-                  ['Free tier', '✓ 3/day', '✕', '✕'],
-                  ['30-day money-back', '✓', '—', '✕'],
-                  ['Price', '$19/mo', '—', 'from $99 one-time'],
-                ].map(([label, ...cells]) => (
-                  <tr key={label} className="border-b border-slate-100">
-                    <td className="py-3 pr-4 font-medium text-slate-900">{label}</td>
-                    {cells.map((c, i) => (
-                      <td
-                        key={i}
-                        className={`py-3 px-4 ${i === 0 ? 'font-semibold text-emerald-700' : ''}`}
-                      >
-                        {c}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <Link
+            href="/compare"
+            className="inline-block rounded-lg border-2 border-slate-300 px-6 py-3 font-semibold text-slate-800 hover:bg-slate-50"
+          >
+            Compare us against 10 job-search tools &rarr;
+          </Link>
+        </div>
+      </section>
+
+      {/* Mid-page money paths — same two offers as the hero, for visitors who
+          scrolled past it (E2). */}
+      <section className="border-y border-slate-100 bg-emerald-50/40 px-4 py-16">
+        <div className="mx-auto max-w-3xl text-center">
+          <h2 className="mb-3 text-2xl font-bold text-slate-900">
+            Start with the job you want right now
+          </h2>
+          <p className="mb-6 text-slate-700">
+            Paste a posting and see your fit score free. If it needs work, we&apos;ll rewrite your
+            resume for that exact role in minutes.
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <Link
+              href="/ats-check?ref=home-mid"
+              className="rounded-lg bg-emerald-600 px-6 py-3 font-semibold text-white hover:bg-emerald-700"
+            >
+              Check your resume against a job — free
+            </Link>
+            <Link
+              href="/resume-rescue?ref=home-mid"
+              className="rounded-lg border-2 border-emerald-600 px-6 py-3 font-semibold text-emerald-700 hover:bg-emerald-100"
+            >
+              Fix my resume for this job — {PRICE.rescue}
+            </Link>
           </div>
-          <p className="mt-4 text-center text-sm text-slate-600">
-            Sonara shut down in 2024 — ResumeAI-Bot is a still-running alternative that covers more
-            countries.
+          <p className="mt-3 text-sm text-slate-600">
+            or{' '}
+            <Link href="/login?ref=home-mid" className="underline">
+              start free — 3 applications/day
+            </Link>
           </p>
         </div>
       </section>
@@ -454,34 +456,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-slate-100 bg-slate-50 px-4 py-8">
-        <div className="mx-auto flex max-w-5xl flex-col items-center gap-4 text-sm text-slate-600 sm:flex-row sm:justify-between">
-          <span>
-            &copy; {new Date().getFullYear()} ResumeAI ·{' '}
-            <a href="mailto:support@resumeai-bot.ru" className="hover:text-slate-900">
-              support@resumeai-bot.ru
-            </a>
-          </span>
-          <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">
-            <Link href="/faq" className="hover:text-slate-900">
-              FAQ
-            </Link>
-            <Link href="/refund-policy" className="hover:text-slate-900">
-              Refund Policy
-            </Link>
-            <Link href="/terms" className="hover:text-slate-900">
-              Terms
-            </Link>
-            <Link href="/privacy" className="hover:text-slate-900">
-              Privacy
-            </Link>
-            <Link href="/contact" className="hover:text-slate-900">
-              Contact
-            </Link>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter />
     </main>
   )
 }

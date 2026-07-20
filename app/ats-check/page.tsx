@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
-import { Navbar } from '@/components/navbar'
+import { SiteHeader } from '@/components/site-header'
+import { SiteFooter } from '@/components/site-footer'
 import { AtsCheckForm } from '@/components/ats-check-form'
 
 const SITE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
@@ -34,7 +35,7 @@ const jsonLd = {
 export default function AtsCheckPage() {
   return (
     <div className="flex min-h-screen flex-col">
-      <Navbar />
+      <SiteHeader />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <main className="flex-1 bg-slate-50">
         <div className="mx-auto max-w-3xl px-4 py-16">
@@ -62,6 +63,7 @@ export default function AtsCheckPage() {
           </p>
         </div>
       </main>
+      <SiteFooter />
     </div>
   )
 }

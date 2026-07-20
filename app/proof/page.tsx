@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { Navbar } from '@/components/navbar'
+import { SiteHeader } from '@/components/site-header'
+import { SiteFooter } from '@/components/site-footer'
 import { getVerifiedStats } from '@/lib/stats/verified'
 
 const SITE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
@@ -44,7 +45,7 @@ export default async function ProofPage() {
   }
   return (
     <div className="flex min-h-screen flex-col">
-      <Navbar />
+      <SiteHeader />
       <main className="flex-1 bg-slate-50">
         <div className="mx-auto max-w-4xl px-4 py-16">
           <div className="text-center">
@@ -100,6 +101,7 @@ export default async function ProofPage() {
           </div>
         </div>
       </main>
+      <SiteFooter />
     </div>
   )
 }

@@ -6,6 +6,8 @@ import Link from "next/link";
 import seo from "@/lib/seo-data.json"; // <-- adjust path if needed
 import { RescueCtaBlock } from "@/components/rescue-cta-block";
 import { PRICE } from "@/lib/pricing";
+import { SiteHeader } from "@/components/site-header";
+import { SiteFooter } from "@/components/site-footer";
 
 const SITE = seo._meta.site;
 const competitors = seo.competitors;
@@ -68,7 +70,9 @@ export default async function Page({ params }: { params: Promise<Params> }) {
   };
 
   return (
-    <article style={{ maxWidth: 760, margin: "0 auto", padding: "2rem 1rem", lineHeight: 1.7 }}>
+    <>
+      <SiteHeader />
+      <article style={{ maxWidth: 760, margin: "0 auto", padding: "2rem 1rem", lineHeight: 1.7 }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
       <h1>
@@ -141,5 +145,7 @@ export default async function Page({ params }: { params: Promise<Params> }) {
         · <Link href="/pricing">Pricing →</Link>
       </p>
     </article>
+      <SiteFooter />
+    </>
   );
 }

@@ -1,4 +1,5 @@
-import { Navbar } from '@/components/navbar'
+import { SiteHeader } from '@/components/site-header'
+import { SiteFooter } from '@/components/site-footer'
 
 export const metadata = {
   title: 'Refund Policy — ResumeAI',
@@ -8,7 +9,7 @@ export const metadata = {
 export default function RefundPolicyPage() {
   return (
     <div className="flex min-h-screen flex-col">
-      <Navbar />
+      <SiteHeader />
       <main className="flex-1 container mx-auto max-w-3xl px-4 py-16">
         <h1 className="text-4xl font-bold mb-2">Refund Policy</h1>
         <p className="text-muted-foreground mb-10">Last updated: May 2026</p>
@@ -106,6 +107,7 @@ export default function RefundPolicyPage() {
 
         </section>
       </main>
+      <SiteFooter />
     </div>
   )
 }

@@ -3,6 +3,8 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { RescueCtaBlock } from '@/components/rescue-cta-block'
 import roleData from '@/lib/seo/role-keywords.json'
+import { SiteHeader } from '@/components/site-header'
+import { SiteFooter } from '@/components/site-footer'
 
 const SITE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
 
@@ -24,7 +26,9 @@ export const metadata: Metadata = {
 
 export default function ResumeKeywordsHub() {
   return (
-    <article style={{ maxWidth: 760, margin: '0 auto', padding: '2rem 1rem', lineHeight: 1.7 }}>
+    <>
+      <SiteHeader />
+      <article style={{ maxWidth: 760, margin: '0 auto', padding: '2rem 1rem', lineHeight: 1.7 }}>
       <h1>Resume keywords by role — extracted from real postings</h1>
       <p>
         Every page below lists the ATS keywords employers are actually asking for in that role,
@@ -44,5 +48,7 @@ export default function ResumeKeywordsHub() {
       </ul>
       <RescueCtaBlock refTag="seo-keywords-hub" />
     </article>
+      <SiteFooter />
+    </>
   )
 }

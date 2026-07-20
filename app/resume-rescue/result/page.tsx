@@ -3,7 +3,8 @@
  * The client component polls the status endpoint; its first poll after
  * payment is what drives generation on the server.
  */
-import { Navbar } from '@/components/navbar'
+import { SiteHeader } from '@/components/site-header'
+import { SiteFooter } from '@/components/site-footer'
 import { RescueResult } from '@/components/rescue-result'
 
 const SITE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
@@ -23,7 +24,7 @@ export default async function RescueResultPage({
   const { order } = await searchParams
   return (
     <div className="flex min-h-screen flex-col">
-      <Navbar />
+      <SiteHeader />
       <main className="flex-1">
         <section className="w-full py-12">
           <div className="container mx-auto max-w-3xl px-4">
@@ -37,6 +38,7 @@ export default async function RescueResultPage({
           </div>
         </section>
       </main>
+      <SiteFooter />
     </div>
   )
 }
