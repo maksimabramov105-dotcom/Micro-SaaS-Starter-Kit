@@ -1,4 +1,5 @@
-import { Navbar } from '@/components/navbar'
+import { SiteHeader } from '@/components/site-header'
+import { SiteFooter } from '@/components/site-footer'
 
 // Bump this date on any meaningful policy edit.
 const LAST_UPDATED = new Date('2026-05-25')
@@ -6,7 +7,7 @@ const LAST_UPDATED = new Date('2026-05-25')
 export default function TermsPage() {
   return (
     <div className="flex min-h-screen flex-col">
-      <Navbar />
+      <SiteHeader />
       <main className="flex-1">
         <div className="container mx-auto max-w-4xl px-4 py-12">
           <h1 className="mb-8 text-4xl font-bold">Terms of Service</h1>
@@ -119,6 +120,7 @@ export default function TermsPage() {
           </div>
         </div>
       </main>
+      <SiteFooter />
     </div>
   )
 }

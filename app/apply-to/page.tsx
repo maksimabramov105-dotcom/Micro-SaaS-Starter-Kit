@@ -3,6 +3,8 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { RescueCtaBlock } from '@/components/rescue-cta-block'
 import { APPLY_COMPANIES } from '@/lib/seo/apply-companies'
+import { SiteHeader } from '@/components/site-header'
+import { SiteFooter } from '@/components/site-footer'
 
 const SITE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
 
@@ -17,7 +19,9 @@ const ATS_ORDER = ['greenhouse', 'lever', 'ashby', 'recruitee', 'personio'] as c
 
 export default function ApplyToHubPage() {
   return (
-    <article style={{ maxWidth: 760, margin: '0 auto', padding: '2rem 1rem', lineHeight: 1.7 }}>
+    <>
+      <SiteHeader />
+      <article style={{ maxWidth: 760, margin: '0 auto', padding: '2rem 1rem', lineHeight: 1.7 }}>
       <h1>How to apply to jobs at {APPLY_COMPANIES.length} tech companies</h1>
       <p>
         Every company below hires through a public applicant tracking system (ATS) that we
@@ -48,5 +52,7 @@ export default function ApplyToHubPage() {
 
       <RescueCtaBlock refTag="seo-apply-hub" />
     </article>
+      <SiteFooter />
+    </>
   )
 }

@@ -4,7 +4,8 @@
  * One job: convert a visitor with a specific job posting in hand into a
  * $4.99 purchase. No signup wall — guest checkout, account auto-created.
  */
-import { Navbar } from '@/components/navbar'
+import { SiteHeader } from '@/components/site-header'
+import { SiteFooter } from '@/components/site-footer'
 import { RescueForm } from '@/components/rescue-form'
 import { PRICE, RESCUE_PRICE_USD } from '@/lib/pricing'
 
@@ -66,7 +67,7 @@ export default function ResumeRescuePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(rescueJsonLd) }}
       />
-      <Navbar />
+      <SiteHeader />
       <main className="flex-1">
         <section className="w-full py-12 md:py-20">
           <div className="container mx-auto max-w-5xl px-4">
@@ -120,6 +121,7 @@ export default function ResumeRescuePage() {
           </div>
         </section>
       </main>
+      <SiteFooter />
     </div>
   )
 }

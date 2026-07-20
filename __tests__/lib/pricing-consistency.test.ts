@@ -40,11 +40,13 @@ const ALLOWLIST: { file: string; reason: string }[] = [
 ]
 
 function sourceFiles(): string[] {
-  const out = execSync(
-    `git ls-files 'app/**/*.tsx' 'app/**/*.ts' 'components/**/*.tsx' 'components/**/*.ts'`,
-    { cwd: ROOT, encoding: 'utf8' },
-  )
-  return out.split('\n').filter(Boolean)
+  // NOTE: pass directories, not 'app/**/*.tsx' globs — that pattern silently
+  // skips files sitting directly in app/ (it missed app/page.tsx, the very
+  // homepage this guard exists to police).
+  const out = execSync(`git ls-files app components`, { cwd: ROOT, encoding: 'utf8' })
+  return out
+    .split('\n')
+    .filter((f) => f.endsWith('.ts') || f.endsWith('.tsx'))
 }
 
 /** Strip comments so documentation mentioning a price isn't a violation. */

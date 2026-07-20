@@ -8,6 +8,8 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { RescueCtaBlock } from '@/components/rescue-cta-block'
 import roleData from '@/lib/seo/role-keywords.json'
+import { SiteHeader } from '@/components/site-header'
+import { SiteFooter } from '@/components/site-footer'
 
 const SITE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
 
@@ -87,7 +89,9 @@ export default async function ResumeKeywordsPage({
   }
 
   return (
-    <article style={{ maxWidth: 760, margin: '0 auto', padding: '2rem 1rem', lineHeight: 1.7 }}>
+    <>
+      <SiteHeader />
+      <article style={{ maxWidth: 760, margin: '0 auto', padding: '2rem 1rem', lineHeight: 1.7 }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <p style={{ fontSize: 14 }}>
         <Link href="/resume-keywords">Resume keywords</Link> › {r.role}
@@ -159,5 +163,7 @@ export default async function ResumeKeywordsPage({
         · <Link href="/resume-keywords">All roles</Link>
       </p>
     </article>
+      <SiteFooter />
+    </>
   )
 }

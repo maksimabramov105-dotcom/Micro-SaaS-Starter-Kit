@@ -1,7 +1,8 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getOrAssignVariant } from '@/lib/experiments'
-import { Navbar } from '@/components/navbar'
+import { SiteHeader } from '@/components/site-header'
+import { SiteFooter } from '@/components/site-footer'
 import { PricingCards } from '@/components/pricing-cards'
 import { LaunchBanner } from '@/components/launch-banner'
 import { VISIBLE_PLANS } from '@/lib/pricing'
@@ -55,7 +56,7 @@ export default async function PricingPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(pricingJsonLd) }}
       />
       <LaunchBanner />
-      <Navbar />
+      <SiteHeader />
       <main className="flex-1">
         <section className="w-full py-12 md:py-24 lg:py-32">
           <div className="container px-4 md:px-6">
@@ -93,6 +94,7 @@ export default async function PricingPage() {
           </div>
         </section>
       </main>
+      <SiteFooter />
     </div>
   )
 }

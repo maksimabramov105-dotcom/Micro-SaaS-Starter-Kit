@@ -2,6 +2,8 @@
 // pipeline telemetry, so the content is unique and self-updating.
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { SiteHeader } from '@/components/site-header'
+import { SiteFooter } from '@/components/site-footer'
 
 const SITE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
 
@@ -29,7 +31,9 @@ const POSTS = [
 
 export default function BlogHub() {
   return (
-    <article style={{ maxWidth: 760, margin: '0 auto', padding: '2rem 1rem', lineHeight: 1.7 }}>
+    <>
+      <SiteHeader />
+      <article style={{ maxWidth: 760, margin: '0 auto', padding: '2rem 1rem', lineHeight: 1.7 }}>
       <h1>Honest data from real job applications</h1>
       <p>
         We operate a verified application pipeline: nothing is marked &ldquo;applied&rdquo;
@@ -49,5 +53,7 @@ export default function BlogHub() {
         ))}
       </ul>
     </article>
+      <SiteFooter />
+    </>
   )
 }

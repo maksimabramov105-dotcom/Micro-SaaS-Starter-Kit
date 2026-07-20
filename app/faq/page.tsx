@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
-import { Navbar } from '@/components/navbar'
+import { SiteHeader } from '@/components/site-header'
+import { SiteFooter } from '@/components/site-footer'
 import { RescueCtaBlock } from '@/components/rescue-cta-block'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -91,7 +92,7 @@ export default function FaqPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
       />
-      <Navbar />
+      <SiteHeader />
       <main className="flex-1">
         <div className="container mx-auto max-w-4xl px-4 py-12">
           <div className="mb-12 text-center">
@@ -137,6 +138,7 @@ export default function FaqPage() {
           </Card>
         </div>
       </main>
+      <SiteFooter />
     </div>
   )
 }
