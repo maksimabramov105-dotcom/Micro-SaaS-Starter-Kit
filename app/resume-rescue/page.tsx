@@ -16,6 +16,18 @@ export const metadata = {
   description:
     'Paste a job posting, get your resume rewritten for it plus a fit report: score, missing keywords, concrete fixes. Delivered in minutes or refunded.',
   alternates: { canonical: `${SITE}/resume-rescue` },
+  openGraph: {
+    title: `AI Resume Rescue — tailored for one job, ${PRICE.rescue}`,
+    description:
+      'Paste a job posting, get your resume rewritten for it plus a fit report: score, missing keywords, concrete fixes. Delivered in minutes.',
+    url: `${SITE}/resume-rescue`,
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: `AI Resume Rescue — tailored for one job, ${PRICE.rescue}`,
+    description: 'Your resume rewritten for one specific job, plus a fit report. Delivered in minutes.',
+  },
 }
 
 // Product + Offer structured data (A3): the tripwire is a real product with a

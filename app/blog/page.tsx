@@ -12,6 +12,18 @@ export const metadata: Metadata = {
   description:
     'What our verified application pipeline actually measures: how many applications reach a human, why auto-apply fails, and what that means for your search.',
   alternates: { canonical: `${SITE}/blog` },
+  openGraph: {
+    title: 'Blog — honest data from real job applications',
+    description:
+      'What our verified application pipeline measures: how many applications reach a human, and why auto-apply fails.',
+    url: `${SITE}/blog`,
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Blog — honest data from real job applications',
+    description: 'How many applications reach a human, and why auto-apply fails. Live pipeline numbers.',
+  },
 }
 
 const POSTS = [
