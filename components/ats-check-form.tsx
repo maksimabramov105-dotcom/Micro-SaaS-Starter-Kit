@@ -8,6 +8,7 @@
  */
 import { useState } from 'react'
 import Link from 'next/link'
+import { PRICE } from '@/lib/pricing'
 
 interface Result {
   score: number
@@ -232,13 +233,13 @@ export function AtsCheckForm() {
             </p>
             <p className="mt-1 text-sm text-emerald-800">
               Resume Rescue rewrites your resume for the posting and includes the full keyword
-              report. $4.99 one-time, delivered in minutes, auto-refund if we fail.
+              report. {PRICE.rescue} one-time, delivered in minutes, auto-refund if we fail.
             </p>
             <Link
               href="/resume-rescue?ref=fitcheck"
               className="mt-4 inline-block rounded-lg bg-emerald-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-emerald-700"
             >
-              Rescue my resume — $4.99
+              Rescue my resume — {PRICE.rescue}
             </Link>
             <p className="mt-2 text-xs text-emerald-800">
               or{' '}

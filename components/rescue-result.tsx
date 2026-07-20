@@ -6,6 +6,7 @@
  * the fetch timeout must comfortably exceed the inline generation time.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { PRICE } from '@/lib/pricing'
 
 interface FitReport {
   score?: number
@@ -242,13 +243,13 @@ export function RescueResult({ orderId }: { orderId: string }) {
           <p className="mb-4 text-sm text-muted-foreground">
             Pro tailors your resume for every job you apply to, runs 25 verified
             auto-applications a day, and collects recruiter replies in one inbox. Your first
-            month is <b>$9</b> (then $19/mo) — this link works for 72 hours.
+            month is <b>{PRICE.upsellFirstMonth}</b> (then {PRICE.proMonthly}/mo) — this link works for 72 hours.
           </p>
           <a
             href={`/api/rescue/${orderId}/upsell`}
             className="inline-block rounded-md bg-primary px-5 py-3 font-semibold text-primary-foreground hover:opacity-90"
           >
-            Get Pro — first month $9
+            Get Pro — first month {PRICE.upsellFirstMonth}
           </a>
           <p className="mt-2 text-xs text-muted-foreground">
             30-day money-back guarantee, cancel anytime.

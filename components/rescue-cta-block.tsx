@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { PRICE } from '@/lib/pricing'
 
 /**
  * RescueCtaBlock — contextual conversion block for SEO/marketing pages (A3).
@@ -38,7 +39,7 @@ export function RescueCtaBlock({ context, refTag }: { context?: string; refTag: 
             textDecoration: 'none',
           }}
         >
-          Fix my resume for this job — $4.99
+          Fix my resume for this job — {PRICE.rescue}
         </Link>
         <Link href={`/ats-check?ref=${refTag}`} style={{ fontWeight: 600 }}>
           or get a free fit score first →

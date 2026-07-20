@@ -6,6 +6,7 @@
  * Fires `tripwire_view` once on mount and `checkout_started` server-side.
  */
 import { useEffect, useRef, useState } from 'react'
+import { PRICE } from '@/lib/pricing'
 
 const MAX_PDF_BYTES = 5 * 1024 * 1024
 
@@ -201,7 +202,7 @@ export function RescueForm() {
         disabled={submitting}
         className="w-full rounded-md bg-primary px-4 py-3 font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60"
       >
-        {submitting ? 'Preparing checkout…' : 'Rescue my resume — $4.99'}
+        {submitting ? 'Preparing checkout…' : `Rescue my resume — ${PRICE.rescue}`}
       </button>
       <p className="text-center text-xs text-muted-foreground">
         One-time payment. Delivered in ~5 minutes. Auto-refund if we fail.

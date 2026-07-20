@@ -1,14 +1,11 @@
 /**
- * lib/blog/stats.ts — live telemetry for the data-driven blog posts (B3).
+ * lib/blog/stats.ts — blog-shaped view of the verified-pipeline telemetry (B3).
  *
- * Aggregate, anonymized numbers straight from our own pipeline tables. The
- * posts render these at request time under daily ISR, so the content stays
- * current automatically — no manual refresh, no cron, and nobody can copy
- * the dataset because it is ours.
+ * The NUMBERS come from lib/stats/verified.ts (the single source shared with
+ * /proof — see E1); this module only adds the blog-specific presentation:
+ * bucketing raw failure messages into human-readable modes.
  */
-import { prisma } from '@/lib/prisma'
-
-const SENT_STATUSES = ['SUBMITTED', 'INTERVIEW', 'OFFER', 'REJECTED'] as const
+import { getVerifiedStatsSafe, type VerifiedStats } from '@/lib/stats/verified'
 
 export interface VerificationStats {
   attempted: number
@@ -41,34 +38,10 @@ function bucketFailure(message: string): string {
   return 'Other automation failures'
 }
 
-/** Never throws: a DB hiccup must not 500 a marketing page. Null = unavailable. */
-export async function getVerificationStatsSafe(): Promise<VerificationStats | null> {
-  try {
-    return await getVerificationStats()
-  } catch (err) {
-    console.warn('[blog] stats unavailable:', err)
-    return null
-  }
-}
-
-export async function getVerificationStats(): Promise<VerificationStats> {
-  const [attempted, sent, confirmed, replies, humanReplies, failedRows] = await Promise.all([
-    prisma.jobApplication.count(),
-    prisma.jobApplication.count({ where: { status: { in: [...SENT_STATUSES] } } }),
-    prisma.applicationEvent.count({ where: { type: 'confirmed' } }),
-    prisma.inboxMessage.count(),
-    prisma.inboxMessage.count({
-      where: { classification: { in: ['INTERVIEW_REQUEST', 'QUESTION', 'REJECTION'] } },
-    }),
-    prisma.jobApplication.findMany({
-      where: { status: 'FAILED', errorMessage: { not: null } },
-      select: { errorMessage: true },
-    }),
-  ])
-
+function toBlogShape(s: VerifiedStats): VerificationStats {
   const buckets = new Map<string, number>()
-  for (const row of failedRows) {
-    const bucket = bucketFailure(row.errorMessage ?? '')
+  for (const msg of s.failureMessages) {
+    const bucket = bucketFailure(msg)
     buckets.set(bucket, (buckets.get(bucket) ?? 0) + 1)
   }
   const topFailureModes = [...buckets.entries()]
@@ -76,20 +49,23 @@ export async function getVerificationStats(): Promise<VerificationStats> {
     .sort((a, b) => b.count - a.count)
     .slice(0, 6)
 
-  const failed = failedRows.length
-  const pct = (num: number, den: number) => (den > 0 ? Math.round((num / den) * 100) : null)
-
   return {
-    attempted,
-    sent,
-    confirmed,
-    confirmedPct: pct(confirmed, sent),
-    replies,
-    humanReplies,
-    replyPct: pct(humanReplies, sent),
-    failed,
-    failedPct: pct(failed, attempted),
+    attempted: s.attempted,
+    sent: s.submitted,
+    confirmed: s.confirmed,
+    confirmedPct: s.confirmedPct,
+    replies: s.replies,
+    humanReplies: s.humanReplies,
+    replyPct: s.replyPct,
+    failed: s.failed,
+    failedPct: s.failedPct,
     topFailureModes,
-    generatedAt: new Date().toISOString().slice(0, 10),
+    generatedAt: s.generatedAt,
   }
+}
+
+/** Never throws: a DB hiccup must not 500 a marketing page. Null = unavailable. */
+export async function getVerificationStatsSafe(): Promise<VerificationStats | null> {
+  const stats = await getVerifiedStatsSafe()
+  return stats === null ? null : toBlogShape(stats)
 }
