@@ -29,7 +29,7 @@ export async function generateMetadata(
     c.status === "shut down"
       ? `Best ${c.name} Alternative in 2026 (${c.name} Shut Down — Use This Instead)`
       : `Best ${c.name} Alternative in 2026 — ResumeAI-Bot`;
-  const description = `Looking for a ${c.name} alternative? ResumeAI-Bot auto-applies to remote-first roles at 160+ companies (AU/NZ/US/EU) with AI resumes, a free tier, and a 30-day money-back guarantee.`;
+  const description = `Looking for a ${c.name} alternative? ResumeAI tailors resumes per role, verifies every submission, and has a free tier + 30-day money-back guarantee.`;
   const url = `${SITE}/alternatives/${c.slug}`;
   return {
     title,

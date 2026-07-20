@@ -8,9 +8,9 @@ import { TeardownForm } from '@/components/teardown-form'
 const SITE = seo._meta.site
 
 export const metadata: Metadata = {
-  title: 'Free AI Resume Teardown — Instant ATS Score + Fixes | ResumeAI-Bot',
+  title: 'Free AI Resume Teardown — ATS Score + Fixes | ResumeAI',
   description:
-    'Paste your resume and get an instant, free AI teardown: ATS score, missing keywords, and 3 concrete fixes. Then auto-apply to eligible remote-first roles (AU/NZ/US/EU).',
+    'Paste your resume for an instant, free AI teardown: ATS score, missing keywords, and 3 concrete fixes. Then auto-apply to eligible remote-first roles.',
   alternates: { canonical: `${SITE}/free-resume-teardown` },
   openGraph: {
     title: 'Free AI Resume Teardown — ResumeAI-Bot',
