@@ -44,22 +44,40 @@ export async function sendRescueDeliveryEmail(order: RescueOrder): Promise<void>
   })
 }
 
-export async function sendRescueApologyEmail(email: string, refunded: boolean): Promise<void> {
+/**
+ * Three-state, because "not refunded" is not one thing: an order that was fully
+ * discounted to $0 has no captured payment to refund, and telling that customer
+ * a refund is on its way is a promise we can never keep.
+ */
+export type RefundOutcome = 'refunded' | 'nothing-to-refund' | 'failed'
+
+const APOLOGY_SUBJECT: Record<RefundOutcome, string> = {
+  refunded: 'Your Resume Rescue failed on our side — full refund issued',
+  'nothing-to-refund': 'Your Resume Rescue failed on our side — you were not charged',
+  failed: 'Your Resume Rescue failed on our side — refund on its way',
+}
+
+const APOLOGY_MONEY_LINE: Record<RefundOutcome, string> = {
+  refunded:
+    '<b>Your payment has been refunded in full automatically.</b> Depending on your bank it can take 5-10 business days to appear.',
+  'nothing-to-refund':
+    '<b>You were not charged for this order</b>, so there is nothing to refund.',
+  failed: '<b>Your refund is being processed manually right now</b> and will be issued within 24 hours.',
+}
+
+export async function sendRescueApologyEmail(
+  email: string,
+  outcome: RefundOutcome,
+): Promise<void> {
   await sendEmail({
     to: email,
-    subject: refunded
-      ? 'Your Resume Rescue failed on our side — full refund issued'
-      : 'Your Resume Rescue failed on our side — refund on its way',
+    subject: APOLOGY_SUBJECT[outcome],
     html: `
       <div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;line-height:1.6;">
         <h2>We could not generate your resume — sorry</h2>
         <p>Something broke on our side while generating your tailored resume, and it
           did not complete within our quality bar.</p>
-        <p>${
-          refunded
-            ? '<b>Your payment has been refunded in full automatically.</b> Depending on your bank it can take 5-10 business days to appear.'
-            : '<b>Your refund is being processed manually right now</b> and will be issued within 24 hours.'
-        }</p>
+        <p>${APOLOGY_MONEY_LINE[outcome]}</p>
         <p>If you would like us to try again once, just reply to this email — no
           extra charge either way.</p>
         <p style="color:#888;font-size:13px;">— Maxim, founder</p>

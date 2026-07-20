@@ -133,10 +133,42 @@ test('second failure auto-refunds, apologizes, and alerts the founder', async ()
   await processRescueOrder('order1')
 
   expect(refundCreate).toHaveBeenCalledWith({ payment_intent: 'pi_123' })
-  expect(apologyEmail).toHaveBeenCalledWith('buyer@example.com', true)
+  expect(apologyEmail).toHaveBeenCalledWith('buyer@example.com', 'refunded')
   expect(adminAlert).toHaveBeenCalled()
   const updates = mockPrisma.rescueOrder.update.mock.calls.map((c) => c[0].data)
   expect(updates.some((d: { status?: string }) => d.status === 'REFUNDED')).toBe(true)
+})
+
+// Regression (evidence sweep F1c): a fully-discounted order has no payment
+// intent. Before this, it alerted "FAILED - refund manually in Stripe!" and
+// emailed the customer that a refund was on its way — both untrue.
+test('order with no captured payment reports nothing-to-refund, not a failed refund', async () => {
+  mockPrisma.rescueOrder.findUnique.mockResolvedValue({
+    ...baseOrder,
+    attempts: 1,
+    paymentIntentId: null,
+  })
+  callWorker.mockRejectedValue(new Error('LLM exploded again'))
+
+  await processRescueOrder('order1')
+
+  expect(refundCreate).not.toHaveBeenCalled()
+  expect(apologyEmail).toHaveBeenCalledWith('buyer@example.com', 'nothing-to-refund')
+  expect(adminAlert).toHaveBeenCalled()
+  expect(adminAlert.mock.calls[0][0]).not.toMatch(/refund manually in Stripe/)
+})
+
+test('a genuinely failed Stripe refund still screams for manual intervention', async () => {
+  mockPrisma.rescueOrder.findUnique.mockResolvedValue({ ...baseOrder, attempts: 1 })
+  callWorker.mockRejectedValue(new Error('LLM exploded again'))
+  refundCreate.mockRejectedValue(new Error('stripe down'))
+
+  await processRescueOrder('order1')
+
+  expect(apologyEmail).toHaveBeenCalledWith('buyer@example.com', 'failed')
+  expect(adminAlert.mock.calls[0][0]).toMatch(/refund manually in Stripe/)
+  const updates = mockPrisma.rescueOrder.update.mock.calls.map((c) => c[0].data)
+  expect(updates.some((d: { status?: string }) => d.status === 'FAILED')).toBe(true)
 })
 
 test('does nothing for orders that are not PAID/GENERATING', async () => {
