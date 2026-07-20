@@ -390,6 +390,27 @@ deploys smoke-green.
   40-char cap, so no upsell promo was ever created (PR #136). Test promos
   deactivated, coupon deleted. $0 orders have no payment intent -> refund
   path no-ops correctly.
+- 2026-07-19 — SESSION C COMPLETE (PR #144). Autonomous capture -> nurture
+  -> convert funnel shipped; migration 20260718100000_nurture_fields applied
+  on prod (Lead nurture cols + EmailSuppression + RescueOrder.abandonedEmailAt
+  all confirmed). LIVE VERIFICATION on prod (curl against /api/ats-check,
+  test email cnurture-verify@, cleaned up after):
+  * free tier: score 63 + 2 findings, unlocked=false, 3 hints locked ✓
+  * email WITHOUT consent -> 400 (C4 gate) ✓; WITH consent -> unlocked,
+    3 hints ✓
+  * Lead enrolled: nurtureStage=1, consentAt set, lastScore=63,
+    lastJobTitle captured, nurtureNextAt=+2.00d ✓; fitcheck_started x2 +
+    lead_captured x1 events ✓
+  * unsubscribe: HMAC token -> 303 -> /unsubscribed; EmailSuppression row
+    (reason=unsubscribe) + Lead.unsubscribedAt set + sequence stopped ✓
+  * suppressed re-capture: full report still returned (good UX) but NO
+    re-enrollment + NO new lead_captured event ✓
+  * digest cron tick: nurture+abandoned processing ran clean (200, no
+    errors; test lead not yet due so 0 sent, correct)
+  * C3 revenue-funnel data path returns sane counts (25 visits / 3
+    fitchecks / 1 lead / 0 tripwire-with-payment / leads-in-nurture).
+  Nurture schedule verified: t0 (inline) / +2d / +5d / +9d, stops on
+  purchase or unsubscribe.
 - 2026-07-18 — SESSION B COMPLETE. Sitemap 103 -> 290 URLs, every one
   conversion-wired with the tripwire CTA. B1 seo-health ran autonomously on
   its first cron cycle (103 URLs, 0 failures, no false alerts); after the
