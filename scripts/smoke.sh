@@ -62,7 +62,8 @@ curl \
   -sS -m 30 -o "$T/health"    -w "health %{http_code}\n"    "${BASE_URL}/api/health"         --next \
   -sS -m 30 -o "$T/whealth"   -w "whealth %{http_code}\n"   "${BASE_URL}/api/worker/health"  --next \
   -sS -m 30 -c "$T/jar" -o "$T/csrf" -w "csrf %{http_code}\n" "${BASE_URL}/api/auth/csrf"    --next \
-  -sS -m 30 -o "$T/providers" -w "providers %{http_code}\n" "${BASE_URL}/api/auth/providers" \
+  -sS -m 30 -o "$T/providers" -w "providers %{http_code}\n" "${BASE_URL}/api/auth/providers" --next \
+  -sS -m 30 -o "$T/rescue"    -w "rescue %{http_code}\n"    "${BASE_URL}/resume-rescue" \
   > "$T/statuses" 2> "$T/curl_err" || warn "curl reported: $(head -1 "$T/curl_err")"
 
 status_of() { grep "^$1 " "$T/statuses" | awk '{print $2}'; }
@@ -99,6 +100,7 @@ check_status health    "web /api/health"
 check_status whealth   "worker health (proxy)"
 check_body   csrf      "NextAuth CSRF"         "csrfToken"
 check_body   providers "OAuth providers"       "google"
+check_body   rescue    "tripwire page"         '\$4.99'
 
 # OAuth sign-in initiation: POST with a fresh CSRF token must redirect to
 # Google, not bounce back with ?error= (catches broken NEXTAUTH_URL/OAuth env).
@@ -120,6 +122,35 @@ else
   else
     warn "auth sign-in redirect unclear (${SIGNIN_LOCATION:-no redirect}) -- soft check"
   fi
+fi
+
+# ── Money-path self-checks (Session D4) ──────────────────────────────────────
+
+# Fit-check API must answer within 5s. A deliberately-too-short body gets a fast
+# structured 400 — proves the route + JSON + latency without burning AI quota or
+# the 3/IP/day rate limit.
+FIT=$(curl -sS -m 8 -o "$T/fit" -w "%{http_code} %{time_total}" -X POST \
+  -H "Content-Type: application/json" -d '{"resumeText":"x","jobDescription":"y"}' \
+  "${BASE_URL}/api/ats-check" 2>/dev/null) || FIT="000 9.9"
+FIT_CODE=$(echo "$FIT" | awk '{print $1}')
+FIT_TIME=$(echo "$FIT" | awk '{print $2}')
+if [[ "$FIT_CODE" == "400" ]] && awk "BEGIN{exit !($FIT_TIME < 5)}"; then
+  log "  OK fit-check API (HTTP 400 in ${FIT_TIME}s)"
+else
+  fail "fit-check API -- HTTP ${FIT_CODE} in ${FIT_TIME}s (want 400 <5s)"
+  notify_failure "fit-check API HTTP ${FIT_CODE} in ${FIT_TIME}s"
+fi
+
+# Stripe webhook must reject an UNSIGNED body with 400 (proves the endpoint is
+# alive AND verifying signatures — a 200 here would mean verification is off).
+WH_CODE=$(curl -sS -m 10 -o /dev/null -w "%{http_code}" -X POST \
+  -H "Content-Type: application/json" -d '{"id":"evt_smoke","type":"ping"}' \
+  "${BASE_URL}/api/webhooks/stripe" 2>/dev/null) || WH_CODE="000"
+if [[ "$WH_CODE" == "400" ]]; then
+  log "  OK stripe webhook (rejects unsigned with 400)"
+else
+  fail "stripe webhook -- HTTP ${WH_CODE} on unsigned body (want 400)"
+  notify_failure "stripe webhook HTTP ${WH_CODE} on unsigned body"
 fi
 
 # ── 2+3. Infra checks (containers + recent web errors) — ONE remote call ─────

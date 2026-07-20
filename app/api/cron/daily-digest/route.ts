@@ -28,6 +28,8 @@ import { createUnsubscribeToken } from '@/lib/notifications/unsubscribe-token'
 import { maybeSendWeeklySnapshot } from '@/lib/pmf/weekly-snapshot'
 import { maybeRunSeoAutomation } from '@/lib/seo/health'
 import { processAbandonedCheckouts, processNurtureQueue } from '@/lib/nurture'
+import { maybeSendDailyPulse } from '@/lib/ops/daily-pulse'
+import { maybeRunOpsSelfCheck } from '@/lib/ops/self-check'
 
 // Local hour at which we send the digest
 const SEND_HOUR = 8
@@ -70,6 +72,22 @@ export async function POST(req: Request) {
       console.log('[daily-digest] nurture sent:', nurtured, 'abandoned reminders:', reminded)
   } catch (err) {
     console.error('[daily-digest] nurture processing failed', err)
+  }
+
+  // ── Daily founder pulse (Session D1) — self-gates to 9am Sydney ──────────
+  try {
+    const pulse = await maybeSendDailyPulse()
+    if (pulse === 'sent') console.log('[daily-digest] daily pulse sent')
+  } catch (err) {
+    console.error('[daily-digest] daily pulse failed', err)
+  }
+
+  // ── Ops self-check (Session D4) — money path health, self-gated ─────────
+  try {
+    const check = await maybeRunOpsSelfCheck()
+    if (check === 'ran') console.log('[daily-digest] ops self-check ran')
+  } catch (err) {
+    console.error('[daily-digest] ops self-check failed', err)
   }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'

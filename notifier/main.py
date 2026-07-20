@@ -102,7 +102,11 @@ async def handle_event(
         text = html_lib.escape(str(event.get("text") or "")[:3800])
         if not text:
             return
-        ok = await send_message(http, chat_id, f"\N{POLICE CARS REVOLVING LIGHT} <b>ResumeAI alert</b>\n\n<pre>{text}</pre>")
+        # Optional title/emoji so routine reports (daily pulse, money alerts,
+        # SEO watch) don't wear the error siren. Defaults preserve P0.4.
+        title = html_lib.escape(str(event.get("title") or "ResumeAI alert")[:80])
+        emoji = str(event.get("emoji") or "\N{POLICE CARS REVOLVING LIGHT}")[:8]
+        ok = await send_message(http, chat_id, f"{emoji} <b>{title}</b>\n\n<pre>{text}</pre>")
         log.info("admin_alert.sent" if ok else "admin_alert.send_failed")
         return
 
