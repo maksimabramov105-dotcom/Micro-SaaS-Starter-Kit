@@ -50,6 +50,10 @@ explicitly requires it.
       external verify job) is parked on local branch `ci/smoke-verify-job-local`
       — the deploy token lacks the GitHub `workflow` scope (see OWNER ACTIONS).
       Until then deploys keep using the embedded legacy heredoc checks.
+      CAVEAT found 2026-07-20 by the evidence sweep: run off-VPS with an
+      unreachable SSH target, the script skips every container check and still
+      prints "All smoke checks passed". Its default `SMOKE_SSH_HOST` is also
+      stale. Make the skip loud. See `docs/EVIDENCE_2026-07.md` F3d.
 - [x] **P0.2 Product analytics**: DONE 2026-07-16 (PR #126) via the existing
       first-party layer (AnalyticsEvent + page_view tracker) instead of adding
       Plausible/PostHog — VPS is memory/disk-tight and the in-house layer
@@ -207,10 +211,16 @@ Goal: the founder learns about money, traffic, and breakage from Telegram —
 never by checking dashboards. All driven from the hourly digest cron
 (self-gated) since the deploy token can't add GitHub workflows.
 
-- [x] **D1 Daily pulse** (~9am Sydney). One Telegram message: yesterday's
+- [ ] **D1 Daily pulse** (~9am Sydney). One Telegram message: yesterday's
       unique visitors + top pages/referrers, leads, tripwire sales + revenue,
       new subs + MRR, applications submitted/failed, top error bucket.
       `lib/ops/daily-pulse.ts`, deduped, 📊 header (not the error siren).
+      UNCHECKED 2026-07-20 by the evidence sweep: built and wired, but **has
+      never fired in production** — zero `daily_pulse_sent` rows all time.
+      The gate wants Sydney hour == 9 (a single 23:00-23:59 UTC hour) and the
+      GitHub scheduler routinely skips whole hours. Widen to a window + marker
+      dedupe, the way `maybeRunSeoAutomation` already does. See
+      `docs/EVIDENCE_2026-07.md` F3a.
 - [x] **D2 Real-time money alerts.** Stripe webhook -> Telegram (💰) on every
       tripwire sale (incl. $0 promo tests), subscription start, and cancel —
       amount + source. Deduped by Stripe event id so retries never double-fire.
@@ -225,6 +235,8 @@ never by checking dashboards. All driven from the hourly digest cron
 
 **Exit:** 48h autonomous — daily pulse arriving, money alerts firing on the
 $0 test purchases, zero manual intervention. (Live verification: see LOG.)
+**NOT MET as of 2026-07-20** — money alerts fire (proven three times), the
+pulse does not. D1 above.
 
 ## REVENUE SPRINT STATUS (as of 2026-07-20)
 
@@ -422,8 +434,56 @@ deploys smoke-green.
    guard (prod was never touched: Docker build + VPS deploy were skipped).
    Fix = add the unit-test job to PR CI, which needs the `workflow` scope
    from action #1.
+9. **Archive 9 orphaned live Stripe prices.** Found by the evidence sweep
+   (2026-07-20): 14 prices are active in live mode, but only 5 are
+   referenced by the code — and those 5 reconcile exactly with
+   `lib/pricing.ts`. The other 9 are leftovers from earlier pricing:
+   $299/yr (Unlimited Yearly), $287.90/yr, $199/yr, $191.90/yr, $149,
+   $39.99, $19.99 ×2, $2.99 ×2. An active price only charges if a Checkout
+   Session names it, so nothing is billing today — but a stale link or an
+   old Payment Link could charge a price we no longer sell. Archiving live
+   payment config is your call, not an agent's. Details in
+   `docs/EVIDENCE_2026-07.md` F1a.
+10. **Rotate the GitHub PAT in `.git/config`.** The `origin` remote embeds a
+   `ghp_...` token that now fails auth (pushes fall back to the `gh` token).
+   A dead credential sitting in plaintext is worth revoking and removing
+   from the remote URL.
 
 ## LOG
+
+- 2026-07-20 — EVIDENCE SWEEP. Full report: `docs/EVIDENCE_2026-07.md`.
+  Not a feature session — an attempt to prove the autonomous half actually
+  runs, against live Stripe / live DB / live domain. 16 items: 10 PASS,
+  4 PARTIAL, 1 FAIL, and 3 defects found.
+  * PASS, with real timestamps: end-to-end tripwire purchase (**17.3s**
+    paid→delivered vs a 5-min budget), Pro subscription opening the quota
+    gate (dailyApplicationLimit 3→25, firstPaidAt set), upsell coupon
+    ($10 off, single-use, exactly +72h), /ats-check → lead + delivered
+    report + nurture scheduled at +2d, abandoned-checkout email at the 4h
+    mark, one-click unsubscribe → suppression row + sequence stopped,
+    three real-time money alerts matching their events to the second,
+    IndexNow 290 URLs accepted by the real Monday cron, 290/290 sitemap
+    URLs 200, Lighthouse SEO 100 on all four sampled pages.
+  * FAIL — **the daily pulse has never fired** (zero `daily_pulse_sent`
+    rows, all time). D1 unchecked above; the one-hour Sydney gate loses to
+    GitHub's hour-skipping scheduler.
+  * Defect FIXED (PR #155): a failed rescue on an order with no captured
+    payment alerted "refund FAILED - refund manually in Stripe!" and told
+    the customer a refund was coming. Both false. Outcome is now
+    three-state; two regression tests added.
+  * Defect OPEN: `npm run smoke` prints "All smoke checks passed" after
+    silently skipping every container check (P0.1 note above).
+  * Owner decision: **9 of 14 active live Stripe prices are orphans**
+    ($299, $287.90, $199, $191.90, $149, $39.99, $19.99 ×2, $2.99 ×2).
+    All 5 that the code reads reconcile exactly. Archiving live payment
+    config is a human call — owner action #8.
+  * Could not prove: `upsell_accepted` (the upsell route requires a card
+    even at $0 today, and entering live card details is out of scope) and
+    the real `stripe.refunds.create` call (no captured payment on a
+    100%-off test order). Both documented with what *was* proven instead.
+  * All live test artifacts cleaned: 3 promos deactivated, 3 coupons
+    deleted, test subscription cancelled, 2 sessions expired, the real
+    upsell promo restored on the order it belongs to.
 
 - 2026-07-20 — PROMPT E COMPLETE (homepage + site-wide consistency).
   PRs #148 (E1), #149 (E2), #150 (E3), #151 (E4), #152 (fix). All live and
