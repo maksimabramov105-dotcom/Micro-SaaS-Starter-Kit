@@ -15,7 +15,7 @@
  * AnalyticsEvent markers, same pattern as the weekly metrics snapshot.
  */
 import { trackEvent } from '@/lib/analytics-advanced'
-import { sendAdminAlert } from '@/lib/alerts'
+import { sendAdminAlert, sendAdminMessage } from '@/lib/alerts'
 import { prisma } from '@/lib/prisma'
 import { getSitemapUrls, submitIndexNow } from '@/lib/seo/indexnow'
 
@@ -111,6 +111,24 @@ export async function maybeRunSeoAutomation(): Promise<'ran' | 'skipped'> {
       ...(indexnow ? { indexnowSubmitted: indexnow.submitted, indexnowOk: indexnow.ok } : {}),
     },
   }).catch(() => {})
+
+  // D3 SEO watch: a weekly Telegram summary on Mondays (a report, not an alert;
+  // failures already alert inline via runSeoHealthCheck / submitIndexNow).
+  if (now.getUTCDay() === 1) {
+    const nonOk = report.failures.length
+    const lines = [
+      `Sitemap URLs    ${report.checked}`,
+      `Pages non-200   ${nonOk}${nonOk > 0 ? ` (${report.failures.slice(0, 3).map((f) => f.status).join(',')}…)` : ''}`,
+      `IndexNow push   ${indexnow ? `${indexnow.submitted} URLs, ${indexnow.ok ? 'accepted' : 'REJECTED'}` : 'n/a'}`,
+      `GSC clicks/impr pending owner GSC API access`,
+    ]
+    await sendAdminMessage(lines.join('\n'), {
+      title: 'ResumeAI SEO watch (weekly)',
+      emoji: '\u{1F50E}', // 🔎
+      key: `seo-watch:${now.toISOString().slice(0, 10)}`,
+      dedupeSeconds: 20 * 3600,
+    })
+  }
 
   return 'ran'
 }

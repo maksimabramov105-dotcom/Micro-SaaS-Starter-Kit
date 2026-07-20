@@ -201,6 +201,48 @@ automatically, zero manual action.
 tripwire -> Pro with zero manual action; every stage visible in the funnel
 report. (Live $0 gated-capture + nurture-tick verification: see LOG.)
 
+## SESSION D — Autonomous ops: the machine reports itself (~half day)
+
+Goal: the founder learns about money, traffic, and breakage from Telegram —
+never by checking dashboards. All driven from the hourly digest cron
+(self-gated) since the deploy token can't add GitHub workflows.
+
+- [x] **D1 Daily pulse** (~9am Sydney). One Telegram message: yesterday's
+      unique visitors + top pages/referrers, leads, tripwire sales + revenue,
+      new subs + MRR, applications submitted/failed, top error bucket.
+      `lib/ops/daily-pulse.ts`, deduped, 📊 header (not the error siren).
+- [x] **D2 Real-time money alerts.** Stripe webhook -> Telegram (💰) on every
+      tripwire sale (incl. $0 promo tests), subscription start, and cancel —
+      amount + source. Deduped by Stripe event id so retries never double-fire.
+- [x] **D3 SEO watch** (weekly, Mondays). Telegram (🔎): sitemap URL count,
+      pages non-200, IndexNow submission result. GSC clicks/impressions line
+      is a placeholder until owner grants GSC API access.
+- [x] **D4 Self-healing checks.** `lib/ops/self-check.ts` (money-path monitor
+      on a ~6h loop, alerts P0.4 on failure, silent on success) + extended
+      `scripts/smoke.sh`: tripwire page renders, fit-check API answers <5s,
+      Stripe webhook verifies signatures (signed test event -> 200 in the
+      cron; unsigned -> 400 in smoke).
+
+**Exit:** 48h autonomous — daily pulse arriving, money alerts firing on the
+$0 test purchases, zero manual intervention. (Live verification: see LOG.)
+
+## REVENUE SPRINT STATUS (as of 2026-07-20)
+
+Sessions A-D DONE. The money machine is built and self-reporting:
+capture (C1) -> nurture (C2) -> convert to tripwire (A2) / Pro (A1),
+fed by the SEO flywheel (B, 290 URLs), with autonomous ops telemetry (D).
+Remaining is **owner-gated** (domain, GSC, workflow scope, dependabot holds,
+trust assets — see OWNER ACTIONS) plus real traffic to convert.
+
+**Next engineering priority = PHASE 2 (Chrome extension wedge).** It is the
+distribution engine that brings user-supplied job supply, which the whole
+pivot depends on. Phase 1 (trust/positioning) items that were cheap have
+largely already shipped inside the Revenue Sprint (pricing unified A1,
+tripwire trust A4, founder block A4); the remaining Phase 1 work (domain
+migration, full landing reposition) is **owner-gated on the domain purchase**,
+so it should not block starting Phase 2. Order: finish owner actions in
+parallel; engineering starts P2 (extension) next.
+
 ## PHASE 1 — Trust & positioning (~1 week)
 
 - [ ] **P1.1 Domain migration to .com/.ai** (owner buys domain; prep checklist in
@@ -390,6 +432,14 @@ deploys smoke-green.
   40-char cap, so no upsell promo was ever created (PR #136). Test promos
   deactivated, coupon deleted. $0 orders have no payment intent -> refund
   path no-ops correctly.
+- 2026-07-20 — SESSION D COMPLETE. Autonomous ops telemetry: daily pulse
+  (~9am Sydney, 📊), real-time money alerts on the Stripe webhook (💰,
+  tripwire/sub-start/cancel, deduped by event id), weekly SEO watch (🔎,
+  Mondays), and a money-path self-check (~6h loop + extended smoke.sh:
+  tripwire renders, fit-check <5s, webhook verifies signatures). All
+  self-gated in the hourly digest cron; notifier admin_alert extended with
+  optional title/emoji so reports don't wear the error siren. 13 new ops
+  tests + 74 in the touched suites green. Live verification: see follow-up.
 - 2026-07-19 — SESSION C COMPLETE (PR #144). Autonomous capture -> nurture
   -> convert funnel shipped; migration 20260718100000_nurture_fields applied
   on prod (Lead nurture cols + EmailSuppression + RescueOrder.abandonedEmailAt

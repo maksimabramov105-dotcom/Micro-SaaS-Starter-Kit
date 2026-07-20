@@ -10,6 +10,15 @@ import { qualifyReferral, clawbackReferral } from '@/lib/referral'
 import { sendPaymentFailedEmail } from '@/lib/email'
 import { mintInboxHandle } from '@/lib/auth/handle-mint'
 import { trackEvent } from '@/lib/analytics-advanced'
+import { sendAdminMessage } from '@/lib/alerts'
+
+// Session D2: real-time money alerts to the founder's Telegram. Fire-and-forget,
+// deduped by Stripe event id so retries never double-alert. 💰 header, not the siren.
+function moneyAlert(text: string, eventId: string): void {
+  sendAdminMessage(text, { title: 'ResumeAI money', emoji: '\u{1F4B0}', key: `money:${eventId}` }).catch(
+    () => {},
+  )
+}
 
 export async function POST(req: Request) {
   const body = await req.text()
@@ -108,6 +117,16 @@ export async function POST(req: Request) {
             properties: { orderId: session.metadata.upsellOrderId, sessionId: session.id },
           }).catch((err: unknown) => console.warn('[webhook] upsell_accepted track failed:', err))
         }
+
+        // D2 money alert: subscription start
+        const src = session.metadata?.upsellOrderId ? 'rescue upsell ($9 first month)' : 'pricing/direct'
+        moneyAlert(
+          `NEW SUBSCRIPTION ${isFirstPayment ? '(first payment)' : '(resub)'}\n` +
+            `${plan.name} · $${plan.price}/${plan.period ?? 'mo'}\n` +
+            `source: ${src}\n` +
+            `paid: $${((session.amount_total ?? 0) / 100).toFixed(2)}`,
+          event.id,
+        )
       }
 
       // ── Resume Rescue one-time payment (Revenue Sprint A2) ────────────────
@@ -165,6 +184,15 @@ export async function POST(req: Request) {
           userId: rescueUserId ?? undefined,
           properties: { orderId, amountTotal: session.amount_total },
         }).catch((err: unknown) => console.warn('[webhook] tripwire_paid track failed:', err))
+
+        // D2 money alert: tripwire purchase (fires on $0 promo tests too)
+        moneyAlert(
+          `TRIPWIRE SALE — Resume Rescue\n` +
+            `paid: $${((session.amount_total ?? 0) / 100).toFixed(2)}\n` +
+            `job: ${order.jobTitle}${order.jobCompany ? ` @ ${order.jobCompany}` : ''}\n` +
+            `buyer: ${buyerEmail}`,
+          event.id,
+        )
       }
       break
     }
@@ -247,6 +275,15 @@ export async function POST(req: Request) {
           winBackSentAt: null,
         },
       })
+
+      // D2 money alert: subscription cancelled
+      const cancelledPlan = getPlanByPriceId(subscription.items.data[0]?.price?.id)
+      moneyAlert(
+        `SUBSCRIPTION CANCELLED\n` +
+          `was: ${cancelledPlan.name} · $${cancelledPlan.price}/${cancelledPlan.period ?? 'mo'}\n` +
+          `win-back scheduled in ${winBackDelayDays}d`,
+        event.id,
+      )
       break
     }
 
