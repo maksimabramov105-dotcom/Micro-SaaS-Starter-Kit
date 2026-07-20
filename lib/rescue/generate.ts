@@ -18,7 +18,11 @@ import { trackEvent } from '@/lib/analytics-advanced'
 import { sendAdminAlert } from '@/lib/alerts'
 import { prisma } from '@/lib/prisma'
 import { getRedis } from '@/lib/redis'
-import { sendRescueApologyEmail, sendRescueDeliveryEmail } from '@/lib/rescue/emails'
+import {
+  sendRescueApologyEmail,
+  sendRescueDeliveryEmail,
+  type RefundOutcome,
+} from '@/lib/rescue/emails'
 import { stripe } from '@/lib/stripe'
 import { callWorker } from '@/lib/worker-client'
 import type { RescueOrder } from '@prisma/client'
@@ -58,27 +62,37 @@ async function createUpsellPromo(orderId: string): Promise<{ id: string; expires
   }
 }
 
+const REFUND_ALERT_LINE: Record<RefundOutcome, string> = {
+  refunded: 'issued automatically',
+  'nothing-to-refund': 'n/a — order had no captured payment (free or fully discounted)',
+  failed: 'FAILED - refund manually in Stripe!',
+}
+
 async function refundAndApologize(order: RescueOrder, reason: string): Promise<void> {
-  let refunded = false
+  // An order with no payment intent was never charged (100%-off promo, $0
+  // order). That is NOT a failed refund — alerting as if it were trains us to
+  // ignore the one alert that means "money is stuck".
+  let outcome: RefundOutcome = 'nothing-to-refund'
   if (order.paymentIntentId) {
     try {
       await stripe.refunds.create({ payment_intent: order.paymentIntentId })
-      refunded = true
+      outcome = 'refunded'
     } catch (err) {
+      outcome = 'failed'
       console.error('[rescue] auto-refund FAILED for order', order.id, err)
     }
   }
   await prisma.rescueOrder.update({
     where: { id: order.id },
-    data: { status: refunded ? 'REFUNDED' : 'FAILED', error: reason.slice(0, 500) },
+    data: { status: outcome === 'refunded' ? 'REFUNDED' : 'FAILED', error: reason.slice(0, 500) },
   })
-  await sendRescueApologyEmail(order.email, refunded).catch((err) =>
+  await sendRescueApologyEmail(order.email, outcome).catch((err) =>
     console.error('[rescue] apology email failed:', err),
   )
   await sendAdminAlert(
     `Resume Rescue order ${order.id} FAILED after ${order.attempts} attempts` +
       `\nreason: ${reason.slice(0, 200)}` +
-      `\nrefund: ${refunded ? 'issued automatically' : 'FAILED - refund manually in Stripe!'}`,
+      `\nrefund: ${REFUND_ALERT_LINE[outcome]}`,
     `rescue-failed:${order.id}`,
   )
 }
