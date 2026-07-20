@@ -3,7 +3,7 @@
   "description": "Programmatic SEO dataset for ResumeAI-Bot. Each array drives one page template. Slugs are URL-safe. Content fields are fed into the page templates to produce unique 600-900 word pages. Edit freely.",
   "site": "https://resumeai-bot.ru",
   "brand": "ResumeAI-Bot",
-  "valueProp": "AI builds your resume and auto-applies to jobs in 50+ countries",
+  "valueProp": "AI builds your resume and auto-applies to remote-first roles at 160+ companies (AU/NZ/US/EU)",
   "freeTier": "3 applications/day, 1 AI resume, Adzuna + RemoteOK",
   "guarantee": "30-day money-back guarantee",
   "generatedRouteIdeas": [
@@ -1151,7 +1151,7 @@
    ],
    "ourEdge": [
     "Still running and actively maintained",
-    "Covers 50+ countries, not just US LinkedIn",
+    "Covers AU/NZ/US/EU remote-first roles, not just US LinkedIn",
     "Real free tier (3 apps/day) and a 30-day money-back guarantee",
     "AI resume tailored per role"
    ],
@@ -1181,7 +1181,7 @@
     "No real free tier; lifetime pricing is a bigger upfront commitment"
    ],
    "ourEdge": [
-    "50+ countries including the whole EU, Gulf, and Asia",
+    "160+ companies we can actually submit to across AU, NZ, US and EU",
     "AI tailors the resume per role to lift relevance",
     "Free tier to try before paying",
     "30-day money-back guarantee"
@@ -1232,7 +1232,7 @@
     "Pricing has risen to ~$29.99-39.99/mo"
    ],
    "ourEdge": [
-    "Built for international and relocation searches across 50+ countries",
+    "Built for international and relocation searches across AU/NZ/US/EU",
     "Full auto-apply included",
     "Lower entry price with a 30-day guarantee"
    ],
@@ -1270,7 +1270,7 @@
     "Fully hands-off auto-apply, not just autofill",
     "Eligibility-aware: only applies where you can actually work, and answers screening questions honestly",
     "Captures employer replies in one inbox and confirms each submission via the ATS",
-    "Remote-first across 50+ countries with a per-role AI resume"
+    "Remote-first across AU/NZ/US/EU with a per-role AI resume"
    ],
    "theirPrice": "Free (autofill only)",
    "features": {
@@ -1302,7 +1302,7 @@
     "Eligibility-aware: only applies where you’re actually authorized, and answers screening questions honestly",
     "Confirms each submission via the ATS — no fake \"applied\"",
     "Captures every employer reply in one inbox",
-    "Remote-first across 50+ countries with a per-role AI resume",
+    "Remote-first across AU/NZ/US/EU with a per-role AI resume",
     "Real free tier + 30-day money-back guarantee"
    ],
    "theirPrice": "~$29-$49/mo",
@@ -1337,7 +1337,7 @@
    ],
    "ourEdge": [
     "Fully hands-off auto-apply, not just tracking + tailoring",
-    "Eligibility-aware applications across 50+ countries",
+    "Eligibility-aware applications across AU/NZ/US/EU",
     "Confirms submissions via the ATS and captures replies in one inbox",
     "Real free tier + 30-day money-back guarantee"
    ],

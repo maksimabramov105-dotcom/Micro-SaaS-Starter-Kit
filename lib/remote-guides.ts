@@ -62,9 +62,9 @@ export const REMOTE_GUIDES: RemoteGuide[] = [
   },
   {
     slug: 'auto-apply-international-jobs',
-    title: 'Auto-Apply to International Jobs (2026) — 50+ Countries | ResumeAI-Bot',
+    title: 'Auto-Apply to International Jobs (2026) — AU/NZ/US/EU | ResumeAI-Bot',
     description: 'Apply across borders. We auto-apply to roles in your authorized countries and to remote jobs that hire internationally, with honest eligibility answers.',
-    h1: 'Auto-apply to international jobs across 50+ countries',
+    h1: 'Auto-apply to international remote-first jobs (AU/NZ/US/EU)',
     intro: 'Built for people applying across borders — not just US LinkedIn. We only target what you’re eligible for.',
     forWho: 'Job seekers searching across multiple countries, relocating, or going remote internationally.',
     points: [

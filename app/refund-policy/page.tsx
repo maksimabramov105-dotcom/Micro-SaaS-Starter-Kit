@@ -3,7 +3,7 @@ import { SiteFooter } from '@/components/site-footer'
 
 export const metadata = {
   title: 'Refund Policy — ResumeAI',
-  description: '30-day money-back guarantee. If ResumeAI doesn\'t help you land interviews, get a full refund — no questions asked.',
+  description: '30-day money-back guarantee, no questions asked. Cancel any paid plan within 30 days of your first payment for a full refund.',
 }
 
 export default function RefundPolicyPage() {

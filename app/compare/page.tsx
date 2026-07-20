@@ -35,7 +35,7 @@ export default function ComparePage() {
       <h1>Compare AI Auto-Apply Tools (2026)</h1>
       <p>
         Most auto-apply tools are built for US / LinkedIn job seekers. ResumeAI-Bot is built for
-        applying <strong>globally — across 50+ countries</strong> — with an AI resume tailored to
+        applying <strong>across AU, NZ, US and EU — 160+ companies we can actually submit to</strong> — with an AI resume tailored to
         every role, a free tier, and a 30-day money-back guarantee. Here&apos;s how it stacks up.
       </p>
 
@@ -81,7 +81,7 @@ export default function ComparePage() {
 
       <h2 style={{ marginTop: '2rem' }}>Why ResumeAI-Bot</h2>
       <ul>
-        <li><strong>Truly global</strong> — apply across 50+ countries, not just US LinkedIn.</li>
+        <li><strong>Cross-border by default</strong> — remote-first roles at 160+ companies across AU/NZ/US/EU, not just US LinkedIn.</li>
         <li><strong>Tailored per role</strong> — the AI rewrites your resume for each job so it passes the ATS.</li>
         <li><strong>Risk-free to try</strong> — free tier (3 applications/day) and a 30-day money-back guarantee on paid plans.</li>
       </ul>
