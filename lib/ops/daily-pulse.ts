@@ -12,6 +12,7 @@
 import { sendAdminMessage } from '@/lib/alerts'
 import { trackEvent } from '@/lib/analytics-advanced'
 import { getRevenueMetrics } from '@/lib/pmf/queries'
+import { RESCUE_PRICE_USD } from '@/lib/pricing'
 import { prisma } from '@/lib/prisma'
 
 const TZ = 'Australia/Sydney'
@@ -45,7 +46,7 @@ export function sydneyYesterdayWindow(now: Date = new Date()): { start: Date; en
 }
 
 const SENT_STATUSES = ['SUBMITTED', 'INTERVIEW', 'OFFER', 'REJECTED'] as const
-const TRIPWIRE_PRICE_CENTS = 499
+const TRIPWIRE_PRICE_CENTS = Math.round(RESCUE_PRICE_USD * 100)
 
 function topN(items: (string | null)[], n: number, drop: (s: string) => boolean): [string, number][] {
   const counts = new Map<string, number>()

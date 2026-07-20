@@ -14,7 +14,13 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Check, Lock } from 'lucide-react'
-import { VISIBLE_PLANS, getMonthlyEquivalent, type BillingInterval } from '@/lib/pricing'
+import {
+  PRO_ANNUAL_SAVINGS_USD,
+  VISIBLE_PLANS,
+  formatUsd,
+  getMonthlyEquivalent,
+  type BillingInterval,
+} from '@/lib/pricing'
 
 // ── Analytics helper (fire-and-forget; never throws) ─────────────────────────
 async function trackClientEvent(event: string, properties: Record<string, unknown>) {
@@ -29,10 +35,9 @@ async function trackClientEvent(event: string, properties: Record<string, unknow
   }
 }
 
-// Savings copy per plan family ($19 x 12 = $228 vs $180 annual)
+// Savings copy — derived from lib/pricing.ts so it can never drift (E1).
 const SAVINGS = {
-  pro: { amount: 48, label: 'Save $48/year' },
-  unlimited: { amount: 60, label: 'Save $60/year' },
+  pro: { amount: PRO_ANNUAL_SAVINGS_USD, label: `Save ${formatUsd(PRO_ANNUAL_SAVINGS_USD)}/year` },
 }
 
 export function PricingCards() {

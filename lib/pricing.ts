@@ -140,9 +140,48 @@ export function getPlanForCheckout(
 
 /**
  * Effective monthly cost for display purposes.
- * Yearly plans show their per-month equivalent ($199/12 ≈ $16.58).
+ * Yearly plans show their per-month equivalent ($180/12 = $15).
  */
 export function getMonthlyEquivalent(plan: PricingPlan): number {
   if (plan.period === 'year') return plan.price / 12
   return plan.price
 }
+
+// ── One-time & promotional prices (Revenue Sprint) ──────────────────────────
+// These live here, not in components, so there is exactly ONE place any price
+// can change. `__tests__/lib/pricing-consistency.test.ts` fails the build if a
+// price literal reappears in app/ or components/.
+
+/** AI Resume Rescue tripwire, one-time. Stripe: STRIPE_PRICE_ID_RESCUE. */
+export const RESCUE_PRICE_USD = 4.99
+
+/** Post-purchase upsell: Pro's first month, after a $10-off single-use coupon. */
+export const UPSELL_FIRST_MONTH_USD = 9
+export const UPSELL_DISCOUNT_USD = 10
+
+/** `$19` for whole dollars, `$4.99` otherwise — never hand-format a price. */
+export function formatUsd(amount: number): string {
+  return Number.isInteger(amount) ? `$${amount}` : `$${amount.toFixed(2)}`
+}
+
+const PRO = getPlanById('pro')
+const PRO_YEARLY = getPlanById('pro_yearly')
+
+/**
+ * Canonical display strings. Import these into copy instead of typing a price:
+ *   PRICE.rescue          → "$4.99"
+ *   PRICE.proMonthly      → "$19"
+ *   PRICE.proYearly       → "$180"
+ *   PRICE.proYearlyPerMo  → "$15"   (annual framed as "$15/mo billed annually")
+ *   PRICE.upsellFirstMonth→ "$9"
+ */
+export const PRICE = {
+  rescue: formatUsd(RESCUE_PRICE_USD),
+  proMonthly: formatUsd(PRO.price),
+  proYearly: formatUsd(PRO_YEARLY.price),
+  proYearlyPerMo: formatUsd(getMonthlyEquivalent(PRO_YEARLY)),
+  upsellFirstMonth: formatUsd(UPSELL_FIRST_MONTH_USD),
+} as const
+
+/** Annual savings vs paying monthly for 12 months ($19×12 − $180 = $48). */
+export const PRO_ANNUAL_SAVINGS_USD = PRO.price * 12 - PRO_YEARLY.price

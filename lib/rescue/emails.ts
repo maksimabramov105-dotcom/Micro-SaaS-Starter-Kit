@@ -3,6 +3,7 @@
  * Plain founder-voice HTML, no template framework.
  */
 import { sendEmail } from '@/lib/email'
+import { PRICE } from '@/lib/pricing'
 import type { RescueOrder } from '@prisma/client'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
@@ -15,9 +16,9 @@ export async function sendRescueDeliveryEmail(order: RescueOrder): Promise<void>
   const upsellBlock = order.upsellPromoId
     ? `<p style="margin-top:24px;padding:16px;background:#f5f7ff;border-radius:8px;">
         <b>One more thing:</b> for the next 72 hours you can get your first month of
-        Pro for <b>$9</b> (normally $19) — unlimited tailoring for every job you
+        Pro for <b>${PRICE.upsellFirstMonth}</b> (normally ${PRICE.proMonthly}) — unlimited tailoring for every job you
         apply to, 25 verified auto-applications/day, and a reply inbox.<br/>
-        <a href="${upsellUrl}">Claim the $9 first month &rarr;</a>
+        <a href="${upsellUrl}">Claim the ${PRICE.upsellFirstMonth} first month &rarr;</a>
       </p>`
     : ''
 

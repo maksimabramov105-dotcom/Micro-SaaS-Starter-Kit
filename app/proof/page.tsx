@@ -1,7 +1,6 @@
 import Link from 'next/link'
-import { unstable_cache } from 'next/cache'
 import { Navbar } from '@/components/navbar'
-import { prisma } from '@/lib/prisma'
+import { getVerifiedStats } from '@/lib/stats/verified'
 
 const SITE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
 
@@ -22,42 +21,9 @@ export const metadata = {
   },
 }
 
-function median(nums: number[]): number | null {
-  if (nums.length === 0) return null
-  const s = [...nums].sort((a, b) => a - b)
-  const mid = Math.floor(s.length / 2)
-  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2
-}
-
-const getProof = unstable_cache(
-  async () => {
-    const SENT = ['SUBMITTED', 'INTERVIEW', 'REJECTED', 'OFFER'] as const
-    const [submitted, confirmed, replyGroups, replied] = await Promise.all([
-      prisma.jobApplication.count({ where: { status: { in: [...SENT] } } }),
-      prisma.applicationEvent.count({ where: { type: 'confirmed' } }),
-      prisma.inboxMessage.groupBy({ by: ['classification'], _count: { _all: true } }),
-      prisma.jobApplication.findMany({
-        where: { appliedAt: { not: null }, responseAt: { not: null } },
-        select: { appliedAt: true, responseAt: true },
-      }),
-    ])
-    const c = (k: string) => replyGroups.find((g) => g.classification === k)?._count._all ?? 0
-    const humanReplies = c('INTERVIEW_REQUEST') + c('REJECTION') + c('QUESTION')
-    const days = replied
-      .map((a) => (a.responseAt!.getTime() - a.appliedAt!.getTime()) / 86_400_000)
-      .filter((d) => d >= 0)
-    const medianDays = median(days)
-    return {
-      submitted,
-      confirmed,
-      humanReplies,
-      interviews: c('INTERVIEW_REQUEST'),
-      medianReplyDays: medianDays,
-    }
-  },
-  ['proof-stats-v1'],
-  { revalidate: 3600 },
-)
+// Stats come from lib/stats/verified.ts — the single source shared with the
+// blog, so no two pages can ever show different verified numbers (E1).
+const getProof = getVerifiedStats
 
 function Stat({ value, label, sub, accent }: { value: string; label: string; sub?: string; accent?: boolean }) {
   return (

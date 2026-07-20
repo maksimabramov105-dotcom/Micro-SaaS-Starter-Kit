@@ -6,11 +6,12 @@
  */
 import { Navbar } from '@/components/navbar'
 import { RescueForm } from '@/components/rescue-form'
+import { PRICE, RESCUE_PRICE_USD } from '@/lib/pricing'
 
 const SITE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
 
 export const metadata = {
-  title: 'AI Resume Rescue — tailored for one job, $4.99',
+  title: `AI Resume Rescue — tailored for one job, ${PRICE.rescue}`,
   description:
     'Paste a job posting, get your resume rewritten for it plus a fit report: score, missing keywords, concrete fixes. Delivered in minutes or refunded.',
   alternates: { canonical: `${SITE}/resume-rescue` },
@@ -27,7 +28,7 @@ const rescueJsonLd = {
   brand: { '@type': 'Brand', name: 'ResumeAI' },
   offers: {
     '@type': 'Offer',
-    price: 4.99,
+    price: RESCUE_PRICE_USD,
     priceCurrency: 'USD',
     url: `${SITE}/resume-rescue`,
     availability: 'https://schema.org/InStock',
@@ -80,7 +81,7 @@ export default function ResumeRescuePage() {
                 report showing why you were getting filtered out.
               </p>
               <p className="mb-8 text-lg font-semibold">
-                $4.99 one-time. No subscription. Delivered in minutes.
+                {PRICE.rescue} one-time. No subscription. Delivered in minutes.
               </p>
             </div>
 

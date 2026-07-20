@@ -15,6 +15,7 @@ import {
 } from '@/lib/pmf/queries'
 import { getRevenueFunnel } from '@/lib/pmf/revenue-funnel'
 import sitemap from '@/app/sitemap'
+import { PRICE } from '@/lib/pricing'
 
 // ── helpers ──────────────────────────────────────────────────────────────
 
@@ -230,7 +231,7 @@ export default async function PmfDashboardPage() {
             accent={revenueFunnel.leadCaptured > 0 ? 'green' : undefined}
           />
           <Tile
-            title="Tripwire paid ($4.99)"
+            title={`Tripwire paid (${PRICE.rescue})`}
             value={revenueFunnel.tripwirePaid}
             sub={`${pctStr(revenueFunnel.conversion.leadToTripwire)} of leads`}
             accent={revenueFunnel.tripwirePaid > 0 ? 'green' : undefined}
@@ -244,7 +245,7 @@ export default async function PmfDashboardPage() {
           <Tile
             title="Tripwire gross (30d)"
             value={usd(revenueFunnel.revenue.tripwireGrossCents)}
-            sub={`${revenueFunnel.revenue.tripwirePaidCount} × $4.99 one-time`}
+            sub={`${revenueFunnel.revenue.tripwirePaidCount} × ${PRICE.rescue} one-time`}
             accent={revenueFunnel.revenue.tripwireGrossCents > 0 ? 'green' : undefined}
           />
           <Tile

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
+import { PRICE } from '@/lib/pricing'
 
 // Routes where a marketing CTA shouldn't appear (app / auth / internal).
 const HIDE_PREFIXES = ['/dashboard', '/login', '/signin', '/admin', '/extension', '/api']
@@ -41,14 +42,14 @@ export function StickyCta() {
         <p className="text-sm">
           <span className="font-semibold">Found a job you want?</span> Get your resume rewritten
           for that exact posting + a fit report.{' '}
-          <span className="hidden sm:inline">$4.99 one-time, delivered in minutes.</span>
+          <span className="hidden sm:inline">{PRICE.rescue} one-time, delivered in minutes.</span>
         </p>
         <div className="flex shrink-0 items-center gap-2">
           <a
             href="/resume-rescue?ref=sticky-cta"
             className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
           >
-            Fix my resume — $4.99
+            Fix my resume — {PRICE.rescue}
           </a>
           <a
             href="/login?ref=sticky-cta"

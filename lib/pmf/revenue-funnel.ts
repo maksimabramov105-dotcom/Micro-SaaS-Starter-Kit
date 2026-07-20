@@ -16,10 +16,10 @@
  *   tripwire_paid    RescueOrder with a real payment intent, paid in window
  *   pro_subscribed   User.firstPaidAt in window
  */
-import { getPlanByPriceId } from '@/lib/pricing'
+import { RESCUE_PRICE_USD, getPlanByPriceId } from '@/lib/pricing'
 import { prisma } from '@/lib/prisma'
 
-const TRIPWIRE_PRICE_CENTS = 499
+const TRIPWIRE_PRICE_CENTS = Math.round(RESCUE_PRICE_USD * 100)
 
 function ratio(num: number, den: number): number | null {
   return den > 0 ? Math.round((num / den) * 100) : null
