@@ -5,7 +5,7 @@ import { SiteHeader } from '@/components/site-header'
 import { SiteFooter } from '@/components/site-footer'
 import { PricingCards } from '@/components/pricing-cards'
 import { LaunchBanner } from '@/components/launch-banner'
-import { VISIBLE_PLANS } from '@/lib/pricing'
+import { PRICE, VISIBLE_PLANS } from '@/lib/pricing'
 
 const SITE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
 
@@ -16,14 +16,14 @@ export const metadata = {
   openGraph: {
     title: 'Pricing — ResumeAI',
     description:
-      'Start free. Pro is $19/month ($15/mo billed annually): unlimited tailoring, verified auto-applications, reply inbox.',
+      `Start free. Pro is ${PRICE.proMonthly}/month (${PRICE.proYearlyPerMo}/mo billed annually): unlimited tailoring, verified auto-applications, reply inbox.`,
     url: `${SITE}/pricing`,
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Pricing — ResumeAI',
-    description: 'Start free. Pro $19/month, or $15/mo billed annually. 30-day money-back guarantee.',
+    description: `Start free. Pro ${PRICE.proMonthly}/month, or ${PRICE.proYearlyPerMo}/mo billed annually. 30-day money-back guarantee.`,
   },
 }
 
