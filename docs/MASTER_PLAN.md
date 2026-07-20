@@ -406,11 +406,63 @@ deploys smoke-green.
    magic-link login depends on nodemailer via next-auth — test sign-in
    after merging) and #102 (starlette bump; CI runs no worker tests, so
    merge + watch worker health or add a worker test job first).
-6. **Trust assets** — founder photo for the landing block + one
+6. **Trust assets** — founder photo for the landing block (drop it at
+   public/founder.jpg; an initials avatar ships until then) + one
    permissioned real ATS-confirmation screenshot for lib/proof.ts.
+7. **LAUNCH40 decision** — the banner is NOT expired. Live Stripe check
+   (2026-07-20): promo_1Th6TDHH7N0YD11QPjyoZKpw is ACTIVE, 40% off, valid
+   to 2026-09-01, 0 redemptions — exactly matching lib/promo.ts, and the
+   banner auto-hides after endsAt. Decide: keep running / expire early /
+   convert to an evergreen offer. (An older promo_1TdXVs... is already
+   expired + inactive and referenced nowhere.)
+8. **CI gap — guards don't block merges.** PR-level checks (ci.yml) do NOT
+   run jest; only the deploy pipeline's "Test & type-check" job does. So
+   the price/claim guard blocks RELEASES but not MERGES — proven live on
+   2026-07-20 when PR #151 merged green and its deploy then failed on the
+   guard (prod was never touched: Docker build + VPS deploy were skipped).
+   Fix = add the unit-test job to PR CI, which needs the `workflow` scope
+   from action #1.
 
 ## LOG
 
+- 2026-07-20 — PROMPT E COMPLETE (homepage + site-wide consistency).
+  PRs #148 (E1), #149 (E2), #150 (E3), #151 (E4), #152 (fix). All live and
+  verified on prod.
+  * E1 single source of truth: lib/pricing.ts now owns every price
+    (added RESCUE_PRICE_USD $4.99, UPSELL_FIRST_MONTH_USD $9, derived
+    PRO_ANNUAL_SAVINGS_USD, PRICE.* strings); ~20 hardcoded literals
+    across components/pages replaced. lib/stats/verified.ts is now the
+    ONLY pipeline-counter query — /proof and the blog each ran their own,
+    which is how numbers could diverge. Guard test fails the build if a
+    price or a banned claim reappears (proven to fail, not just pass).
+  * E2 homepage rebuilt: hero repositioned (tailored resume per role +
+    verified applications + one inbox; auto-apply demoted to a feature),
+    three ?ref-tagged money paths above the fold AND mid-page, divergent
+    3-tool comparison table replaced by a link to /compare (10 tools).
+    New SiteHeader/SiteFooter (server components, zero client JS) now on
+    ALL public pages — the ~290 programmatic SEO pages previously had no
+    navigation at all.
+  * E3 claim hygiene: all 19 '50+ countries' occurrences retired for a
+    defensible claim derived from the real company list; interview-linked
+    refund wording removed from /pricing, /dashboard/billing and the
+    /refund-policy meta.
+  * E4 per-page social cards: lib/og-card.tsx + 7 routes (incl.
+    params-aware /blog/[slug] and /alternatives/[competitor]); missing
+    openGraph/twitter blocks added. Verified live: every page serves its
+    own og:title AND its own og:image.
+  * AUDIT CORRECTIONS: two claimed defects were already fixed and were
+    verified stale against live prod before acting — the 321/88 counters
+    (removed in A4; the homepage had none) and the '$299 Unlimited' tier
+    (hidden in #129). The REAL divergence was the duplicated stats query.
+  * SELF-INFLICTED BUGS CAUGHT: (a) the E1 guard's
+    `git ls-files 'app/**/*.tsx'` glob silently skipped files directly in
+    app/ — it never checked app/page.tsx, the very homepage it polices
+    (fixed in E2, then verified it caught the homepage's $19);
+    (b) the E3 claim rewrite pushed five templated meta descriptions past
+    seo_health's real 155-char gate (not 160), failing E3 CI — fixed
+    before merge; (c) my own E4 OG cards hardcoded $19/$15/$4.99 — the
+    guard caught it at the DEPLOY gate, Docker build and VPS deploy were
+    skipped, so production was never broken (PR #152).
 - 2026-07-16 — Plan created. Baseline: 0 real users, $0 MRR, 72 submitted / 0
   interviews, dogfood only. Prod verified healthy before starting Phase 0.
 - 2026-07-16 — Phase 0 built in one session: P0.1 smoke.sh (PR #125), P0.2
