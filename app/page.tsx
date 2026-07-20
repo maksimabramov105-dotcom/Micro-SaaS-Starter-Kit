@@ -212,7 +212,7 @@ export default async function HomePage() {
               {
                 Icon: Globe,
                 title: 'Remote-first & global',
-                body: 'Built for people applying across borders. We prioritize remote and internationally-friendly roles across 50+ countries — not just US LinkedIn.',
+                body: 'Built for people applying across borders. We prioritize remote-first roles at 160+ companies we can actually submit to across AU, NZ, US and EU — not just US LinkedIn.',
               },
               {
                 Icon: FileCheck2,
@@ -253,7 +253,7 @@ export default async function HomePage() {
                 step: '2',
                 title: 'Pick your countries & roles',
                 description:
-                  'Choose from 50+ countries and the job types you want. We find matching openings.',
+                  'Choose your target regions (AU/NZ/US/EU) and job types. We find matching openings.',
               },
               {
                 step: '3',

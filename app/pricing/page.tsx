@@ -20,7 +20,7 @@ const pricingJsonLd = {
   '@context': 'https://schema.org',
   '@type': 'Product',
   name: 'ResumeAI-Bot',
-  description: 'AI resume builder + auto-apply to jobs across 50+ countries.',
+  description: 'AI resume builder + auto-apply to remote-first roles at 160+ companies (AU/NZ/US/EU).',
   brand: { '@type': 'Brand', name: 'ResumeAI-Bot' },
   offers: VISIBLE_PLANS.filter((p) => p.intervalKey !== 'year').map((p) => ({
     '@type': 'Offer',
@@ -77,7 +77,7 @@ export default async function PricingPage() {
                   30-day money-back guarantee
                 </p>
                 <p className="text-sm text-green-800 dark:text-green-200">
-                  Not getting interviews? Get a full refund within 30 days — no questions asked.{' '}
+                  30-day money-back guarantee, no questions asked.{' '}
                   <a href="/refund-policy" className="underline underline-offset-2 hover:opacity-80">
                     See policy →
                   </a>

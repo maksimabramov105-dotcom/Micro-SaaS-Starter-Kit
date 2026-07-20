@@ -11,7 +11,7 @@ const inter = Inter({ subsets: ['latin'] })
 
 const SITE_TITLE = 'ResumeAI-Bot — AI Resume Builder + Auto-Apply'
 const SITE_DESCRIPTION =
-  'Build an ATS-ready resume with AI and auto-apply to jobs across 50+ countries. Free tier, 30-day money-back guarantee.'
+  'Build an ATS-ready resume with AI and auto-apply to remote-first roles at 160+ companies (AU/NZ/US/EU). Free tier, 30-day money-back guarantee.'
 
 export const metadata: Metadata = {
   title: SITE_TITLE,

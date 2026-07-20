@@ -163,7 +163,7 @@ export default function BillingPage() {
                   30-day money-back guarantee
                 </p>
                 <p className="text-xs text-amber-800 mb-2">
-                  Not getting interviews? You have{' '}
+                  You have{' '}
                   <strong>{Math.max(0, Math.ceil(30 - daysSinceFirstPayment))} days</strong>{' '}
                   left to claim your full refund.
                 </p>

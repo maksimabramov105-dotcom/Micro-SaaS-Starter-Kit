@@ -21,7 +21,7 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
   const b = get(board);
   if (!b) return {};
   const title = `Auto-Apply to Jobs on ${b.name} with AI (2026) — ResumeAI-Bot`;
-  const description = `Automatically apply to ${b.name} jobs with an AI-tailored resume. ResumeAI-Bot covers ${b.name} and 50+ countries. Free tier + 30-day money-back guarantee.`;
+  const description = `Automatically apply to ${b.name} jobs with an AI-tailored resume. ResumeAI-Bot covers ${b.name} plus 160+ companies across AU/NZ/US/EU. Free tier + 30-day money-back guarantee.`;
   const url = `${SITE}/auto-apply/${b.slug}`;
   return { title, description, alternates: { canonical: url }, openGraph: { title, description, url, siteName: "ResumeAI-Bot", type: "article" }, twitter: { card: "summary_large_image", title, description } };
 }

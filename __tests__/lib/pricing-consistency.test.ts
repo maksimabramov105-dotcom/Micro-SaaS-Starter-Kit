@@ -96,6 +96,37 @@ describe('canonical pricing', () => {
   })
 })
 
+describe('claim hygiene (E3)', () => {
+  /** Phrases we can't substantiate, or that promise an outcome we don't control. */
+  const BANNED: { pattern: RegExp; why: string }[] = [
+    { pattern: /50\+\s*countries/i, why: 'unsubstantiated coverage claim — use lib/claims.ts COVERAGE_CLAIM' },
+    { pattern: /not getting interviews\?/i, why: 'never tie the refund to getting interviews' },
+    { pattern: /help you land interviews/i, why: 'never promise interviews' },
+  ]
+
+  it('no page, component, or content data makes a banned claim', () => {
+    const dataFiles = ['lib/seo-data.json', 'lib/remote-guides.ts', 'lib/claims.ts']
+    const files = [...sourceFiles(), ...dataFiles]
+    const violations: string[] = []
+
+    for (const file of files) {
+      let src: string
+      try {
+        src = readFileSync(path.join(ROOT, file), 'utf8')
+      } catch {
+        continue
+      }
+      // lib/claims.ts documents the retired phrasing in a comment — strip comments.
+      const body = file.endsWith('.json') ? src : stripComments(src)
+      for (const { pattern, why } of BANNED) {
+        if (pattern.test(body)) violations.push(`${file}: ${why}`)
+      }
+    }
+
+    expect(violations).toEqual([])
+  })
+})
+
 describe('single stats source', () => {
   it('only lib/stats/verified.ts queries the verified-pipeline counters', () => {
     // /proof and the blog must not run their own counts — they diverged before

@@ -10,7 +10,7 @@ const SITE = seo._meta.site
 export const metadata: Metadata = {
   title: 'Free AI Resume Teardown — Instant ATS Score + Fixes | ResumeAI-Bot',
   description:
-    'Paste your resume and get an instant, free AI teardown: ATS score, missing keywords, and 3 concrete fixes. Then auto-apply to eligible jobs in 50+ countries.',
+    'Paste your resume and get an instant, free AI teardown: ATS score, missing keywords, and 3 concrete fixes. Then auto-apply to eligible remote-first roles (AU/NZ/US/EU).',
   alternates: { canonical: `${SITE}/free-resume-teardown` },
   openGraph: {
     title: 'Free AI Resume Teardown — ResumeAI-Bot',
@@ -46,7 +46,7 @@ export default function FreeResumeTeardownPage() {
       <h2>Then apply at scale</h2>
       <p>
         Once your resume is sharp, ResumeAI-Bot tailors it to each role and auto-applies to matching
-        jobs across 50+ countries — so you get more interviews with far less effort.{' '}
+        remote-first roles across AU/NZ/US/EU — so you cover more ground with far less effort.{' '}
         {seo._meta.freeTier}. Paid plans include a {seo._meta.guarantee}.
       </p>
       <p>

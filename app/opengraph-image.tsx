@@ -3,7 +3,7 @@ import { ImageResponse } from 'next/og'
 // Auto-wired by Next.js into og:image AND twitter:image for the site.
 // Renders a 1200x630 branded card (no external asset needed).
 export const alt =
-  'ResumeAI-Bot — AI resume builder + auto-apply to jobs in 50+ countries'
+  'ResumeAI — a resume built for the job you actually want'
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 
@@ -59,7 +59,7 @@ export default function OpengraphImage() {
             }}
           >
             <span>AI applies for you in&nbsp;</span>
-            <span style={{ color: '#86efac' }}>50+ countries.</span>
+            <span style={{ color: '#86efac' }}>160+ companies, AU/NZ/US/EU.</span>
           </div>
           <div style={{ marginTop: 24, fontSize: 30, color: '#d1fae5' }}>
             AI builds your resume &amp; auto-applies — while you sleep.

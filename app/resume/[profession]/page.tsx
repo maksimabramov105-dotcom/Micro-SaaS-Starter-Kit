@@ -23,7 +23,7 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
   const p = get(profession);
   if (!p) return {};
   const title = `${p.name} Resume — AI Builder + Auto-Apply (2026)`;
-  const description = `Build an ATS-ready ${p.name} resume with AI and auto-apply to ${p.name} jobs in 50+ countries. Free tier + 30-day money-back guarantee.`;
+  const description = `Build an ATS-ready ${p.name} resume with AI and auto-apply to remote-first ${p.name} roles (AU/NZ/US/EU). Free tier + 30-day money-back guarantee.`;
   const url = `${SITE}/resume/${p.slug}`;
   return { title, description, alternates: { canonical: url }, openGraph: { title, description, url, siteName: "ResumeAI-Bot", type: "article" }, twitter: { card: "summary_large_image", title, description } };
 }
@@ -36,7 +36,7 @@ export default async function Page({ params }: { params: Promise<Params> }) {
   const faq = [
     { q: `What should a ${p.name} resume include?`, a: `${p.note} Include keywords like ${p.keywords.join(", ")} so it passes ATS screens.` },
     { q: `Can AI write my ${p.name} resume?`, a: `Yes — ResumeAI-Bot generates an ATS-optimized ${p.name} resume tailored to each role you apply to.` },
-    { q: `Can I auto-apply to ${p.name} jobs abroad?`, a: `Yes, across 50+ countries. Start free with 3 applications/day.` },
+    { q: `Can I auto-apply to ${p.name} jobs abroad?`, a: `Yes — remote-first roles at 160+ companies across AU, NZ, US and EU. Start free with 3 applications/day.` },
   ];
   const jsonLd = { "@context": "https://schema.org", "@graph": [
     { "@type": "Article", headline: `${p.name} Resume + Auto-Apply`, mainEntityOfPage: url, author: { "@type": "Organization", name: "ResumeAI-Bot" }, publisher: { "@type": "Organization", name: "ResumeAI-Bot" } },
@@ -52,7 +52,7 @@ export default async function Page({ params }: { params: Promise<Params> }) {
         keywords into a tailored resume for every role automatically.</p>
       <h2>Build it with AI, then apply at scale</h2>
       <p>Don&apos;t hand-write a new resume for every posting. ResumeAI-Bot builds an ATS-ready {p.name}
-        resume and auto-applies to matching jobs in 50+ countries — so you get more interviews with
+        resume and auto-applies to matching remote-first roles across AU/NZ/US/EU — so you cover more ground with
         far less effort.</p>
       <h2>Start free</h2>
       <p>{seo._meta.freeTier}. Paid plans include a {seo._meta.guarantee}.</p>
