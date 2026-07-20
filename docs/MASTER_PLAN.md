@@ -439,7 +439,21 @@ deploys smoke-green.
   tripwire renders, fit-check <5s, webhook verifies signatures). All
   self-gated in the hourly digest cron; notifier admin_alert extended with
   optional title/emoji so reports don't wear the error siren. 13 new ops
-  tests + 74 in the touched suites green. Live verification: see follow-up.
+  tests + 74 in the touched suites green. LIVE VERIFICATION on prod
+  (PR #146, deploy rebuilt web + notifier):
+  * D2 money alert — drove a live $0 tripwire purchase (DMONEY100 promo);
+    webhook -> notifier admin_alert.sent (💰) at 08:37 UTC, order DELIVERED,
+    tripwire_paid recorded. Fires on $0 promo purchases = exit criterion. ✓
+  * D4 self-check — cron ran ops_selfcheck_ran {ok:true}; the SIGNED Stripe
+    test event was accepted 200 (evt_selfcheck recorded); all 3 new smoke.sh
+    checks green live (tripwire renders, fit-check 400 in 0.45s, webhook
+    rejects unsigned with 400). ✓
+  * D1/D3 delivery — published a 📊 pulse-style message -> notifier
+    admin_alert.sent, delivered with the report emoji (title/emoji path
+    works for reports, not just the money siren). ✓  Daily pulse content is
+    unit-tested + the gate; autonomous 9am-Sydney arrival fires at the next
+    23:00 UTC (founder to confirm first arrival). SEO watch fires next Mon.
+  All test data + promos cleaned up.
 - 2026-07-19 — SESSION C COMPLETE (PR #144). Autonomous capture -> nurture
   -> convert funnel shipped; migration 20260718100000_nurture_fields applied
   on prod (Lead nurture cols + EmailSuppression + RescueOrder.abandonedEmailAt
