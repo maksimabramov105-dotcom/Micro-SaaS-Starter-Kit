@@ -13,6 +13,18 @@ export const metadata = {
   title: 'Pricing — ResumeAI',
   description: 'Simple, transparent pricing with a 30-day money-back guarantee. No risk.',
   alternates: { canonical: `${SITE}/pricing` },
+  openGraph: {
+    title: 'Pricing — ResumeAI',
+    description:
+      'Start free. Pro is $19/month ($15/mo billed annually): unlimited tailoring, verified auto-applications, reply inbox.',
+    url: `${SITE}/pricing`,
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Pricing — ResumeAI',
+    description: 'Start free. Pro $19/month, or $15/mo billed annually. 30-day money-back guarantee.',
+  },
 }
 
 // Product/Offer JSON-LD built from the canonical plan list (monthly tiers).
