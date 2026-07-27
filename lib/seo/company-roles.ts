@@ -37,7 +37,12 @@ export interface CompanyRoles {
 export interface OpenRolesSnapshot {
   /** False when the JobListing query failed — callers must not skip on this. */
   available: boolean
-  byCompany: Map<string, CompanyRoles>
+  /**
+   * Plain object (NOT a Map): unstable_cache JSON-serializes its return value,
+   * and a Map round-trips to `{}`, which silently broke every lookup. Keyed by
+   * company slug.
+   */
+  byCompany: Record<string, CompanyRoles>
 }
 
 const SAMPLE_LIMIT = 8
@@ -48,7 +53,7 @@ const SAMPLE_LIMIT = 8
  * one pass beats 168 `contains` count queries.
  */
 async function buildSnapshot(): Promise<OpenRolesSnapshot> {
-  const byCompany = new Map<string, CompanyRoles>()
+  const byCompany: Record<string, CompanyRoles> = {}
   try {
     const listings = await prisma.jobListing.findMany({
       select: { title: true, url: true, location: true, remote: true },
@@ -65,10 +70,10 @@ async function buildSnapshot(): Promise<OpenRolesSnapshot> {
       const url = l.url ?? ''
       for (const { company, matcher } of matchers) {
         if (!url.includes(matcher)) continue
-        let bucket = byCompany.get(company.slug)
+        let bucket = byCompany[company.slug]
         if (!bucket) {
           bucket = { count: 0, remoteCount: 0, sample: [] }
-          byCompany.set(company.slug, bucket)
+          byCompany[company.slug] = bucket
         }
         bucket.count += 1
         if (l.remote) bucket.remoteCount += 1
@@ -94,7 +99,7 @@ export const getOpenRolesSnapshot = unstable_cache(buildSnapshot, ['apply-to-ope
 
 /** Roles for one company, or null. `available:false` snapshots yield null too. */
 export function companyRoles(snap: OpenRolesSnapshot, slug: string): CompanyRoles | null {
-  return snap.byCompany.get(slug) ?? null
+  return snap.byCompany[slug] ?? null
 }
 
 /**
@@ -103,7 +108,7 @@ export function companyRoles(snap: OpenRolesSnapshot, slug: string): CompanyRole
  */
 export function companyHasPage(snap: OpenRolesSnapshot, slug: string): boolean {
   if (!snap.available) return true
-  const roles = snap.byCompany.get(slug)
+  const roles = snap.byCompany[slug]
   return !!roles && roles.count > 0
 }
 
