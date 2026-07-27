@@ -10,9 +10,15 @@ import {
   APPLY_COMPANIES,
   ATS_GUIDE,
   getApplyCompany,
-  jobUrlMatcher,
+  applyToMeta,
+  applyToFaq,
+  applyToFollowup,
 } from '@/lib/seo/apply-companies'
-import { prisma } from '@/lib/prisma'
+import {
+  getOpenRolesSnapshot,
+  companyRoles,
+  companyHasPage,
+} from '@/lib/seo/company-roles'
 import { SiteHeader } from '@/components/site-header'
 import { SiteFooter } from '@/components/site-footer'
 
@@ -33,17 +39,8 @@ export async function generateMetadata({
   const c = getApplyCompany(company)
   if (!c) return {}
   return {
-    title: `Apply to ${c.name} jobs — ${c.atsName} guide`,
-    description: `How to apply to jobs at ${c.name}: their ${c.atsName} application form explained, live openings, and how to tailor your resume for it.`,
+    ...applyToMeta(c),
     alternates: { canonical: `${SITE}/apply-to/${c.slug}` },
-  }
-}
-
-async function openRolesCount(matcher: string): Promise<number> {
-  try {
-    return await prisma.jobListing.count({ where: { url: { contains: matcher } } })
-  } catch {
-    return 0
   }
 }
 
@@ -56,24 +53,18 @@ export default async function ApplyToCompanyPage({
   const c = getApplyCompany(company)
   if (!c) notFound()
 
+  // G1: one snapshot of the scraper cache drives roles + the thin-page skip.
+  // When the DB answered and this company genuinely has 0 open roles, the page
+  // would be shared ATS boilerplate + a name — skip it rather than ship thin.
+  const snap = await getOpenRolesSnapshot()
+  if (!companyHasPage(snap, c.slug)) notFound()
+  const openRoles = companyRoles(snap, c.slug)
+  const roles = openRoles?.count ?? 0
+
   const guide = ATS_GUIDE[c.ats]
-  const roles = await openRolesCount(jobUrlMatcher(c))
   const related = APPLY_COMPANIES.filter((x) => x.ats === c.ats && x.slug !== c.slug).slice(0, 6)
 
-  const faq = [
-    {
-      q: `Which ATS does ${c.name} use for job applications?`,
-      a: `${c.name} runs its hiring on ${c.atsName}. Applications submitted on the official board (${c.boardUrl}) go directly into their ${c.atsName} pipeline.`,
-    },
-    {
-      q: `Should I tailor my resume for each ${c.name} role?`,
-      a: `Yes. ${c.atsName} applications are reviewed against the specific posting, so mirroring the role's actual requirements (truthfully) is the highest-leverage 10 minutes you can spend.`,
-    },
-    {
-      q: `Where do I find ${c.name}'s open roles?`,
-      a: `The official board is ${c.boardUrl}. Aggregator re-posts often go stale — apply at the source.`,
-    },
-  ]
+  const faq = applyToFaq(c)
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -133,6 +124,38 @@ export default async function ApplyToCompanyPage({
         )}
       </p>
 
+      {openRoles && openRoles.sample.length > 0 && (
+        <>
+          <h2>Open {c.name} roles right now</h2>
+          <p>
+            A live sample from our crawler
+            {openRoles.remoteCount > 0 ? (
+              <>
+                {' '}— <strong>{openRoles.remoteCount}</strong> of the{' '}
+                {roles === 1 ? 'role' : `${roles} roles`} we currently index{' '}
+                {openRoles.remoteCount === 1 ? 'is' : 'are'} remote-eligible.
+              </>
+            ) : (
+              <> — check each posting for its location and remote policy.</>
+            )}
+          </p>
+          <ul>
+            {openRoles.sample.map((r) => (
+              <li key={r.url}>
+                <a href={r.url} rel="nofollow noopener" target="_blank">
+                  {r.title}
+                </a>
+                {r.remote ? ' · Remote' : r.location ? ` · ${r.location}` : ''}
+              </li>
+            ))}
+          </ul>
+          <p style={{ fontSize: 14 }}>
+            Apply on the official board rather than an aggregator re-post — source postings
+            close first, and {c.atsName} tracks where the application came from.
+          </p>
+        </>
+      )}
+
       <h2>What the {c.atsName} application actually looks like</h2>
       <p>{guide.form.replaceAll('{company}', c.slug)}</p>
 
@@ -147,6 +170,9 @@ export default async function ApplyToCompanyPage({
           anything.
         </li>
       </ul>
+
+      <h2>After you apply</h2>
+      <p>{applyToFollowup(c)}</p>
 
       <RescueCtaBlock context={`a ${c.name} posting`} refTag="seo-apply-to" />
 
@@ -166,7 +192,14 @@ export default async function ApplyToCompanyPage({
             {x.name}
           </Link>
         ))}
-        · <Link href="/apply-to">All {APPLY_COMPANIES.length} companies</Link>
+        · <Link href="/apply-to">All companies</Link>
+      </p>
+      <p style={{ fontSize: 14 }}>
+        Keep going: <Link href="/ats-check">free ATS fit check</Link> ·{' '}
+        <Link href="/resume-keywords">resume keywords by role</Link> ·{' '}
+        <Link href="/compare">how we compare</Link> ·{' '}
+        <Link href="/alternatives/teal">tool alternatives</Link> ·{' '}
+        <Link href="/blog">what actually reaches a human</Link>
       </p>
     </article>
       <SiteFooter />
