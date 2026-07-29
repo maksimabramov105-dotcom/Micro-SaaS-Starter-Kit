@@ -11,6 +11,16 @@ const nextConfig = {
     root: __dirname,
   },
   output: 'standalone',
+  async redirects() {
+    return [
+      // The /companies/* namespace resolves to the canonical per-company
+      // application guides (G1). We keep a single canonical URL space
+      // (/apply-to/*) rather than duplicating ~150 pages of ATS content, so
+      // these are permanent redirects, not a parallel section.
+      { source: '/companies', destination: '/apply-to', permanent: true },
+      { source: '/companies/:slug', destination: '/apply-to/:slug', permanent: true },
+    ]
+  },
 }
 
 // Only wire up the Sentry webpack plugin when we have real credentials.

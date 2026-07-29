@@ -122,3 +122,69 @@ export const ATS_GUIDE: Record<ApplyCompany['ats'], { form: string; tips: string
     ],
   },
 }
+
+/**
+ * SINGLE source of truth for the per-company page's title + meta description
+ * (G1/G4). The page and the thin/duplicate guard both import these, so a copy
+ * change can never silently produce a duplicate description across companies.
+ */
+export function applyToMeta(c: ApplyCompany): { title: string; description: string } {
+  return {
+    title: `Apply to ${c.name} jobs — ${c.atsName} guide`,
+    description: `How to apply to jobs at ${c.name}: their ${c.atsName} application form explained, live openings, and how to tailor your resume for it.`,
+  }
+}
+
+/** Intro paragraph — canonical copy rendered by the per-company page. */
+export function applyToIntro(c: ApplyCompany): string {
+  return (
+    `${c.name} runs its hiring on ${c.atsName}, which means every application you send goes ` +
+    `through the same form, the same parsing, and the same screening rules — and knowing how ` +
+    `that pipeline works is the difference between being read and being filtered. The official ` +
+    `board is ${c.boardUrl.replace('https://', '')}; always apply at the source rather than an ` +
+    `aggregator re-post, which often goes stale.`
+  )
+}
+
+/** Shared closing guidance rendered on every company page (honest, on-brand). */
+export function applyToFollowup(c: ApplyCompany): string {
+  return (
+    `After you submit, keep the ${c.atsName} confirmation email — it is your proof of application ` +
+    `and the thread most recruiters reply on. If you have not heard back in 7 to 10 business days, ` +
+    `a short, specific follow-up that references the exact role and one relevant strength is worth ` +
+    `sending; generic "just checking in" notes are not. Applying early in a posting's life helps too: ` +
+    `${c.name}'s roles are reviewed on a rolling basis, so the first qualified applicants are often ` +
+    `screened before later ones are ever opened.`
+  )
+}
+
+export function applyToFaq(c: ApplyCompany): { q: string; a: string }[] {
+  return [
+    {
+      q: `Which ATS does ${c.name} use for job applications?`,
+      a: `${c.name} runs its hiring on ${c.atsName}. Applications submitted on the official board (${c.boardUrl}) go directly into their ${c.atsName} pipeline.`,
+    },
+    {
+      q: `Should I tailor my resume for each ${c.name} role?`,
+      a: `Yes. ${c.atsName} applications are reviewed against the specific posting, so mirroring the role's actual requirements (truthfully) is the highest-leverage 10 minutes you can spend.`,
+    },
+    {
+      q: `Where do I find ${c.name}'s open roles?`,
+      a: `The official board is ${c.boardUrl}. Aggregator re-posts often go stale — apply at the source.`,
+    },
+  ]
+}
+
+/** Full editorial text a company page renders (excluding the live role list,
+ * which only adds words). The guard asserts this clears the >=300-word floor. */
+export function applyToBodyText(c: ApplyCompany): string {
+  const g = ATS_GUIDE[c.ats]
+  return [
+    applyToIntro(c),
+    g.form.replaceAll('{company}', c.slug),
+    ...g.tips,
+    'Read the posting twice and mirror its top requirements in your summary and first bullets — truthfully. Recruiters scan the top third of page one before deciding anything.',
+    applyToFollowup(c),
+    ...applyToFaq(c).flatMap((f) => [f.q, f.a]),
+  ].join(' ')
+}
