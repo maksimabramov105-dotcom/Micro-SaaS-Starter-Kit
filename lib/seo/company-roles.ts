@@ -7,14 +7,16 @@
  * derived from one consistent snapshot of the scraper cache (JobListing) that
  * the existing crons refresh — zero manual work keeps the pages current.
  *
- * Thin-page rule (G1): a company whose board currently returns 0 cached roles
- * gets no page and no sitemap entry — its page would be shared ATS boilerplate
- * plus a name, which is exactly the duplicate/thin content we don't want.
+ * Thin-page rule (G1): the live role list is a BONUS, not a gate. Every curated
+ * company keeps its page — each already carries 300+ words of unique editorial
+ * (the seo-thin-pages guard proves it without any live roles), and the crawler
+ * pulls supply in bumps, so gating on "0 cached roles today" would churn ~120
+ * indexed URLs in and out of the index. partitionCompanies stays available for
+ * REPORTING which companies currently have roles, not for hiding any.
  *
  * Build safety: if the DB is unreachable (a CI/Docker build without prod DB
- * access), `available` is false and callers MUST NOT skip anything — otherwise
- * a DB-less build would pre-render the entire section as 404s. We only skip a
- * company when the DB answered AND it genuinely has 0 roles.
+ * access), `available` is false and no enrichment renders — pages fall back to
+ * their editorial-only form, never an empty section.
  */
 import { unstable_cache } from 'next/cache'
 import { prisma } from '@/lib/prisma'

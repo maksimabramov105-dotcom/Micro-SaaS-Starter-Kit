@@ -1,14 +1,10 @@
 import { MetadataRoute } from 'next'
 import seo from '@/lib/seo-data.json'
 import { REMOTE_GUIDES } from '@/lib/remote-guides'
-import { getOpenRolesSnapshot, partitionCompanies } from '@/lib/seo/company-roles'
+import { APPLY_COMPANIES } from '@/lib/seo/apply-companies'
 import ROLE_KEYWORDS from '@/lib/seo/role-keywords.json'
 
-export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  // G1: only list companies that currently have open roles. partitionCompanies
-  // returns ALL of them when the DB is unreachable, so a DB-less build never
-  // emits an empty section.
-  const { published: publishedCompanies } = partitionCompanies(await getOpenRolesSnapshot())
+export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
   // Honest lastmod (B1): a stable content-release date for pages whose copy
   // only changes with deploys. Stamping `new Date()` on every request told
@@ -75,7 +71,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     })),
     // Per-company application guides (B2) — hub + one page per curated company.
     { url: `${baseUrl}/apply-to`, lastModified: CONTENT_UPDATED, changeFrequency: 'weekly' as const, priority: 0.8 },
-    ...publishedCompanies.map((c) => ({
+    ...APPLY_COMPANIES.map((c) => ({
       url: `${baseUrl}/apply-to/${c.slug}`,
       lastModified: CONTENT_UPDATED,
       changeFrequency: 'weekly' as const,

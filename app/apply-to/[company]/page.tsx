@@ -14,11 +14,7 @@ import {
   applyToFaq,
   applyToFollowup,
 } from '@/lib/seo/apply-companies'
-import {
-  getOpenRolesSnapshot,
-  companyRoles,
-  companyHasPage,
-} from '@/lib/seo/company-roles'
+import { getOpenRolesSnapshot, companyRoles } from '@/lib/seo/company-roles'
 import { SiteHeader } from '@/components/site-header'
 import { SiteFooter } from '@/components/site-footer'
 
@@ -53,11 +49,13 @@ export default async function ApplyToCompanyPage({
   const c = getApplyCompany(company)
   if (!c) notFound()
 
-  // G1: one snapshot of the scraper cache drives roles + the thin-page skip.
-  // When the DB answered and this company genuinely has 0 open roles, the page
-  // would be shared ATS boilerplate + a name — skip it rather than ship thin.
+  // G1: one snapshot of the scraper cache adds a live open-role list to
+  // companies that currently have postings. We do NOT 404 companies with 0
+  // cached roles: their page still carries 300+ words of unique, per-company
+  // editorial (the thin-page guard proves it), and the crawler pulls supply in
+  // bumps — hiding a page the day its board happens to read 0 would churn ~120
+  // indexed URLs in and out of the index. The role list is a bonus, not a gate.
   const snap = await getOpenRolesSnapshot()
-  if (!companyHasPage(snap, c.slug)) notFound()
   const openRoles = companyRoles(snap, c.slug)
   const roles = openRoles?.count ?? 0
 

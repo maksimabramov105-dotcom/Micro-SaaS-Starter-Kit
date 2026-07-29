@@ -6,7 +6,8 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { RescueCtaBlock } from '@/components/rescue-cta-block'
 import { ApplyToDirectory, type DirectoryCompany } from '@/components/apply-to-directory'
-import { getOpenRolesSnapshot, partitionCompanies, companyRoles } from '@/lib/seo/company-roles'
+import { APPLY_COMPANIES } from '@/lib/seo/apply-companies'
+import { getOpenRolesSnapshot, companyRoles } from '@/lib/seo/company-roles'
 import { SiteHeader } from '@/components/site-header'
 import { SiteFooter } from '@/components/site-footer'
 
@@ -23,17 +24,17 @@ export const metadata: Metadata = {
 
 export default async function ApplyToHubPage() {
   const snap = await getOpenRolesSnapshot()
-  const { published } = partitionCompanies(snap)
 
-  const companies: DirectoryCompany[] = published
-    .map((c) => ({
-      slug: c.slug,
-      name: c.name,
-      ats: c.ats,
-      atsName: c.atsName,
-      openRoles: companyRoles(snap, c.slug)?.count ?? 0,
-    }))
-    .sort((a, b) => b.openRoles - a.openRoles || a.name.localeCompare(b.name))
+  // Every curated company is listed; those with live roles rise to the top via
+  // the open-roles sort, so the directory leads with the companies actually
+  // hiring right now without hiding the rest.
+  const companies: DirectoryCompany[] = APPLY_COMPANIES.map((c) => ({
+    slug: c.slug,
+    name: c.name,
+    ats: c.ats,
+    atsName: c.atsName,
+    openRoles: companyRoles(snap, c.slug)?.count ?? 0,
+  })).sort((a, b) => b.openRoles - a.openRoles || a.name.localeCompare(b.name))
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -58,8 +59,7 @@ export default async function ApplyToHubPage() {
           operate against daily — Greenhouse, Lever, Ashby, Recruitee, or Personio. Each guide
           explains what that company&apos;s application form actually asks, how its resume
           parsing behaves, and how to tailor your resume for it. Open-role counts refresh
-          automatically from our crawler, and companies with no live openings are hidden until
-          they post again — so every link here goes to a page with real roles on it.
+          automatically from our crawler, and the companies hiring right now sort to the top.
         </p>
 
         <ApplyToDirectory companies={companies} />

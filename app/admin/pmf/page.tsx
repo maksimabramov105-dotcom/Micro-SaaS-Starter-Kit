@@ -152,7 +152,6 @@ export default async function PmfDashboardPage() {
       getWeeklyTrends(),
       getRevenueFunnel(),
     ])
-  const sitemapEntries = await sitemap()
 
   const updatedAt = getLastUpdated()
 
@@ -315,7 +314,7 @@ export default async function PmfDashboardPage() {
           />
           <Tile
             title="SEO pages indexed"
-            value={sitemapEntries.length}
+            value={sitemap().length}
             sub="entries in sitemap.xml"
           />
         </Section>
