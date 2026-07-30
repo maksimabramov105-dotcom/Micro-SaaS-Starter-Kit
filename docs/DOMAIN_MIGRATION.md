@@ -55,9 +55,16 @@ You do NOT want the Analytics *Dashboards* page. The token lives elsewhere:
 ```bash
 ssh root@178.105.185.214
 export CF_API_TOKEN='paste-the-token'
-cd /opt/resumeai && git pull            # gets scripts/migrate_domain.py
-python3 scripts/migrate_domain.py       # dry run — prints every change, does none
-python3 scripts/migrate_domain.py --apply
+python3 /opt/resumeai/scripts/migrate_domain.py           # dry run — prints every change, makes none
+python3 /opt/resumeai/scripts/migrate_domain.py --apply   # do it
+```
+
+The script is already installed at that path (the VPS has no git checkout, so it
+was copied there directly). If you ever change it in the repo, re-copy it:
+
+```bash
+base64 -i scripts/migrate_domain.py | ssh root@178.105.185.214 \
+  'base64 -d > /opt/resumeai/scripts/migrate_domain.py'
 ```
 
 ### What it does, in order
