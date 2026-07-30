@@ -6,7 +6,7 @@ Returns jobs with direct ``job-boards.greenhouse.io`` apply URLs that the
 CareerOps ATS filler can fill and submit without any page navigation.
 
 No API key required.  API endpoint per company:
-    https://boards-api.greenhouse.io/v1/boards/{company}/jobs?content=false
+    https://boards-api.greenhouse.io/v1/boards/{company}/jobs?content=true
 
 Apply URL format (returned by this scraper):
     https://job-boards.greenhouse.io/{company}/jobs/{job_id}
@@ -14,6 +14,7 @@ Apply URL format (returned by this scraper):
 The CareerOps filler matches this via the ``greenhouse.io`` pattern.
 """
 import asyncio
+import html
 import random
 import re
 
@@ -69,6 +70,38 @@ def _keyword_matches(title: str, keywords: str) -> bool:
     return all(w in title_lower for w in words if w)  # AND match
 
 
+#: Cap stored description length. 4 KB rather than lever.py's 2 KB because
+#: Greenhouse bodies are long and the ROLE-SPECIFIC part (responsibilities,
+#: requirements, skills) sits after the intro — truncating at 2 KB captured
+#: nothing but the company blurb. Still bounded: ~4 KB/listing.
+_DESC_MAX_CHARS = 4000
+
+#: Greenhouse wraps the company's standard opening in <div class="content-intro">
+#: and the EEO/benefits footer in "content-conclusion". Those are IDENTICAL on
+#: every posting for a company, so keeping them would make each role's text look
+#: the same — poison for keyword extraction (measured: truncating at 2 KB left
+#: all 187 Twilio jobs starting "Who we are At Twilio, we're shaping the future
+#: of communications", with zero role-specific content). Drop both blocks.
+_BOILERPLATE_DIV = re.compile(
+    r'<div[^>]*class="[^"]*content-(?:intro|conclusion)[^"]*"[^>]*>.*?</div>',
+    re.S | re.I,
+)
+
+
+def _clean_content(raw: str) -> str:
+    """Greenhouse returns entity-escaped HTML. Unescape, de-boilerplate, strip."""
+    if not raw:
+        return ""
+    # Entities first (&lt;p&gt; -> <p>), otherwise nothing below sees real tags.
+    text = html.unescape(raw)
+    text = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", text, flags=re.S | re.I)
+    text = _BOILERPLATE_DIV.sub(" ", text)
+    text = re.sub(r"<[^>]+>", " ", text)
+    # A second unescape catches entities that were themselves double-escaped.
+    text = html.unescape(text)
+    return re.sub(r"\s+", " ", text).strip()[:_DESC_MAX_CHARS]
+
+
 async def _fetch_company(
     client: httpx.AsyncClient, company: str
 ) -> list[dict]:
@@ -76,7 +109,12 @@ async def _fetch_company(
     try:
         r = await client.get(
             f"https://boards-api.greenhouse.io/v1/boards/{company}/jobs",
-            params={"content": "false"},
+            # content=true returns each posting's body in this SAME request — no
+            # extra HTTP calls, no new endpoint. We previously sent
+            # content=false and stored description="", which left 76% of the
+            # cached corpus with no text at all: /resume-keywords could only be
+            # built for 12 roles, and job-fit scoring had nothing to read.
+            params={"content": "true"},
         )
         if r.status_code != 200:
             logger.warning("greenhouse.http_error", company=company, status=r.status_code)
@@ -105,7 +143,7 @@ async def _fetch_company(
                     "salary": "",
                     "url": abs_url,
                     "apply_url": abs_url,
-                    "description": "",
+                    "description": _clean_content(job.get("content") or ""),
                     "source": "greenhouse",
                     "apply_email": None,
                     "tags": [],
