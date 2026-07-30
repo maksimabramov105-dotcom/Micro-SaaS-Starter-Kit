@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { SUPPORT_EMAIL } from '@/lib/site'
 
 /**
  * SiteFooter — ONE footer for every public/marketing page (E2).
@@ -24,8 +25,8 @@ export function SiteFooter() {
       <div className="mx-auto flex max-w-5xl flex-col items-center gap-4 text-sm text-slate-600 sm:flex-row sm:justify-between">
         <span>
           &copy; {new Date().getFullYear()} ResumeAI ·{' '}
-          <a href="mailto:support@resumeai-bot.ru" className="hover:text-slate-900">
-            support@resumeai-bot.ru
+          <a href={`mailto:${SUPPORT_EMAIL}`} className="hover:text-slate-900">
+            {SUPPORT_EMAIL}
           </a>
         </span>
         <div className="flex flex-wrap justify-center gap-x-5 gap-y-2">

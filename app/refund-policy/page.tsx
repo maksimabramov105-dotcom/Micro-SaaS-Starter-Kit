@@ -1,5 +1,6 @@
 import { SiteHeader } from '@/components/site-header'
 import { SiteFooter } from '@/components/site-footer'
+import { SUPPORT_EMAIL } from '@/lib/site'
 
 export const metadata = {
   title: 'Refund Policy — ResumeAI',
@@ -44,10 +45,10 @@ export default function RefundPolicyPage() {
             <p className="mt-3">
               Prefer to reach us by email? Write to{' '}
               <a
-                href="mailto:support@resumeai-bot.ru"
+                href={`mailto:${SUPPORT_EMAIL}`}
                 className="underline underline-offset-2 hover:text-foreground"
               >
-                support@resumeai-bot.ru
+                {SUPPORT_EMAIL}
               </a>{' '}
               with the subject line &ldquo;Refund request&rdquo;.
             </p>
@@ -96,10 +97,10 @@ export default function RefundPolicyPage() {
             <p>
               Email{' '}
               <a
-                href="mailto:support@resumeai-bot.ru"
+                href={`mailto:${SUPPORT_EMAIL}`}
                 className="underline underline-offset-2 hover:text-foreground"
               >
-                support@resumeai-bot.ru
+                {SUPPORT_EMAIL}
               </a>{' '}
               — we respond within one business day.
             </p>

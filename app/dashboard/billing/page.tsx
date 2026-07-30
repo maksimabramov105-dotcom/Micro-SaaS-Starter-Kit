@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { EXIT_REASONS, type ExitReason } from '@/lib/pmf/types'
+import { HELLO_EMAIL } from '@/lib/site'
 
 export default function BillingPage() {
   const { data: session } = useSession()
@@ -114,7 +115,7 @@ export default function BillingPage() {
           Your subscription has been cancelled. You&apos;ll retain access until the end of your
           current billing period.
           {' '}If you got a job through ResumeAI, we&apos;d love a{' '}
-          <a href="mailto:hello@resumeai-bot.ru" className="underline">
+          <a href={`mailto:${HELLO_EMAIL}`} className="underline">
             testimonial
           </a>
           !
