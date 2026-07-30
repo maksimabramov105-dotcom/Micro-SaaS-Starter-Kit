@@ -27,6 +27,7 @@ import DailyDigestEmail from '@/lib/notifications/templates/daily-digest'
 import { createUnsubscribeToken } from '@/lib/notifications/unsubscribe-token'
 import { maybeSendWeeklySnapshot } from '@/lib/pmf/weekly-snapshot'
 import { maybeRunSeoAutomation } from '@/lib/seo/health'
+import { maybeRevalidateCompanyPages } from '@/lib/seo/revalidate-company-pages'
 import { processAbandonedCheckouts, processNurtureQueue } from '@/lib/nurture'
 import { maybeSendDailyPulse } from '@/lib/ops/daily-pulse'
 import { maybeRunOpsSelfCheck } from '@/lib/ops/self-check'
@@ -62,6 +63,15 @@ export async function POST(req: Request) {
     if (seoResult === 'ran') console.log('[daily-digest] seo automation ran')
   } catch (err) {
     console.error('[daily-digest] seo automation failed', err)
+  }
+
+  // ── /apply-to live open-role enrichment (G1) — the image is built with a
+  //    dummy DATABASE_URL, so pages ship editorial-only until revalidated ────
+  try {
+    const rev = await maybeRevalidateCompanyPages()
+    if (rev === 'ran') console.log('[daily-digest] apply-to pages revalidated')
+  } catch (err) {
+    console.error('[daily-digest] apply-to revalidation failed', err)
   }
 
   // ── Lead nurture + abandoned checkouts (Session C) — due-based, hourly ──
