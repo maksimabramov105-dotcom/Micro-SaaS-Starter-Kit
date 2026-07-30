@@ -9,6 +9,32 @@ import { mintInboxHandle } from './auth/handle-mint'
 import { captureReferral, REFERRAL_COOKIE } from './referral'
 import { trackEvent } from './analytics-advanced'
 
+/** Magic-link email body. Plain, single CTA, no tracking pixels. */
+function signInEmailHtml(url: string, host: string): string {
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2 style="color:#111;">Sign in to ResumeAI</h2>
+      <p>Click the button below to sign in. This link works once and expires in 24 hours.</p>
+      <p style="margin:28px 0;">
+        <a href="${url}"
+           style="background:#4f46e5;color:#fff;padding:12px 22px;border-radius:8px;
+                  text-decoration:none;font-weight:600;display:inline-block;">
+          Sign in to ResumeAI
+        </a>
+      </p>
+      <p style="color:#666;font-size:13px;">
+        If the button doesn't work, paste this into your browser:<br>
+        <span style="word-break:break-all;">${url}</span>
+      </p>
+      <p style="color:#666;font-size:13px;">
+        You're receiving this because someone entered your address at ${host}.
+        If that wasn't you, you can safely ignore it — no account is created until
+        the link is used.
+      </p>
+    </div>
+  `
+}
+
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   providers: [
@@ -28,15 +54,38 @@ export const authOptions: NextAuthOptions = {
       allowDangerousEmailAccountLinking: true,
     }),
     EmailProvider({
-      server: {
-        host: 'smtp.resend.com',
-        port: 465,
-        auth: {
-          user: 'resend',
-          pass: process.env.RESEND_API_KEY,
-        },
-      },
+      // Magic links go out over Resend's HTTPS API, NOT SMTP.
+      //
+      // This used to be `server: { host: 'smtp.resend.com', port: 465 }`, which
+      // silently broke email sign-in for the entire life of the deployment:
+      // Hetzner blocks outbound 25 and 465 (verified from the host — only 587 is
+      // open), so nodemailer hung until the request timed out. The
+      // VerificationToken row was still written, so it looked half-working, but
+      // Resend had never delivered a single sign-in email.
+      //
+      // Using the same sendEmail() path as every other email in the app means one
+      // transport (443, always open), one place to debug, and magic links show up
+      // in the Resend dashboard like everything else. `server` is still required
+      // by the provider's types, so it stays as an unused placeholder.
+      server: { host: 'api.resend.com', port: 443 },
       from: process.env.RESEND_FROM ?? 'noreply@resumeai-bot.ru',
+      async sendVerificationRequest({ identifier, url }) {
+        // Imported lazily on purpose: lib/email.ts pulls in the Resend SDK (and
+        // through it react-dom/server). At module scope that would load on every
+        // request that touches auth — and it broke the auth test suite outright
+        // ("TextEncoder is not defined"). This path runs only when someone
+        // actually requests a magic link.
+        const { sendEmail } = await import('./email')
+        const { host } = new URL(url)
+        const result = await sendEmail({
+          to: identifier,
+          subject: `Sign in to ${host}`,
+          html: signInEmailHtml(url, host),
+        })
+        // Throwing here makes next-auth surface the failure instead of
+        // pretending a link was sent (the old failure mode).
+        if (!result.success) throw new Error('Failed to send the sign-in email')
+      },
     }),
   ],
   pages: {
