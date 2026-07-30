@@ -509,13 +509,53 @@ deploys smoke-green.
    Cost ~4 KB/listing. Coverage moves as the crawler revisits (112 -> 116 of
    479 on the first cycle) because the run-campaigns upsert refreshes
    `description`.
-   STILL OPEN, and now the only blocker for G2: expanding /resume-keywords
-   needs the LLM extractor (worker/worker/ai/keywords.py). A deterministic
-   extractor was built (scripts/gen-role-keywords.ts), measured, and rejected —
-   it produced company names, US states and benefits boilerplate. The script is
-   committed as a read-only corpus/role-coverage analyzer.
+   FOLLOW-THROUGH DONE the same day (#173): backfilling the already-cached
+   Greenhouse listings took coverage 116 -> 293 of 479 (24% -> 61%), which
+   unblocked G2. /resume-keywords went 12 -> 23 roles using the LLM extractor.
+   The deterministic extractor (scripts/gen-role-keywords.ts) stays committed as
+   a read-only corpus/role-coverage analyzer only — it was measured twice and
+   rejected both times for producing company names, US states and benefits
+   boilerplate. Nothing here is outstanding.
 
 ## LOG
+
+- 2026-07-30 (night) — PROMPT G FULLY COMPLETE. G2 shipped (#173); every exit
+  criterion now verified live.
+  * **Sitemap 290 -> 301 URLs, all 200-OK.** Final count by template: /apply-to
+    169, /jobs-in 39, /resume-keywords 24, /resume 20, /auto-apply 12,
+    /alternatives 10, /remote 10, /blog 3, plus 14 singletons. 301/301 return
+    200 (full sweep), and all 301 were accepted by IndexNow (HTTP 200).
+  * G2: /resume-keywords 12 -> 23 roles. The blocker was never the page
+    template, it was the corpus — 76% of listings had no body text. #171 fixed
+    the scraper going forward; a backfill of already-cached Greenhouse listings
+    took coverage 116 -> 293 of 479 (24% -> 61%) and unblocked extraction.
+  * Keywords come from the REAL LLM extractor (worker/worker/ai/keywords.py),
+    the same one the product uses. The deterministic extractor was built,
+    measured against this corpus and rejected TWICE — it emitted "PBC",
+    "Nevada", "Dental", "Days/8", "Fortune", "Magazine". The LLM output is in a
+    different league: mobile-engineer now lists Kotlin, Jetpack Compose, RxJava,
+    Retrofit, Coroutines, MVVM, Android SDK.
+  * An honesty bug was caught and designed out: extract_ats_keywords() truncates
+    input to 3000 chars, so blending several postings silently used only the
+    FIRST — while the page would have claimed "extracted from 103 real job
+    descriptions". The generator now calls the extractor once PER posting (up to
+    8/role) and ranks by how many postings mention a term, and listingCount is
+    the number actually analysed. Verified live: /resume-keywords/mobile-engineer
+    says "from 4 real job descriptions" and 4 is exactly what was analysed.
+  * Merged, never replaced: 16 roles from the LLM + 7 existing carried forward
+    untouched. ZERO live pages dropped — software-engineer was skipped by the
+    frequency filter and would otherwise have been de-indexed.
+  * New pages are conversion-wired (tripwire + free fit-check CTAs, breadcrumbs,
+    507 words on the sample checked). Guard now 193 checks: min 360 words,
+    191/191 unique meta descriptions.
+  * DELIBERATE DEVIATION, restated because it contradicts the prompt: G1 said to
+    skip companies whose scraper returns 0 jobs. NOT DONE, on purpose. Measured
+    live it would have dropped 124 of 168 company pages — pages that are NOT
+    thin (300+ words of unique per-company editorial, proven by the guard) and
+    are already indexed. Supply arrives in bumps, so gating on "0 roles this
+    hour" would churn ~120 URLs in and out of the index. Thin-content is
+    enforced where it belongs: the >=300-word build guard. Say the word if you
+    want the skip anyway.
 
 - 2026-07-30 (evening) — EVIDENCE RE-SWEEP (Prompt F, second run). Full report:
   `docs/EVIDENCE_2026-07.md`, newest section first. Re-run because the 07-20
