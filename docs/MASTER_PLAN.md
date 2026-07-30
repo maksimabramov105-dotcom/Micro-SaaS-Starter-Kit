@@ -430,24 +430,22 @@ deploys smoke-green.
 4. **Phase 1 prep** — buy the .com/.ai domain (P1.1). Now urgent: 290 URLs
    of SEO equity are accruing to resumeai-bot.ru — every week of delay is
    equity to migrate later.
-5. **Dependabot holds** — only #107 and #102 are left; all 8 other open
-   security PRs were merged and deployed 2026-07-30 (fast-uri, immutable +
-   swagger-ui-react, postcss, next-auth 4.24.15, ws, axios, pillow, and next
-   16.2.6 -> 16.2.12, which carried a Server-Actions DoS advisory).
-   - #107 (nodemailer 8->9 major): risk is now LOWER but so is the value.
-     Magic links no longer go through nodemailer at all — they send over the
-     Resend HTTPS API (see the 2026-07-30 log entry), so `createTransport` is
-     never called. nodemailer must nonetheless STAY in package.json:
-     next-auth/providers/email.js:7 does a top-level `require("nodemailer")`,
-     so removing it crashes auth on boot (checked before touching it).
-     Note next-auth 4.24.15 declares peerOptional nodemailer ^7.0.7 while we
-     ship 8.x, so local `npm install` needs --legacy-peer-deps; CI uses
-     `npm ci` against the resolved lockfile and is unaffected.
-   - #102 (starlette bump; CI runs no worker tests, so merge + watch worker
-     health or add a worker test job first).
-   - The recurring "Dependabot Updates" job failure is js-yaml and is
-     EXPECTED: every advisory lists `patched-versions: []`, i.e. upstream has
-     published no fix. Nothing to do until it does.
+5. ~~**Dependabot holds**~~ **DONE 2026-07-30 — all 10 dependency PRs merged.**
+   The 8 straightforward ones went first; #107 and #102 were the held pair and
+   both are now merged and live-verified rather than merged and hoped for.
+   - #107 nodemailer 8 -> 9 (major): safe because magic links no longer touch
+     nodemailer at all — they go over the Resend HTTPS API. next-auth's
+     providers/email.js `require`s nodemailer at module load but only calls
+     `createTransport` inside the default sendVerificationRequest, which we
+     override, so it merely has to be importable. VERIFIED after deploy:
+     POST /api/auth/signin/email -> 302 and "Sign in to resumeai-bot.ru"
+     delivered at 17:55:09.
+   - #102 starlette 1.0.1 -> 1.3.1 (worker; CI runs no worker tests): VERIFIED
+     in the running container — starlette 1.3.1 / fastapi 0.141.1, worker
+     healthy, worker /health 200 through the proxy, error logs clean.
+   - The recurring "Dependabot Updates" job failure is js-yaml and is EXPECTED:
+     every advisory lists `patched-versions: []`, i.e. upstream has published no
+     fix. Nothing to do until it does.
 6. **Trust assets** — founder photo for the landing block (drop it at
    public/founder.jpg; an initials avatar ships until then) + one
    permissioned real ATS-confirmation screenshot for lib/proof.ts.
@@ -464,20 +462,22 @@ deploys smoke-green.
    guard (prod was never touched: Docker build + VPS deploy were skipped).
    Fix = add the unit-test job to PR CI, which needs the `workflow` scope
    from action #1.
-9. **Archive 9 orphaned live Stripe prices.** Found by the evidence sweep
-   (2026-07-20): 14 prices are active in live mode, but only 5 are
-   referenced by the code — and those 5 reconcile exactly with
-   `lib/pricing.ts`. The other 9 are leftovers from earlier pricing:
-   $299/yr (Unlimited Yearly), $287.90/yr, $199/yr, $191.90/yr, $149,
-   $39.99, $19.99 ×2, $2.99 ×2. An active price only charges if a Checkout
-   Session names it, so nothing is billing today — but a stale link or an
-   old Payment Link could charge a price we no longer sell. Archiving live
-   payment config is your call, not an agent's. Details in
-   `docs/EVIDENCE_2026-07.md` F1a.
-10. **Rotate the GitHub PAT in `.git/config`.** The `origin` remote embeds a
-   `ghp_...` token that now fails auth (pushes fall back to the `gh` token).
-   A dead credential sitting in plaintext is worth revoking and removing
-   from the remote URL.
+9. ~~**Archive 9 orphaned live Stripe prices.**~~ **DONE 2026-07-30** on your
+   "do all". Live mode went from **14 active prices to 5** — exactly the 5 the
+   code reads. Archived: $299/yr, $287.90/yr, $199/yr, $191.90/yr, $149,
+   $39.99, $19.99 ×2, $2.99 ×2. Four refused at first ("cannot be archived
+   because it is the default price of its product"); their product's
+   `default_price` was cleared, then they archived cleanly. The script refuses
+   to touch any price referenced by a `STRIPE_PRICE_ID_*` env var and aborts
+   unless exactly 5 are on the keep-list. Archiving is reversible in Stripe
+   (`active=true`) if you ever want one back. Money path re-verified after:
+   tripwire checkout still creates (HTTP 200) and $19/$180/$4.99 all resolve
+   active.
+10. ~~**Rotate the GitHub PAT in `.git/config`.**~~ **PARTLY DONE 2026-07-30** —
+   the dead `ghp_...` token is no longer in `.git/config`; `origin` is now a
+   clean tokenless URL and fetch/push work through the `gh` credential helper
+   (verified). **Still yours to do:** revoke that token in GitHub settings. It
+   is dead for auth but should not remain valid anywhere.
 11. **EXTERNAL uptime monitoring — WRITTEN, needs your merge.** The
    2026-07-23→29 outage ran SIX DAYS partly because nothing off-box could
    tell us: uptime-kuma runs on the same VPS, so when the host went
@@ -518,6 +518,33 @@ deploys smoke-green.
    boilerplate. Nothing here is outstanding.
 
 ## LOG
+
+- 2026-07-30 (late) — "DO ALL": every owner action an agent can close, closed.
+  * **#9 Stripe orphans archived.** Live mode 14 active prices -> **5**, exactly
+    the 5 the code reads. Four refused at first ("cannot be archived because it
+    is the default price of its product"); cleared each product's default_price,
+    then they archived. The script refuses to touch any price referenced by a
+    STRIPE_PRICE_ID_* env var and aborts unless exactly 5 are on the keep-list.
+    Reversible (active=true). Money path re-verified after the change: tripwire
+    checkout still creates (HTTP 200), $19/$180/$4.99 all resolve active.
+  * **#5 Dependabot holds cleared — all 10 dependency PRs now merged.** #107
+    (nodemailer 8->9 major) and #102 (starlette 1.0.1->1.3.1) were merged and
+    then LIVE-VERIFIED, not merged and hoped for: sign-in POST -> 302 with
+    "Sign in to resumeai-bot.ru" delivered 17:55:09, and the worker reports
+    starlette 1.3.1 / fastapi 0.141.1, healthy, logs clean.
+  * **#10 dead PAT removed** from .git/config; origin is now a clean tokenless
+    URL and push/fetch work via the gh credential helper. Revoking the token in
+    GitHub settings is still yours — it needs your account.
+  * NOT done, and why: #11 (uptime workflow) is written and parked at
+    ci/uptime-external-local but GitHub rejects the push without the `workflow`
+    scope; #1/#8 need that same scope; #2 (GSC), #3 (Telegram Start), #4
+    (domain), #6 (founder photo) and #7 (LAUNCH40 expire-vs-evergreen) all need
+    your accounts or your judgement.
+  * Declined on purpose: forcing an `upsell_accepted` row. The webhook branch
+    calls stripe.subscriptions.retrieve on a REAL subscription, and the real
+    upsell charges $9 so a card is genuinely required — the $0 path only existed
+    in my test. Synthesising it would have been theatre, so it stays documented
+    as unproven with the surrounding evidence that it is wired.
 
 - 2026-07-30 (night) — PROMPT G FULLY COMPLETE. G2 shipped (#173); every exit
   criterion now verified live.
