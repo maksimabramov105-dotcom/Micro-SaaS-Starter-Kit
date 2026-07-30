@@ -32,6 +32,66 @@ The code is already prepared: `lib/site.ts` derives the domain and the support
 addresses from `NEXT_PUBLIC_APP_URL`, with `EMAIL_DOMAIN` as a separate override
 precisely so mail can stay on `.ru` while the site moves to `.com`.
 
+## The one button (added 2026-07-31)
+
+`scripts/migrate_domain.py` does every automatable step. It is idempotent and
+**dry-run by default** — running it without `--apply` changes nothing.
+
+### Step 1 — create the Cloudflare token (2 minutes, only you can do this)
+
+You do NOT want the Analytics *Dashboards* page. The token lives elsewhere:
+
+1. Go to **https://dash.cloudflare.com/profile/api-tokens**
+   (or: click the person icon, top right → **My Profile** → **API Tokens**)
+2. **Create Token** → next to *Edit zone DNS*, click **Use template**
+3. Under **Permissions** confirm: `Zone` · `DNS` · `Edit`
+4. Under **Zone Resources** choose **Include → Specific zone → resumeai-bot.com**,
+   then **+ Add more** and include **resumeai-bot.ru** as well (the runbook needs
+   both: the new zone gets records, the old one keeps serving the 301).
+5. **Continue to summary** → **Create Token** → copy it (shown once).
+
+### Step 2 — run it
+
+```bash
+ssh root@178.105.185.214
+export CF_API_TOKEN='paste-the-token'
+cd /opt/resumeai && git pull            # gets scripts/migrate_domain.py
+python3 scripts/migrate_domain.py       # dry run — prints every change, does none
+python3 scripts/migrate_domain.py --apply
+```
+
+### What it does, in order
+
+| # | Stage | Notes |
+|---|---|---|
+| 1 | Verify the token really has DNS:Edit | fails fast and loudly if not |
+| 2 | `A resumeai-bot.com -> 178.105.185.214` + `www` CNAME | |
+| 3 | Resend: delete `.ru`, add `.com` | **free plan allows 1 domain**, so the delete is forced |
+| 4 | Write Resend's DKIM/SPF records into Cloudflare | by API, no copy-paste |
+| 5 | Poll until Resend says `verified` | ~5 min |
+| 6 | Caddy: serve `.com`, `301` the `.ru` | preserves the 301 indexed URLs |
+| 7 | Env: `NEXT_PUBLIC_APP_URL`, `NEXTAUTH_URL`, `RESEND_FROM`, `EMAIL_FROM` | backs up `.env` first |
+| 8 | `docker compose up -d` | |
+| 9 | Curl `.com` health / `/` / sitemap, and the `.ru` redirect | |
+
+**Email is down between stage 3 and stage 5** (minutes). That is unavoidable on a
+one-domain Resend plan — adding `.com` requires deleting `.ru` first. If you would
+rather move the site now and the email later, use `--skip-email`: it does stages
+1, 2, 6-9 and pins `EMAIL_DOMAIN` to `.ru` so mail keeps working untouched.
+
+`INBOX_DOMAIN` is deliberately **not** migrated — 9 users hold
+`@inbox.resumeai-bot.ru` handles and repointing it would silently break their
+inbound mail. `.ru` MX must keep accepting mail indefinitely.
+
+### After it finishes — yours, and only yours
+
+- **Google Search Console / Bing**: add `resumeai-bot.com`, submit the sitemap,
+  and use GSC's **Change of Address** tool from `.ru` to `.com`.
+- **OAuth redirect URIs**: add `https://resumeai-bot.com/api/auth/callback/google`
+  (Google Cloud Console) and `.../callback/github` (GitHub OAuth app). Sign-in on
+  the new domain breaks until you do.
+- Rotate the Cloudflare token and the R2 keys shared in chat.
+
 ## Blocked on you (cannot be automated from here)
 
 | # | Item | Why |
