@@ -20,8 +20,29 @@ const PAGES = [
 type Problem = string
 const problems: Problem[] = []
 
+/**
+ * fetch with a small retry. A single transient socket error used to abort the
+ * WHOLE run — CI failed on `seo_health crashed: TypeError: fetch failed
+ * [cause]: SocketError: other side closed` on a docs-only PR, and passed on
+ * re-run. A flaky gate that cries wolf gets ignored, which is worse than no
+ * gate, and the odds grow with the sitemap (301 URLs and climbing).
+ * Real problems still fail the run — this only absorbs transport blips.
+ */
+async function fetchWithRetry(url: string, init?: RequestInit, attempts = 3): Promise<Response> {
+  let lastErr: unknown
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      return await fetch(url, init)
+    } catch (err) {
+      lastErr = err
+      if (i < attempts) await new Promise((r) => setTimeout(r, 300 * i))
+    }
+  }
+  throw lastErr
+}
+
 async function getText(path: string): Promise<{ status: number; html: string }> {
-  const res = await fetch(`${BASE}${path}`, { redirect: 'manual' })
+  const res = await fetchWithRetry(`${BASE}${path}`, { redirect: 'manual' })
   const html = res.status < 400 ? await res.text() : ''
   return { status: res.status, html }
 }
@@ -34,7 +55,7 @@ function tag(html: string, re: RegExp): string | null {
 async function main() {
   // sitemap + robots reachable
   for (const path of ['/sitemap.xml', '/robots.txt']) {
-    const r = await fetch(`${BASE}${path}`)
+    const r = await fetchWithRetry(`${BASE}${path}`)
     if (!r.ok) problems.push(`${path} not reachable (${r.status})`)
   }
 
