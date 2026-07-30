@@ -102,6 +102,18 @@ describe('claim hygiene (E3)', () => {
     { pattern: /50\+\s*countries/i, why: 'unsubstantiated coverage claim — use lib/claims.ts COVERAGE_CLAIM' },
     { pattern: /not getting interviews\?/i, why: 'never tie the refund to getting interviews' },
     { pattern: /help you land interviews/i, why: 'never promise interviews' },
+    // A hardcoded promo end date shipped to prod and sat there past its expiry
+    // ("40% off your first year (ends June 8)" still on /pricing in late July,
+    // quoting a promo code that had been inactive in Stripe since June 8). Dates
+    // and codes must come from lib/promo.ts so the banner auto-hides on expiry.
+    {
+      pattern: /ends?\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}/i,
+      why: 'hardcoded promo end date — render promoEndLabel() from lib/promo.ts and gate on isPromoActive()',
+    },
+    {
+      pattern: /LAUNCH40/,
+      why: 'hardcoded promo code — use PROMO.code from lib/promo.ts',
+    },
   ]
 
   it('no page, component, or content data makes a banned claim', () => {

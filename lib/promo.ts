@@ -18,9 +18,16 @@ export interface Promo {
 
 // Active promo — banner shows until endsAt, then auto-hides. The matching Stripe
 // promotion code (LAUNCH40, 40% off) must exist for checkout to accept it.
+//
+// discountLabel says "first payment", not "first year": the live coupon
+// (V8nDJ6pL) is percent_off 40 with duration `once`, and LAUNCH40 is redeemable
+// on ANY plan. On the annual plan that is indeed 40% off the year, but a monthly
+// subscriber gets 40% off month one only — so "first year" would be false for
+// them. To advertise "first year" honestly, restrict the coupon to the annual
+// price in Stripe first, then change this label.
 export const PROMO: Promo = {
   code: 'LAUNCH40',
-  discountLabel: '40% off your first year',
+  discountLabel: '40% off your first payment',
   endsAt: '2026-09-01T23:59:59Z',
 }
 
