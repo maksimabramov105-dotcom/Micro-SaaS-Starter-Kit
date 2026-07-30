@@ -18,7 +18,7 @@
  * access), `available` is false and no enrichment renders — pages fall back to
  * their editorial-only form, never an empty section.
  */
-import { unstable_cache } from 'next/cache'
+import { cache } from 'react'
 import { prisma } from '@/lib/prisma'
 import { APPLY_COMPANIES, jobUrlMatcher, type ApplyCompany } from '@/lib/seo/apply-companies'
 
@@ -93,11 +93,18 @@ async function buildSnapshot(): Promise<OpenRolesSnapshot> {
   }
 }
 
-/** Cached 6h so 168 statically-generated pages share one query per window. */
-export const getOpenRolesSnapshot = unstable_cache(buildSnapshot, ['apply-to-open-roles'], {
-  revalidate: 21600,
-  tags: ['open-roles'],
-})
+/**
+ * Per-render memoization only (React cache): the /apply-to index looks the
+ * snapshot up once per company, and this collapses that to a single query.
+ *
+ * Deliberately NOT unstable_cache. A persisted data cache is populated during
+ * `next build`, which runs with a dummy DATABASE_URL — so it stored the
+ * `available:false` snapshot and kept serving it for the whole TTL, meaning
+ * revalidating the pages re-rendered them from empty data and no roles ever
+ * appeared (observed on prod). Cross-request caching is the page's ISR
+ * `revalidate` window instead, so every regeneration reads the DB fresh.
+ */
+export const getOpenRolesSnapshot = cache(buildSnapshot)
 
 /** Roles for one company, or null. `available:false` snapshots yield null too. */
 export function companyRoles(snap: OpenRolesSnapshot, slug: string): CompanyRoles | null {

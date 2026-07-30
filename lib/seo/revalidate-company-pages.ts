@@ -34,7 +34,10 @@ export async function maybeRevalidateCompanyPages(): Promise<'ran' | 'skipped'> 
     })
     if (recent) return 'skipped'
 
-    // 'page' revalidates every dynamic instance of the route, not just one.
+    // Only the FULL-ROUTE cache needs clearing: getOpenRolesSnapshot is a
+    // per-render React cache (no persisted data cache), so each regenerated
+    // page reads the database fresh. 'page' covers every dynamic instance of
+    // the route, not just one company.
     revalidatePath('/apply-to/[company]', 'page')
     revalidatePath('/apply-to')
 
