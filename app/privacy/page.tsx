@@ -1,5 +1,6 @@
 import { SiteHeader } from '@/components/site-header'
 import { SiteFooter } from '@/components/site-footer'
+import { SUPPORT_EMAIL } from '@/lib/site'
 
 // Bump this date on any meaningful policy edit.
 const LAST_UPDATED = new Date('2026-05-25')
@@ -91,8 +92,8 @@ export default function PrivacyPage() {
                 or delete your personal information. You can delete your account and all associated
                 data (resumes, application history, and stored recruiter emails) yourself from your
                 account settings, or email{' '}
-                <a href="mailto:support@resumeai-bot.ru" className="underline">
-                  support@resumeai-bot.ru
+                <a href={`mailto:${SUPPORT_EMAIL}`} className="underline">
+                  {SUPPORT_EMAIL}
                 </a>{' '}
                 and we will erase it within 30 days. Deleting your account immediately stops all
                 automated application activity.

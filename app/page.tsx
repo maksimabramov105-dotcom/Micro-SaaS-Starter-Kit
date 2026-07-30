@@ -6,6 +6,7 @@ import { SiteHeader } from '@/components/site-header'
 import { SiteFooter } from '@/components/site-footer'
 import { HeroDemo } from '@/components/hero-demo'
 import { testimonials, replyScreenshots } from '@/lib/proof'
+import { SITE_URL, SUPPORT_EMAIL } from '@/lib/site'
 
 // ISR: regenerated hourly so proof/testimonial content stays fresh while
 // the page stays fully server-rendered + indexable.
@@ -40,7 +41,7 @@ const jsonLd = {
   name: 'ResumeAI-Bot',
   applicationCategory: 'BusinessApplication',
   operatingSystem: 'Web',
-  url: 'https://resumeai-bot.ru',
+  url: SITE_URL,
   description:
     'AI resume builder that tailors your resume to each role, auto-applies where you are genuinely eligible, and verifies every submission.',
   offers: [
@@ -447,8 +448,8 @@ export default async function HomePage() {
             </p>
             <p className="mt-2 text-sm text-slate-600">
               Questions? Email me:{' '}
-              <a href="mailto:support@resumeai-bot.ru" className="font-medium underline">
-                support@resumeai-bot.ru
+              <a href={`mailto:${SUPPORT_EMAIL}`} className="font-medium underline">
+                {SUPPORT_EMAIL}
               </a>{' '}
               — answered within 24 hours.
             </p>

@@ -3,6 +3,7 @@ import { SiteHeader } from '@/components/site-header'
 import { SiteFooter } from '@/components/site-footer'
 import { RescueCtaBlock } from '@/components/rescue-cta-block'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { SUPPORT_EMAIL } from '@/lib/site'
 
 const SITE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
 
@@ -129,8 +130,8 @@ export default function FaqPage() {
             <CardContent>
               <p className="text-sm text-gray-600">
                 Email us at{' '}
-                <a href="mailto:support@resumeai-bot.ru" className="text-primary underline">
-                  support@resumeai-bot.ru
+                <a href={`mailto:${SUPPORT_EMAIL}`} className="text-primary underline">
+                  {SUPPORT_EMAIL}
                 </a>{' '}
                 and we&apos;ll get back to you as soon as possible.
               </p>

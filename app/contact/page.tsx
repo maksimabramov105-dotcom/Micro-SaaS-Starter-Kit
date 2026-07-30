@@ -1,5 +1,6 @@
 import { SiteHeader } from '@/components/site-header'
 import { SiteFooter } from '@/components/site-footer'
+import { SUPPORT_EMAIL } from '@/lib/site'
 
 export const metadata = {
   title: 'Contact — ResumeAI',
@@ -25,8 +26,8 @@ export default function ContactPage() {
               <h2 className="text-2xl font-semibold mb-4">Support</h2>
               <p>
                 Questions about your account, billing, or applications:{' '}
-                <a href="mailto:support@resumeai-bot.ru" className="underline">
-                  support@resumeai-bot.ru
+                <a href={`mailto:${SUPPORT_EMAIL}`} className="underline">
+                  {SUPPORT_EMAIL}
                 </a>
               </p>
             </section>
@@ -36,8 +37,8 @@ export default function ContactPage() {
               <p>
                 To access, export, or delete your personal data (resumes, application history,
                 stored recruiter replies), email{' '}
-                <a href="mailto:support@resumeai-bot.ru" className="underline">
-                  support@resumeai-bot.ru
+                <a href={`mailto:${SUPPORT_EMAIL}`} className="underline">
+                  {SUPPORT_EMAIL}
                 </a>{' '}
                 or use the in-app account deletion. See our{' '}
                 <a href="/privacy" className="underline">
