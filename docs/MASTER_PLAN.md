@@ -223,16 +223,19 @@ Goal: the founder learns about money, traffic, and breakage from Telegram —
 never by checking dashboards. All driven from the hourly digest cron
 (self-gated) since the deploy token can't add GitHub workflows.
 
-- [ ] **D1 Daily pulse** (~9am Sydney). One Telegram message: yesterday's
+- [x] **D1 Daily pulse** (~9am Sydney). One Telegram message: yesterday's
       unique visitors + top pages/referrers, leads, tripwire sales + revenue,
       new subs + MRR, applications submitted/failed, top error bucket.
       `lib/ops/daily-pulse.ts`, deduped, 📊 header (not the error siren).
-      UNCHECKED 2026-07-20 by the evidence sweep: built and wired, but **has
-      never fired in production** — zero `daily_pulse_sent` rows all time.
-      The gate wants Sydney hour == 9 (a single 23:00-23:59 UTC hour) and the
-      GitHub scheduler routinely skips whole hours. Widen to a window + marker
-      dedupe, the way `maybeRunSeoAutomation` already does. See
-      `docs/EVIDENCE_2026-07.md` F3a.
+      Unchecked on 2026-07-20 (zero `daily_pulse_sent` rows, all time) and
+      **RE-CHECKED 2026-07-30: it works** — 4 fires, latest 2026-07-29
+      23:24:07 UTC = 9:24am Sydney, clustering exactly in the intended window
+      (4 rather than 10 because of the six-day outage in between). The 07-20
+      finding was a false alarm: Session D shipped at 08:06 UTC that day, so
+      the first eligible window (23:00 UTC) had not yet arrived when it was
+      swept. The recommended gate-widening was therefore deliberately NOT
+      implemented — it would have "fixed" working code. See
+      `docs/EVIDENCE_2026-07.md` (re-sweep F3a).
 - [x] **D2 Real-time money alerts.** Stripe webhook -> Telegram (💰) on every
       tripwire sale (incl. $0 promo tests), subscription start, and cancel —
       amount + source. Deduped by Stripe event id so retries never double-fire.
@@ -247,8 +250,9 @@ never by checking dashboards. All driven from the hourly digest cron
 
 **Exit:** 48h autonomous — daily pulse arriving, money alerts firing on the
 $0 test purchases, zero manual intervention. (Live verification: see LOG.)
-**NOT MET as of 2026-07-20** — money alerts fire (proven three times), the
-pulse does not. D1 above.
+**MET as of 2026-07-30** — money alerts fire (proven again at 16:10:01 on the
+re-sweep purchase) and the daily pulse fires (4 sends, latest 07-29 23:24 UTC).
+Was NOT MET on 07-20 when the pulse had never run; see D1.
 
 ## REVENUE SPRINT STATUS (as of 2026-07-20)
 
@@ -492,15 +496,55 @@ deploys smoke-green.
    workflow — which emails you by default. OPTIONAL for phone alerts: add
    repo secrets TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID (6246429438); the
    alert step is conditional, so it works without them.
-12. **Decide: should the scrapers persist posting descriptions?** 363 of 475
-   cached listings (76%) have an empty `description` — the Greenhouse
-   scrapers store title + URL only. That single gap blocks G2 (expanding
-   /resume-keywords beyond 12 roles), because keyword extraction needs the
-   posting body. Storing bodies means a scraper change (freeze rule) plus a
-   re-crawl and more DB storage. Your call: keep 12 honest role pages, or
-   spend the change to unlock ~20-30 more.
+12. ~~**Decide: should the scrapers persist posting descriptions?**~~ **DONE
+   2026-07-30 — answered yes and shipped (#171).** It turned out to be nearly
+   free: Greenhouse returns the body in the SAME request via `content=true`,
+   and we had been explicitly sending `content=false` while writing
+   `description: ""` into a column that already existed. No extra requests, no
+   new scraper (so the freeze rule isn't in play — this is a data-capture fix).
+   Two measurements shaped it: truncating at lever.py's 2000 chars would have
+   stored nothing but company boilerplate (all 187 Twilio postings began "Who
+   we are At Twilio..."), and stripping Greenhouse's `content-intro` /
+   `content-conclusion` blocks took unique openings from 1/187 to 141/187.
+   Cost ~4 KB/listing. Coverage moves as the crawler revisits (112 -> 116 of
+   479 on the first cycle) because the run-campaigns upsert refreshes
+   `description`.
+   STILL OPEN, and now the only blocker for G2: expanding /resume-keywords
+   needs the LLM extractor (worker/worker/ai/keywords.py). A deterministic
+   extractor was built (scripts/gen-role-keywords.ts), measured, and rejected —
+   it produced company names, US states and benefits boilerplate. The script is
+   committed as a read-only corpus/role-coverage analyzer.
 
 ## LOG
+
+- 2026-07-30 (evening) — EVIDENCE RE-SWEEP (Prompt F, second run). Full report:
+  `docs/EVIDENCE_2026-07.md`, newest section first. Re-run because the 07-20
+  evidence predated a six-day outage, Prompt G, 8 security bumps (incl. Next
+  16.2.6 -> 16.2.12), the magic-link rewrite and three caching fixes — evidence
+  that old is a claim, not a fact.
+  * **F3a FAIL -> PASS. The daily pulse works.** 4 sends, latest 07-29 23:24:07
+    UTC (= 9:24am Sydney), clustering exactly in the intended window. The 07-20
+    "never fired" verdict was a false alarm — Session D shipped at 08:06 UTC
+    that day, so the first eligible window hadn't arrived yet. The gate-widening
+    I recommended was therefore deliberately NOT implemented; it would have
+    "fixed" working code. D1 re-checked, Session D exit criterion now MET.
+  * Money path re-proven on the new framework: real $0 tripwire purchase,
+    **paid -> delivered in 12.320s** (vs 17.342s on 07-20, budget 5 min), money
+    alert at 16:10:01 matching tripwire_paid to the second, delivery email
+    delivered 16:10:14, upsell coupon $10 off / single-use / exactly 72.0h.
+  * **F2b upgraded from simulated to organic.** On 07-20 the abandoned-checkout
+    email had to be forced by backdating. This time the order genuinely sat
+    unpaid from 10:38:06 and the reminder went out at 14:49:27 — 4h11m, the 4h
+    rule firing by itself. The same order then paid and delivered, proving the
+    reminder doesn't corrupt the later purchase.
+  * F4a: **290/290 sitemap URLs return 200**, zero 404s, including all 168
+    /apply-to pages and the /companies -> /apply-to redirects.
+  * Unchanged PARTIALs, stated as such rather than papered over: 9 orphaned
+    Stripe prices (owner action #9, untouched in 10 days), `upsell_accepted`
+    still unprovable ($0 upsell checkout still demands a card), and the refund
+    API still not exercisable without a real captured payment. F1d and F4b were
+    NOT re-run — their 07-20 evidence stands and the report says so explicitly.
+  * Owner action #12 answered and shipped — see #12 above.
 
 - 2026-07-30 (later) — E-R REMAINDER + 8 SECURITY BUMPS + A LOGIN BUG THAT HAD
   NEVER WORKED. PRs #167 (E-R1), #168 (auth), #169 (revalidate-on-deploy), plus

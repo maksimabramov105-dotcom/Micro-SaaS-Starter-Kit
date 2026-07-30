@@ -1,3 +1,284 @@
+# Evidence sweeps — July 2026
+
+Two full sweeps are recorded here, newest first. Each is a real run against
+**live** Stripe, the live database and the live domain — no mocks, no staging.
+Where something could not be proven, it says so and explains why.
+
+- [Re-sweep — 2026-07-30](#re-sweep--2026-07-30) (after the 6-day outage, Prompt G, and 8 security bumps)
+- [Original sweep — 2026-07-20](#evidence-sweep--2026-07-20)
+
+---
+
+# Re-sweep — 2026-07-30
+
+**Why re-run:** the 07-20 sweep predates a six-day production outage
+(07-23 → 07-29), Prompt G's company pages, eight security bumps including
+Next.js 16.2.6 → 16.2.12, a rewrite of magic-link delivery, and three caching
+fixes. Evidence that old is a claim, not a fact.
+
+| Item | 07-20 | 07-30 | Note |
+|---|---|---|---|
+| F1a Stripe prices reconcile | PARTIAL | **PARTIAL** | 5/5 configured still exact; **9 orphans remain** |
+| F1b Tripwire purchase → delivery | PASS (17.3s) | **PASS (12.3s)** | faster on Next 16.2.12 |
+| F1c Failure → refund + apology + alert | PARTIAL | **PARTIAL** | unchanged; refund API still needs a real card |
+| F1d Pro subscription opens quota gate | PASS | **PASS (07-20)** | not re-run — see note |
+| F1e Upsell coupon, single-use, 72h | PASS | **PASS** | exactly 72.0h, $10 off, bound to order |
+| F1f Funnel events land | PARTIAL | **PARTIAL** | 7/8; `upsell_accepted` still unprovable |
+| F2a /ats-check → lead + email + nurture | PASS | **PASS (07-20)** | rows still present |
+| F2b Abandoned-checkout email at 4h | PASS (simulated) | **PASS (organic!)** | fired for real, no backdating |
+| F2c Unsubscribe → suppression | PASS | **PASS** | row still present |
+| F3a Daily pulse | **FAIL** | **PASS** ✅ | now fired 4×; the gate works |
+| F3b Real-time money alert | PASS | **PASS** | fired at 16:10:01 |
+| F3c IndexNow + sitemap | PASS | **PASS** | 290 URLs accepted |
+| F3d `npm run smoke` | PARTIAL | **PASS** | full run, infra included |
+| F4a Sitemap URLs / 404s | PASS | **PASS** | **290/290 → 200** |
+| F4b Lighthouse perf + SEO | PASS | **PASS (07-20)** | not re-run — see note |
+| F4c Static rendering | PASS | **PASS** | unchanged |
+
+**Headline: F3a flipped FAIL → PASS.** The 07-20 sweep found the daily pulse had
+*never* fired and I recommended widening its gate. It has now fired four times —
+so the narrow gate is adequate and **the recommended fix was correctly NOT
+applied.** Checking beat assuming.
+
+**Not re-run, and why:** F1d and F4b are unchanged code paths whose 07-20
+evidence still stands; re-running F1d means another live subscription and F4b
+another Lighthouse pass, neither of which the changes since could plausibly
+break in a way the other 14 items would not have caught. Called out rather than
+quietly presented as fresh.
+
+---
+
+## F1 — Money path
+
+### F1a. Active live prices, reconciled (PARTIAL)
+
+```
+active prices: 14
+  price_1Tah9SHH7N0YD11QLvM1jKXR    299.00 usd | year     | ResumeAI Premium
+  price_1TRBHeHH7N0YD11QQwQq7rtO    287.90 usd | year     | ResumeAI Premium
+  price_1Tah9JHH7N0YD11Q6ILb9q2w    199.00 usd | year     | ResumeAI Pro
+  price_1TRBHcHH7N0YD11QLfWU0N46    191.90 usd | year     | ResumeAI Pro
+  price_1TtnFHHH7N0YD11QDCWqdAM6    180.00 usd | year     | ResumeAI Pro      <- STRIPE_PRICE_ID_PRO_YEARLY
+  price_1TLTVhHH7N0YD11QeFRlaDSw    149.00 usd | month    | Pro Annual
+  price_1TLTWLHH7N0YD11Q7AswwGwm     39.99 usd | month    | Premium Monthly
+  price_1TRBHeHH7N0YD11Qumn5cvDB     29.99 usd | month    | ResumeAI Premium  <- STRIPE_PRICE_ID_UNLIMITED
+  price_1TRBHcHH7N0YD11Q2XMCZmbM     19.99 usd | month    | ResumeAI Pro
+  price_1TLTUuHH7N0YD11QKYiEvUd0     19.99 usd | month    | Pro Monthly
+  price_1TtnFHHH7N0YD11QjK8Np3qf     19.00 usd | month    | ResumeAI Pro      <- STRIPE_PRICE_ID_PRO
+  price_1TtzbEHH7N0YD11QIxm41erG      4.99 usd | one_time | AI Resume Rescue  <- STRIPE_PRICE_ID_RESCUE
+  price_1TRBHbHH7N0YD11Qwx6owN7R      2.99 usd | one_time | ResumeAI Trial
+  price_1TLOaqHH7N0YD11Q2oCO6YJt      2.99 aud | one_time | Buy
+```
+
+All 5 prices the code reads still match `lib/pricing.ts` exactly ($19, $180,
+$4.99, $29.99 hidden, $299 hidden). The **same 9 orphans** are still active —
+nothing bills them today, but a stale link could. Still owner action #9;
+unchanged in 10 days.
+
+### F1b. Real tripwire purchase (PASS)
+
+Single-use 100%-off promo `FSWEEPB`, deleted afterwards.
+
+| Step | Timestamp (UTC) | Source |
+|---|---|---|
+| Order created | 10:38:06.125 | `RescueOrder.createdAt` |
+| *(order left unpaid — see F2b)* | | |
+| Checkout completed → PAID | **16:10:01.272** | `RescueOrder.paidAt` |
+| `tripwire_paid` | 16:10:01.284 | `AnalyticsEvent` |
+| Money alert → Telegram | 16:10:01 | notifier log |
+| Delivered | **16:10:13.592** | `RescueOrder.deliveredAt` |
+| `tripwire_delivered` | 16:10:14.111 | `AnalyticsEvent` |
+| Delivery email accepted | 16:10:14 | Resend API |
+
+```
+ status    |        createdAt        |         paidAt          |       deliveredAt       | paid_to_delivered_secs
+-----------+-------------------------+-------------------------+-------------------------+------------------------
+ DELIVERED | 2026-07-30 10:38:06.125 | 2026-07-30 16:10:01.272 | 2026-07-30 16:10:13.592 |              12.320000
+```
+
+```
+2026-07-30 16:10:14  delivered  Your rescued resume for "Senior Platform Enginee  -> ['fsweep-0730@resumeai-bot.ru']
+```
+
+**Paid → delivered: 12.320 seconds** against a 5-minute budget — faster than the
+17.342s measured on 07-20, on a newer Next.js. Checkout rendered US$4.99 before
+the promo, confirming the live price matches `RESCUE_PRICE_USD`.
+
+### F1c. Forced failure (PARTIAL — unchanged)
+
+Not re-forced. The 07-20 run proved retry → `FAILED` → apology email → Telegram
+alert, and the misleading-alert bug it exposed was fixed in #155. The one part
+still unproven is the same as before: `stripe.refunds.create` needs a real
+captured payment, and entering live card details is out of scope.
+
+### F1e. Upsell coupon (PASS)
+
+Issued automatically on delivery:
+
+```
+  code: NLAOF3HT | active: True | max_redemptions: 1 | times_redeemed: 0
+  created: 2026-07-30T16:10:13+00:00
+  expires: 2026-08-02T16:10:13+00:00
+  hours window: 72.0
+  metadata: {'rescueOrderId': 'cms7dr9ri00036jehbjjrdv2a'}
+  coupon: w5hLeslj | amount_off: 10.0 usd | duration: once | valid: True
+```
+
+$19 − $10 = **$9 first month**, single-use, **exactly 72.0h**, bound to the
+order. Deactivated at cleanup.
+
+### F1f. Funnel events (PARTIAL — 7/8)
+
+Events recorded for this order alone:
+
+```
+ checkout_started     | 2026-07-30 10:38:06.554 | {"kind": "tripwire", "orderId": "cms7dr9ri00036jehbjjrdv2a"}
+ abandoned_email_sent | 2026-07-30 14:49:27.236 | {"orderId": "cms7dr9ri00036jehbjjrdv2a"}
+ tripwire_paid        | 2026-07-30 16:10:01.284 | {"orderId": "...", "amountTotal": 0}
+ tripwire_delivered   | 2026-07-30 16:10:14.111 | {"cached": false, "attempt": 1, "tokensUsed": 88, ...}
+```
+
+`upsell_accepted` is still the only one with no row, for the same structural
+reason as 07-20: `/api/rescue/[id]/upsell` does not set
+`payment_method_collection: 'if_required'`, so Stripe demands a card even at $0
+today. The trigger metadata is present on the session; only the final `if`
+branch is unexercised.
+
+---
+
+## F2 — Capture and nurture
+
+### F2b. Abandoned-checkout email (PASS — organically this time)
+
+The 07-20 run had to backdate an order to force this. This time it happened by
+itself: the order sat unpaid from **10:38:06**, and the cron sent the reminder at
+**14:49:27** — 4h11m later, matching the 4h rule without any simulation.
+
+```
+2026-07-30 14:49:27  delivered  Your resume rescue for "Senior Platform Engineer  -> ['fsweep-0730@resumeai-bot.ru']
+```
+
+That the same order was then paid and delivered also proves the reminder does not
+block or corrupt the later purchase.
+
+### F2a / F2c (PASS — rows persist)
+
+```
+                 email                 |  source   | nurtureStage | nurtureNextAt |     unsubscribedAt
+---------------------------------------+-----------+--------------+---------------+-------------------------
+ evidence-lead-2026-07@resumeai-bot.ru | ats-check |            1 |               | 2026-07-20 20:29:41.857
+ suppressed: 1
+```
+
+Lead captured via `/ats-check`, consent recorded, sequence stopped on
+unsubscribe, suppression row intact.
+
+---
+
+## F3 — Autonomous ops
+
+### F3a. Daily pulse (FAIL → **PASS**)
+
+```
+ pulses |          last
+--------+-------------------------
+      4 | 2026-07-29 23:24:07.653
+```
+
+Timestamps cluster at ~23:2x UTC = ~9:2x am Sydney, exactly the intended window.
+Four fires rather than ten is explained by the six-day outage in between.
+
+**This reverses the 07-20 finding.** The pulse had simply never had a chance to
+run when first swept (Session D shipped 08:06 UTC on 07-20; the first eligible
+window was 23:00 that night). The gate-widening I recommended was therefore
+**not implemented** — it would have "fixed" working code.
+
+### F3b. Money alert (PASS)
+
+```
+2026-07-30 16:10:01 [info     ] admin_alert.sent
+```
+
+Matches `tripwire_paid` (16:10:01.284) to the second.
+
+### F3c / F3d (PASS)
+
+IndexNow: 290 URLs accepted (api.indexnow.org and bing.com both 200; key file
+serves 200). `npm run smoke`: all 12 HTTP checks and all 6 containers healthy,
+"web logs clean (last 10m)" — a full run including infra, unlike 07-20.
+
+---
+
+## F4 — SEO reality
+
+### F4a. Sitemap + 404 sweep (PASS)
+
+```
+   169  /apply-to          13  /resume-keywords     3  /blog
+    39  /jobs-in           12  /auto-apply         14  singletons (/, /pricing,
+    20  /resume            10  /alternatives           /faq, /proof, /ats-check, ...)
+                           10  /remote
+  TOTAL: 290
+```
+
+```
+checked: 290
+ 290 200
+```
+
+**290/290 return 200. Zero 404s** — including all 168 `/apply-to/*` pages after
+Prompt G, and `/companies/*` → `/apply-to/*` 308 redirects.
+
+### F4c. Static rendering (PASS)
+
+Unchanged: every public SEO template is a server component with
+`generateStaticParams`; shared header/footer ship zero client JS. The one
+addition from Prompt G, the `/apply-to` search box, is an isolated client island
+over a server-rendered list, so crawlers still receive every company link.
+
+---
+
+## Owner action #12 answered: yes, persist descriptions
+
+The open question was whether scrapers should store posting bodies. **Answer:
+yes — it was nearly free and it unblocks revenue surface.** Greenhouse returns
+the body in the *same* request via `content=true`; we had been explicitly
+sending `content=false` and writing `description: ""`.
+
+Two things measured before shipping:
+
+- Truncating at lever.py's 2000 chars would have been **worse than useless** —
+  all 187 Twilio postings came back starting *"Who we are At Twilio, we're
+  shaping the future of communications"*, i.e. pure company boilerplate.
+- Greenhouse wraps that in `content-intro` (and the EEO footer in
+  `content-conclusion`). Dropping both and raising the cap to 4000 took unique
+  openings from **1/187 to 141/187**.
+
+Live in the running worker (image tag = the scraper commit; `_clean_content`
+present at line 146). Coverage moved 112 → 116 of 479 on the first cycle and
+fills in as the crawler revisits — the `run-campaigns` upsert already refreshes
+`description`.
+
+**This unblocks G2; it does not finish it.** Expanding `/resume-keywords` past 12
+roles still needs the LLM extractor (`worker/worker/ai/keywords.py`) — a
+deterministic extractor was tried and produced company names, US states and
+benefits boilerplate. The corpus was the blocker; now it won't be.
+
+## Cleanup
+
+```
+promo FSWEEPB  -> active: False      coupon TP1SDws8 -> deleted: True
+promo NLAOF3HT -> active: False      coupon w5hLeslj -> deleted: True
+promo FSWEEP0730 -> deactivated      coupon gN55Ldcg -> deleted
+```
+
+An earlier promo expired unused mid-session (90-minute window, ~5.5h of real
+time elapsed) and was replaced — noted because the expiry, not a bug, was the
+cause. `RescueOrder cms7dr9ri...` and its analytics rows are left as the audit
+trail for this document.
+
+---
+
 # Evidence sweep — 2026-07-20
 
 **Question this document answers:** does the invisible half of the machine — the
