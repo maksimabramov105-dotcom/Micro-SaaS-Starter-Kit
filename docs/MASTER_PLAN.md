@@ -153,6 +153,18 @@ seo_health gate applies to every page (title <=65, description <=160).
         with >=2 genuine postings (grows automatically with the corpus —
         honest provenance over 50 recycled listicles; regen script:
         rolekw.py pattern documented in LOG).
+      - G1 (2026-07-30, PRs #162/#164/#165): company pages now also render a
+        LIVE open-role list with links + a remote-eligibility line from the
+        scraper cache (44 of 168 companies currently have roles; 52 at
+        Twilio, 42 at Cloudflare). /apply-to hub gained search + ATS filter
+        + sort-by-open-roles as a client island over the server-rendered
+        list. /companies and /companies/{slug} 308-redirect here — one
+        canonical URL space instead of ~150 duplicate pages.
+      - G4 (2026-07-30): `__tests__/lib/seo-thin-pages.test.ts` fails the
+        build on any generated page under 300 words or with a duplicate meta
+        description. 180/180 descriptions unique. Meta + body copy come from
+        single-source builders imported by BOTH pages and guard, so copy
+        can't drift (the E1 lesson applied to content).
       - REMAINDER: OG images for new templates (existing opengraph-image
         pattern) — with B4.
 - [x] **B3 Data-driven blog engine.** DONE 2026-07-18. /blog + 2 posts whose
@@ -448,8 +460,92 @@ deploys smoke-green.
    `ghp_...` token that now fails auth (pushes fall back to the `gh` token).
    A dead credential sitting in plaintext is worth revoking and removing
    from the remote URL.
+11. **EXTERNAL uptime monitoring — top ops gap.** The 2026-07-23→29 outage
+   ran SIX DAYS partly because nothing off-box could tell us: uptime-kuma
+   runs on the same VPS, so when the host went unreachable the monitor went
+   with it. The only signal was GitHub cron failures, which nobody was
+   watching. Add an off-box check (UptimeRobot/Healthchecks.io free tier, or
+   a GitHub Action that curls /api/health and opens an issue on failure) that
+   pings Telegram. Cheap, and it converts a 6-day outage into a 5-minute one.
+12. **Decide: should the scrapers persist posting descriptions?** 363 of 475
+   cached listings (76%) have an empty `description` — the Greenhouse
+   scrapers store title + URL only. That single gap blocks G2 (expanding
+   /resume-keywords beyond 12 roles), because keyword extraction needs the
+   posting body. Storing bodies means a scraper change (freeze rule) plus a
+   re-crawl and more DB storage. Your call: keep 12 honest role pages, or
+   spend the change to unlock ~20-30 more.
 
 ## LOG
+
+- 2026-07-30 — SIX-DAY PRODUCTION OUTAGE, then PROMPT G shipped.
+  * OUTAGE: the site was unreachable from 2026-07-23 10:47 UTC until the
+    owner restored it on 07-29. Cause was NETWORK-level, not the app: the
+    host showed `up 54 days` (never rebooted), disk 24%, all 7 containers
+    healthy the whole time, and no deploy since 07-20 — but 443/22/ICMP were
+    all black from every vantage (my machine AND GitHub runners). Consistent
+    with an upstream null-route / DDoS filter at the provider, since cleared.
+    Cost: 88+ consecutive cron failures, so nurture, daily pulse, money
+    alerts and the SEO cron were all dead for ~6 days. LESSON: uptime-kuma
+    runs ON the same box, so it cannot page us when the box is unreachable —
+    external monitoring is now the top ops gap (owner action #11).
+  * All 8 workflows verified green afterwards (ci, deploy, digest,
+    follow-up, run-campaigns, seed-surveys, win-back, codeql). The three
+    daily crons were manually dispatched to prove recovery rather than
+    waiting for their next slot.
+  * PROMPT G — G1/G3/G4 shipped and live-verified; G2 blocked (below).
+    Deliberate scope call: `/companies/*` did not exist, but the "how to
+    apply at {Company}" content it describes already shipped at
+    `/apply-to/*` (168 pages, Session B). Building a parallel namespace
+    would have duplicated ~150 pages of ATS content, split equity, and
+    tripped G4's own duplicate-meta guard — so /apply-to stayed canonical
+    and /companies/* 308-redirects into it.
+  * Two real bugs, both caught by verifying instead of assuming:
+    1. `unstable_cache` JSON-serializes its return value, so the Map I used
+       round-tripped to `{}` and broke every lookup — caught by CI's DB-less
+       build (`a.byCompany.get is not a function`). Fixed to a plain object.
+    2. The enrichment shipped INVISIBLE. deploy.yml builds with a dummy
+       DATABASE_URL, so the persisted data cache stored the
+       `available:false` snapshot and served it for its whole 6h TTL;
+       revalidating routes just re-rendered from that empty snapshot.
+       Verified live: 200s with ZERO role links. Fixed by dropping the
+       persisted cache for React `cache()` (per-render dedupe only) so every
+       ISR regeneration reads the DB fresh. Post-fix: 52 roles at Twilio,
+       42 at Cloudflare, 8 sample links each.
+  * Also rejected a plausible-looking change: the prompt's "skip any company
+    whose scraper returns 0 jobs" would have DROPPED 124 of 168 pages (only
+    44 have cached roles right now). Those pages are not thin — each carries
+    300+ words of unique editorial — they are indexed and ranking, and
+    supply arrives in bumps, so gating on "0 roles this hour" would churn
+    ~120 URLs in and out of the index. Thin-content policing belongs in the
+    >=300-word build guard, not in hiding live pages.
+  * LIVE VERIFICATION: 290/290 sitemap URLs return 200 (zero 404s); sitemap
+    unchanged at 290 URLs by template (169 /apply-to, 39 /jobs-in, 20
+    /resume, 13 /resume-keywords, 12 /auto-apply, 10 /alternatives, 10
+    /remote, 3 /blog, 14 core); IndexNow accepted all 290 at both
+    api.indexnow.org and bing.com (HTTP 200); smoke green (12 HTTP checks +
+    6 containers).
+  * G EXIT CRITERION NOT MET: "sitemap grows past 300 URLs". It is still
+    290. The URL growth was supposed to come from G2's ~50 role pages, which
+    is blocked — see below. G1 deepened the existing 168 rather than adding
+    URLs. Not padding the sitemap to hit a number.
+  * G2 BLOCKED, reported not faked. `scripts/gen-role-keywords.ts` is
+    committed as the auditable role-coverage analyzer (Session B had NO
+    generator, so the corpus could never be refreshed). Title bucketing
+    works well (102 software-engineer, 44 engineering-manager, 37
+    support-engineer) and it MERGES rather than replaces so no live page is
+    de-indexed. Two blockers stop publication: (a) 363 of 475 cached
+    listings (76%) have an EMPTY description — the Greenhouse scrapers
+    persist title+URL, not the body, so most roles have no text to extract
+    from, and that is a crawler data-capture change under the freeze rule
+    (owner action #12); (b) a deterministic extractor is not good enough —
+    against the live corpus it produced company names, US states and
+    benefits boilerplate ("PBC", "Veeva", "Nevada", "Dental", "Days/8",
+    "Let", "Thing"), and title-mining was worse. The 12 live pages keep
+    their real LLM-extracted keywords (AWS, Kubernetes, FastAPI) rather than
+    being replaced by 16 degraded ones. Script defaults to READ-ONLY.
+  * NOTE: prod web logs show recurring `insufficient_memory (550MB < 700MB)`
+    — the box is a 4GB CX23 with ~1.5GB available. Not currently failing
+    user requests, but it is the next thing likely to break.
 
 - 2026-07-20 — EVIDENCE SWEEP. Full report: `docs/EVIDENCE_2026-07.md`.
   Not a feature session — an attempt to prove the autonomous half actually
