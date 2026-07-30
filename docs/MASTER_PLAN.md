@@ -426,10 +426,24 @@ deploys smoke-green.
 4. **Phase 1 prep** — buy the .com/.ai domain (P1.1). Now urgent: 290 URLs
    of SEO equity are accruing to resumeai-bot.ru — every week of delay is
    equity to migrate later.
-5. **Dependabot holds** — decide on PR #107 (nodemailer 8->9 major; the
-   magic-link login depends on nodemailer via next-auth — test sign-in
-   after merging) and #102 (starlette bump; CI runs no worker tests, so
-   merge + watch worker health or add a worker test job first).
+5. **Dependabot holds** — only #107 and #102 are left; all 8 other open
+   security PRs were merged and deployed 2026-07-30 (fast-uri, immutable +
+   swagger-ui-react, postcss, next-auth 4.24.15, ws, axios, pillow, and next
+   16.2.6 -> 16.2.12, which carried a Server-Actions DoS advisory).
+   - #107 (nodemailer 8->9 major): risk is now LOWER but so is the value.
+     Magic links no longer go through nodemailer at all — they send over the
+     Resend HTTPS API (see the 2026-07-30 log entry), so `createTransport` is
+     never called. nodemailer must nonetheless STAY in package.json:
+     next-auth/providers/email.js:7 does a top-level `require("nodemailer")`,
+     so removing it crashes auth on boot (checked before touching it).
+     Note next-auth 4.24.15 declares peerOptional nodemailer ^7.0.7 while we
+     ship 8.x, so local `npm install` needs --legacy-peer-deps; CI uses
+     `npm ci` against the resolved lockfile and is unaffected.
+   - #102 (starlette bump; CI runs no worker tests, so merge + watch worker
+     health or add a worker test job first).
+   - The recurring "Dependabot Updates" job failure is js-yaml and is
+     EXPECTED: every advisory lists `patched-versions: []`, i.e. upstream has
+     published no fix. Nothing to do until it does.
 6. **Trust assets** — founder photo for the landing block (drop it at
    public/founder.jpg; an initials avatar ships until then) + one
    permissioned real ATS-confirmation screenshot for lib/proof.ts.
@@ -460,13 +474,24 @@ deploys smoke-green.
    `ghp_...` token that now fails auth (pushes fall back to the `gh` token).
    A dead credential sitting in plaintext is worth revoking and removing
    from the remote URL.
-11. **EXTERNAL uptime monitoring — top ops gap.** The 2026-07-23→29 outage
-   ran SIX DAYS partly because nothing off-box could tell us: uptime-kuma
-   runs on the same VPS, so when the host went unreachable the monitor went
-   with it. The only signal was GitHub cron failures, which nobody was
-   watching. Add an off-box check (UptimeRobot/Healthchecks.io free tier, or
-   a GitHub Action that curls /api/health and opens an issue on failure) that
-   pings Telegram. Cheap, and it converts a 6-day outage into a 5-minute one.
+11. **EXTERNAL uptime monitoring — WRITTEN, needs your merge.** The
+   2026-07-23→29 outage ran SIX DAYS partly because nothing off-box could
+   tell us: uptime-kuma runs on the same VPS, so when the host went
+   unreachable the monitor went with it. The only signal was GitHub cron
+   failures, which nobody was watching.
+   The workflow is already written and PARKED on local branch
+   `ci/uptime-external-local` (commit a4f77d2) — `.github/workflows/uptime.yml`.
+   It cannot be pushed: the deploy token has scopes
+   `admin:public_key, gist, read:org, repo` and GitHub rejects workflow files
+   without `workflow` (verified: "refusing to allow an OAuth App to create or
+   update workflow ... without `workflow` scope"). Same constraint as
+   `ci/smoke-verify-job-local`.
+   YOU: push/merge that branch with a `workflow`-scoped token. It probes
+   /api/health every 15 min from GitHub's runners (genuinely off-box), retries
+   3x before failing so a mid-deploy restart doesn't cry wolf, and fails the
+   workflow — which emails you by default. OPTIONAL for phone alerts: add
+   repo secrets TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID (6246429438); the
+   alert step is conditional, so it works without them.
 12. **Decide: should the scrapers persist posting descriptions?** 363 of 475
    cached listings (76%) have an empty `description` — the Greenhouse
    scrapers store title + URL only. That single gap blocks G2 (expanding
@@ -476,6 +501,61 @@ deploys smoke-green.
    spend the change to unlock ~20-30 more.
 
 ## LOG
+
+- 2026-07-30 (later) — E-R REMAINDER + 8 SECURITY BUMPS + A LOGIN BUG THAT HAD
+  NEVER WORKED. PRs #167 (E-R1), #168 (auth), #169 (revalidate-on-deploy), plus
+  8 Dependabot merges. All live and verified.
+  * **Magic-link sign-in was broken for the entire life of the deployment.**
+    Found while verifying the next-auth 4.24.15 bump. EmailProvider used
+    `smtp.resend.com:465`, and Hetzner blocks outbound 25 and 465 (verified from
+    the host: 465 BLOCKED, 587 OPEN, 25 BLOCKED, api.resend.com:443 OPEN). So
+    nodemailer opened a socket that could never complete. It failed in the worst
+    way — the VerificationToken row was written FIRST, so the DB looked healthy
+    and nothing logged an error, while the request hung until the client gave up.
+    Resend's last 100 emails contained ZERO sign-in messages, ever. Reproduced
+    live: POST /api/auth/signin/email -> HTTP 000 after 60s, token row at
+    09:38:15. Fixed by sending magic links through the same sendEmail() Resend
+    HTTPS path as every other email; a failed send now throws instead of
+    pretending. After deploy: HTTP 302 in 0.79s and "Sign in to resumeai-bot.ru"
+    delivered at 09:55:22 — the first magic-link email this deployment has ever
+    sent. sendEmail is imported lazily inside sendVerificationRequest because at
+    module scope the Resend SDK (-> react-dom/server) broke the auth test suite.
+  * E-R1 /pricing: the audit was right. A hardcoded paragraph read "Launch week
+    ... LAUNCH40 ... 40% off your first year (ends June 8)" — live on 07-30, six
+    weeks stale. Live Stripe explained it: there are TWO LAUNCH40 codes.
+    promo_1TdXVs... is INACTIVE, expired 2026-06-08 (the date the copy quoted);
+    promo_1Th6TD... (coupon V8nDJ6pL, 40% off) is ACTIVE with 0 redemptions to
+    2026-09-01, matching lib/promo.ts. So the offer was real, the copy quoted a
+    dead promo. Now rendered from lib/promo.ts and gated on isPromoActive().
+    ALSO corrected the label: the coupon is duration `once` and redeemable on
+    ANY plan, so "40% off your first year" was FALSE for monthly subscribers
+    (40% off month one). Now "40% off your first payment", true for both. To
+    advertise "first year", restrict the coupon to the annual price first.
+    Guard extended to ban hardcoded promo dates + the literal LAUNCH40 string;
+    verified it actually fires by reintroducing both and watching it fail.
+  * E-R2/3/4/5 + audit items 5 and 6 were ALREADY DONE by Prompt E — verified
+    against live prod, not assumed: no "Not getting interviews?", unified nav on
+    /pricing, per-page OG ("Pricing — ResumeAI" + /pricing/opengraph-image), no
+    "50+ countries", /companies/* 308-redirecting. Skipped rather than redone.
+  * 8 security bumps merged and deployed: fast-uri, immutable +
+    swagger-ui-react, postcss, next-auth 4.24.15, ws, axios, pillow, and next
+    16.2.6 -> 16.2.12 (Server-Actions DoS advisory). Re-verified magic link,
+    all key pages, and the G1 enrichment on the new framework version.
+  * Third caching bug found by re-verifying: after the next-16.2.12 deploy the
+    company pages were bare AGAIN. Every deploy rebuilds all 168 pages with the
+    dummy DATABASE_URL, but the 6h dedupe marker from 09:56 made the cron skip
+    revalidation until ~15:56. Fixed by also comparing against this process's
+    start time — a container newer than the last marker is by definition serving
+    freshly-built pages. Verified: revalidated at 10:16 despite the 08:56
+    marker, and the roles section came back (52 roles, 8 links, 44/168 companies).
+  * MEMORY PRESSURE: investigated, NOT a standing problem. The
+    `insufficient_memory (550MB < 700MB)` lines were transient, from the
+    outage-recovery window with concurrent deploy builds. Now: worker using
+    73MB of its 1465MB limit, host 2414MB available, ZERO deferrals in 24h.
+    MIN_APPLY_MEMORY_MB=700 on prod (code default 300) is a deliberate guard
+    that DEFERS applies rather than risking an OOM-kill — left alone on purpose.
+  * All 8 workflows verified green. The only remaining red is Dependabot's own
+    js-yaml job, which is expected: every advisory lists patched-versions: [].
 
 - 2026-07-30 — SIX-DAY PRODUCTION OUTAGE, then PROMPT G shipped.
   * OUTAGE: the site was unreachable from 2026-07-23 10:47 UTC until the
