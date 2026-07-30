@@ -22,17 +22,35 @@ const MARKER = 'apply_to_revalidated'
 const WINDOW_HOURS = 6
 
 /**
- * Marks /apply-to and every /apply-to/{company} instance stale. Returns
- * 'skipped' when it already ran inside the window, so the hourly cron doesn't
- * re-render 168 pages every tick.
+ * When this server process started. A deploy replaces the container, so a
+ * process whose start time is NEWER than the last revalidation marker is by
+ * definition serving freshly-built (DB-less, un-enriched) pages.
+ */
+const PROCESS_STARTED_AT = new Date()
+
+/**
+ * Marks /apply-to and every /apply-to/{company} instance stale so the next
+ * request re-renders them with database access.
+ *
+ * Two triggers, either is enough:
+ *   - the 6h refresh window lapsed (keeps open-role counts current), or
+ *   - THIS PROCESS is newer than the last marker, i.e. a deploy happened.
+ *
+ * The deploy trigger matters: without it, a deploy landing inside the 6h window
+ * left all 168 pages editorial-only until the window expired — observed live,
+ * pages served with zero role links right after a deploy at 10:07 because the
+ * marker from 09:56 was still "recent".
  */
 export async function maybeRevalidateCompanyPages(): Promise<'ran' | 'skipped'> {
   try {
     const recent = await prisma.analyticsEvent.findFirst({
       where: { event: MARKER, createdAt: { gte: new Date(Date.now() - WINDOW_HOURS * 3600_000) } },
-      select: { id: true },
+      select: { id: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
     })
-    if (recent) return 'skipped'
+    // Skip only if we revalidated recently AND that happened after this process
+    // booted (so the pages it marked stale are the ones we're serving now).
+    if (recent && recent.createdAt >= PROCESS_STARTED_AT) return 'skipped'
 
     // Only the FULL-ROUTE cache needs clearing: getOpenRolesSnapshot is a
     // per-render React cache (no persisted data cache), so each regenerated
