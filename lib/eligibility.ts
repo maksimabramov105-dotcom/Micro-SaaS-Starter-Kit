@@ -196,13 +196,33 @@ export function detectHiringRegion(text: string): HiringRegion {
   return null // no region signal — caller must not skip on uncertainty
 }
 
+/**
+ * Job families where "Manager" is part of the job's NAME, not its rank.
+ *
+ * A Customer Success Manager manages accounts, not people; so does an Account
+ * Manager, a Product Manager, a Program Manager. Reading those as the
+ * director/manager tier is not a rounding error — it knocked out 518 of 518
+ * scraped jobs across three live campaigns on 2026-07-31, because every
+ * "Senior Customer Success Manager" scored 5 against a mid-level profile's 2
+ * and failed the two-level distance check. The campaigns had been running and
+ * applying to nothing.
+ *
+ * Matched as "<family> manager" so a genuine "Manager, Customer Success" — the
+ * comma form, which IS the people-management role — still reads as level 5.
+ */
+const IC_MANAGER_FAMILIES =
+  /\b(customer success|account|product|program|project|engagement|partner|partnership|community|marketing|social media|content|brand|category|office|case|relationship|territory|portfolio)\s+manager\b/
+
 // ── Seniority extraction (Phase 2 / targeting_v2) ───────────────────────────
 // Numeric ladder so we can skip roles ≥2 levels from the candidate.
 //   0 intern · 1 junior · 2 mid · 3 senior · 4 staff/lead/principal · 5 manager/director · 6 VP+
 export function extractSeniority(title: string): number | null {
   const t = (title || '').toLowerCase()
   if (/\b(vp|vice president|head of|chief|c[teio]o)\b/.test(t)) return 6
-  if (/\b(director|manager|mgr)\b/.test(t)) return 5
+  // "Manager" only means the manager TIER when it is not part of the job family
+  // name. "Director" and "Mgr" always do.
+  if (/\b(director|mgr)\b/.test(t)) return 5
+  if (/\bmanager\b/.test(t) && !IC_MANAGER_FAMILIES.test(t)) return 5
   if (/\b(staff|principal|lead|architect)\b/.test(t)) return 4
   if (/\b(senior|sr\.?|sr )\b/.test(t)) return 3
   if (/\b(junior|jr\.?|jr |entry[- ]level|associate i\b|associate\b)\b/.test(t)) return 1

@@ -91,19 +91,7 @@ Two things to decide:
 
 ---
 
-## 4. Bing — 2 minutes, currently half-done
-
-You added `resumeai-bot.com` to Bing Webmaster Tools. Finish it:
-
-1. **https://www.bing.com/webmasters** → your site → **Sitemaps**
-2. Submit `https://resumeai-bot.com/sitemap.xml`
-
-Bing feeds DuckDuckGo, Ecosia and ChatGPT search, so it is worth more than its
-market share suggests. IndexNow is already wired and accepting all 301 URLs.
-
----
-
-## 5. Telegram alerts for the uptime monitor (optional, recommended)
+## 4. Telegram alerts for the uptime monitor (optional, recommended)
 
 The uptime monitor is live and probing every 15 minutes from GitHub's runners.
 It already emails you on failure. For phone alerts, add two repo secrets:
@@ -120,7 +108,7 @@ once — Telegram refuses bot-initiated messages otherwise (403).
 
 ---
 
-## 6. Security hygiene — rotate what was shared in chat
+## 5. Security hygiene — rotate what was shared in chat
 
 1. **Revoke the old GitHub PAT.** I removed it from `.git/config`, but it still
    exists on GitHub until you revoke it:
@@ -134,7 +122,7 @@ has appeared in a chat log should not stay valid.
 
 ---
 
-## 7. First users — the actual bottleneck now
+## 6. First users — the actual bottleneck now
 
 Everything technical for Phase 5 distribution is built (301 SEO URLs, `/proof`,
 comparison pages, referral loop). What is missing is people, and that part is
@@ -155,32 +143,46 @@ See `docs/FREE_TRAFFIC_PLAYBOOK.md` for the full ordering.
 
 ---
 
-## 8. Optional: turn on the pricing-page speed fix
+## 7. Two A/B tests are built and waiting for you to switch them on
 
-Not blocking anything, but worth knowing. Lighthouse on the new domain:
+Both are off. Neither does anything until you turn it on, and turning one on
+costs nothing and needs no redeploy.
 
-| page | perf | SEO |
+**Dashboard → Admin → Feature Flags**, then set the rollout % and toggle:
+
+| flag | what variant B changes | suggested % |
 |---|---|---|
-| `/` (landing) | **99** | 100 |
-| `/ats-check` | 97 | 100 |
-| `/resume-rescue` | 96 | 100 |
-| `/pricing` | **72** | 100 |
+| `landing_hero_b` | Homepage headline leads with "every application is confirmed by the employer" instead of the resume artifact | 50 |
+| `pricing_headline_b` | `/pricing` headline leads with the 30-day refund instead of "Simple, Transparent Pricing" | 50 |
 
-`/pricing` is the money page and the slowest. The code is not slow — server
-response 190 ms, TBT 70 ms, CLS 0. It renders dynamically because it assigns an
-A/B variant server-side, so it gets none of the static caching the other pages
-do, and LCP lands at 5.4 s.
+A rollout of 0 or 100 means everyone sees one thing, so nothing is recorded —
+use 50 to actually run a test. Changes take effect within 5 minutes, or
+instantly with **Bust cache**.
 
-Fixing it means moving variant assignment client-side so the shell can be
-static. Say the word and I will; I have left it alone because it changes how the
-pricing experiment works and that is a product decision, not a technical one.
+To read the result once traffic has accumulated:
+
+```bash
+npx tsx scripts/experiment_results.ts landing_hero
+```
+
+It prints exposures, conversions and a p-value. Under p < 0.05 you have a
+winner; ship it by setting that flag to 100 (or 0 to keep the control).
+
+**Honest expectation:** with current traffic this will take weeks to reach
+significance, and possibly longer than it takes to just pick one. It is here so
+that when traffic does arrive, the measurement already exists.
 
 ---
 
 ## Done recently — no action needed
 
 Domain migration to `.com` (site, email, crons, sitemap, canonicals) · Search
-Console change-of-address confirmed and running · Resend verified on `.com` ·
-DMARC added · OAuth redirect URIs updated · `workflow` scope granted · all 10
-dependency PRs merged · 9 orphaned Stripe prices archived · uptime monitor live ·
-scraper description capture shipped.
+Console change-of-address confirmed and running · **Bing sitemap submitted** ·
+Resend verified on `.com` · DMARC added · OAuth redirect URIs updated ·
+`workflow` scope granted · all 10 dependency PRs merged · 9 orphaned Stripe
+prices archived · uptime monitor live · scraper description capture shipped ·
+**`/pricing` speed fix shipped** (was Lighthouse 72 / LCP 5.4 s because it
+rendered dynamically to assign an A/B variant; assignment moved client-side and
+the page is static again) · **autoapply seniority bug fixed** (every "… Manager"
+title was read as the director rank, so three live campaigns scraped 518 jobs
+and applied to none of them).
