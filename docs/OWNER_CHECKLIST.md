@@ -1,6 +1,6 @@
 # Owner checklist — only you can do these
 
-Current as of **2026-07-31**. Everything not on this list is either done or is
+Current as of **2026-07-31** (updated after Phases 3 & 4 shipped). Everything not on this list is either done or is
 mine to do. Ordered so the things that unblock the most come first.
 
 Anything already handled has been removed, not left ticked — this is a to-do
@@ -152,6 +152,28 @@ yours.
   real testimonials. Launching early into an empty room wastes the one shot.
 
 See `docs/FREE_TRAFFIC_PLAYBOOK.md` for the full ordering.
+
+---
+
+## 8. Optional: turn on the pricing-page speed fix
+
+Not blocking anything, but worth knowing. Lighthouse on the new domain:
+
+| page | perf | SEO |
+|---|---|---|
+| `/` (landing) | **99** | 100 |
+| `/ats-check` | 97 | 100 |
+| `/resume-rescue` | 96 | 100 |
+| `/pricing` | **72** | 100 |
+
+`/pricing` is the money page and the slowest. The code is not slow — server
+response 190 ms, TBT 70 ms, CLS 0. It renders dynamically because it assigns an
+A/B variant server-side, so it gets none of the static caching the other pages
+do, and LCP lands at 5.4 s.
+
+Fixing it means moving variant assignment client-side so the shell can be
+static. Say the word and I will; I have left it alone because it changes how the
+pricing experiment works and that is a product decision, not a technical one.
 
 ---
 

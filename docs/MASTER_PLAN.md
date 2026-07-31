@@ -363,11 +363,11 @@ job -> sees it tracked in dashboard within 10 min of first visit.
 
 ## PHASE 3 — Outcome-independent paid value (~1-2 weeks)
 
-- [ ] **P3.1 Wire per-job resume tailoring into backend apply path**
+- [x] **P3.1 Wire per-job resume tailoring into backend apply path**
       (`autoapply/prepare` -> careerops TODO). Verify PDF via `/jobs/resume-pdf`.
-- [ ] **P3.2 Fit report** ("why you're getting rejected"): `ai/jobfit.py` +
+- [x] **P3.2 Fit report** ("why you're getting rejected"): `ai/jobfit.py` +
       `ai/critique.py` -> per-application report. Paid feature.
-- [ ] **P3.3 Inbox polish**: classify replies (ack/rejection/interview/question),
+- [x] **P3.3 Inbox polish**: classify replies (ack/rejection/interview/question),
       notify email+Telegram on non-ack. "0 fake applied" ledger front and center.
 - [ ] **P3.4 Weekly user digest email** (Resend): applications, replies, fit tips.
 
@@ -379,16 +379,16 @@ job -> sees it tracked in dashboard within 10 min of first visit.
       prefilled profile -> 5 matching jobs or extension prompt -> first tailored
       resume same session.
 - [ ] **P4.2 Empty states that sell** (dashboard at 0 applications shows next step).
-- [ ] **P4.3 Email lifecycle** (Resend): welcome, day-1, day-3, day-7. Founder voice.
-- [ ] **P4.4 In-app upgrade prompts** at quota edges; conversion tracked per prompt.
+- [x] **P4.3 Email lifecycle** (Resend): welcome, day-1, day-3, day-7. Founder voice.
+- [x] **P4.4 In-app upgrade prompts** at quota edges; conversion tracked per prompt.
 
 **Exit:** signup->activation >=40%; time-to-first-value <10 min median.
 
 ## PHASE 5 — Launch & distribution (continuous from P2 completion)
 
-- [ ] **P5.1 (code) Referral loop**: give 1 month Pro, get 1 month.
-- [ ] **P5.2 (code) Public proof page polish** (`/proof`) as marketing centerpiece.
-- [ ] **P5.3 (code) Programmatic SEO round 2** on .com: "apply to jobs at
+- [x] **P5.1 (code) Referral loop**: give 1 month Pro, get 1 month.
+- [x] **P5.2 (code) Public proof page polish** (`/proof`) as marketing centerpiece.
+- [x] **P5.3 (code) Programmatic SEO round 2** on .com: "apply to jobs at
       {company}" + "X vs ResumeAI" comparison pages. Respect seo_health gate.
 - [ ] **P5.4 (owner) Beta cohort**: 10-20 users, free Pro for feedback/testimonials.
 - [ ] **P5.5 (owner) Product Hunt launch** (code: PH landing variant, banner, badge).
@@ -572,6 +572,50 @@ deploys smoke-green.
    boilerplate. Nothing here is outstanding.
 
 ## LOG
+
+- 2026-07-31 (late) — PHASES 3 & 4 LARGELY SHIPPED. PRs #194-#197. All green,
+  deployed, verified live on resumeai-bot.com.
+  * **P3.1 — the longest-standing TODO in the codebase is closed.** Paid
+    auto-apply generated a tailored COVER LETTER but shipped the BASE resume, so
+    every application went out with the same resume regardless of role. The fit
+    report would tell a user their resume missed the posting's keywords and then
+    we submitted the untailored one anyway. run-campaigns now calls
+    /jobs/autoapply/prepare (tailored resume + cover letter in one request,
+    worker-cached on job+resume so the same pair never bills twice). Best-effort
+    by design: any failure falls back to the base resume, because a slightly
+    worse application still beats no application.
+  * **P3.2 fit report.** ai/jobfit.py had always returned a per-factor breakdown
+    and run-campaigns was DISCARDING it. New nullable JobApplication.fitBreakdown
+    persists it (migration applied and verified on prod), and
+    components/fit-report.tsx shows the score, per-factor bars against the real
+    maxima, the scorer's verbatim reasons, and names the single biggest lever.
+    Refuses to invent: no score recorded says so instead of rendering a fake 0.
+  * **P4.3 lifecycle emails.** sendWelcomeEmail() had existed since the
+    beginning and was NEVER CALLED — a user could sign up and hear nothing,
+    ever. lib/lifecycle now owns welcome + day1/day3/day7, state in
+    AnalyticsEvent (no migration), suppression shared with the nurture engine so
+    one unsubscribe silences everything. After an outage it sends only the most
+    recent due stage, never a backlog; day1 is skipped when the user already
+    made a resume rather than sending something tone-deaf. 10 tests.
+  * **P4.4 quota upgrade prompt.** The free tier was enforced server-side but the
+    user only discovered it by hitting a wall with no way forward. The dashboard
+    now turns the wall into the offer, only in the last third of the allowance,
+    never for paying users, ref-tagged so upgrades are attributable per surface.
+  * **CI gap closed** (#193): PR checks never ran `npm run test:ci`, so the
+    price/claim/thin-page guards blocked RELEASES but not MERGES — proven on
+    07-20 when #151 merged green then failed its deploy on the pricing guard.
+  * **Root metadata still advertised the pre-pivot product** (#197): layout.tsx
+    supplies 404 and fallback metadata and still said "AI Resume Builder +
+    Auto-Apply … 160+ companies", the identity P1.2 moved away from.
+  * FULL SYSTEM VERIFIED: 16/16 public pages 200; health, worker, CSRF and
+    providers 200; extension endpoints 401; unsigned Stripe webhook 400; cron
+    without auth 401; /dashboard redirects; free fit-check returned a real score
+    of 90 in 0.53s; live tripwire checkout created; exactly 5 active Stripe
+    prices; worker healthy; 8 SUBMITTED / 4 FAILED applications in 7d; 15
+    resumes; 479 jobs cached with 293 carrying bodies.
+  * Remaining in these phases: P4.1 (onboarding <10 min), P4.2 (empty states),
+    P3.4 (weekly user digest — the daily digest exists), P5.7 (landing A/B).
+
 
 - 2026-07-31 (night) — PHASE 2 CODE-COMPLETE. Only P2.4 (Web Store submission,
   owner) remains, and it blocks the phase exit criterion.
