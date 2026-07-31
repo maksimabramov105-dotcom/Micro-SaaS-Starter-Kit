@@ -332,9 +332,11 @@ unified; smoke green; Lighthouse >=90 on landing (perf + SEO).
           P2.1 is unimplemented.
         - No E2E fixtures/tests (P2.6), no Web Store assets (P2.4), no
           "Add to Chrome" CTA on the landing page (P2.5).
-      MVP scope status: detection DONE, autofill DONE, track application DONE
-      (source=EXTENSION), **"tailor resume for this job" NOT BUILT** — the one
-      requirement of P2.1 with no implementation anywhere in extension/.
+      MVP scope status: ALL FOUR DONE — detection, autofill, track application
+      (source=EXTENSION), and "tailor resume for this job" (#191), which wires
+      the extension to the worker's /jobs/autoapply/prepare. That endpoint had
+      existed all along with no caller from the extension side; it was the
+      "unwired TODO" the brief flagged.
 - [x] **P2.2 API surface** (token auth, Redis rate-limits, CORS locked to the
       extension). Lives at `app/api/extension/*`, NOT `app/api/ext/*` as the
       plan wrote — the shipped extension already calls the former, and renaming
@@ -347,7 +349,14 @@ unified; smoke green; Lighthouse >=90 on landing (perf + SEO).
 - [x] **P2.5 Landing "Add to Chrome — free" primary CTA** — built and wired,
       renders only once `NEXT_PUBLIC_CHROME_EXTENSION_ID` is set (#189). One env
       var turns it on the moment P2.4 lands.
-- [ ] **P2.6 E2E test**: fixture pages for Greenhouse/Lever/Ashby autofill in CI.
+- [x] **P2.6 E2E test**: 6 Playwright specs over Greenhouse/Lever/Ashby fixtures
+      (#191). They inject the real content scripts into fixture pages rather than
+      loading the unpacked extension — that needs a persistent Chromium context,
+      kills parallelism and is the flakiest thing in a CI suite, while what
+      actually regresses is the per-ATS selector map. MUTATION-TESTED: renaming
+      Ashby's email selector did NOT fail them (autofill.js always runs
+      fillGeneric as a supplement, which refills input[type=email]); renaming
+      firstName DID. Documented in the spec so a green run is not over-trusted.
 
 **Exit:** extension approved; new user installs -> autofills a real Greenhouse
 job -> sees it tracked in dashboard within 10 min of first visit.
@@ -563,6 +572,29 @@ deploys smoke-green.
    boilerplate. Nothing here is outstanding.
 
 ## LOG
+
+- 2026-07-31 (night) — PHASE 2 CODE-COMPLETE. Only P2.4 (Web Store submission,
+  owner) remains, and it blocks the phase exit criterion.
+  * P2.1 req 3 shipped (#191): "Tailor resume for this job" did not exist
+    anywhere in extension/. app/api/extension/tailor now wires it to the
+    worker's /jobs/autoapply/prepare, behind the same guard, and it CONSUMES
+    QUOTA — tailoring is the LLM spend, so leaving it unmetered is how a free
+    tier becomes expensive. job_id is the job URL so the worker caches on
+    job+resume and the same pair never bills twice (<$0.05/application
+    guardrail). detect.js extracts job context JSON-LD -> og: -> headings.
+    The overlay gets a SECOND button on purpose: autofill is instant and local,
+    tailoring costs seconds, so one button would make every autofill slow and
+    every tailor accidental. A 429 opens the upgrade URL, making the wall itself
+    the upgrade prompt.
+  * P2.6 shipped (#191) and was mutation-tested rather than assumed. Renaming
+    Ashby's email selector did NOT fail the specs, because autofill.js always
+    runs fillGeneric() as a supplement and it refills input[type=email].
+    Renaming firstName DID fail them. The spec header now records which
+    assertions actually protect each selector map, so a green run is not
+    mistaken for full coverage.
+  * Verified live on .com: POST /api/extension/tailor -> 401 (present, guarded),
+    OPTIONS -> 204.
+
 
 - 2026-07-31 (evening) — PHASE 2 STARTED. P2.1, P2.2, P2.3, P2.5 done; PRs #186,
   #187, #188, #189. Change of Address CONFIRMED and running (.ru -> .com,
