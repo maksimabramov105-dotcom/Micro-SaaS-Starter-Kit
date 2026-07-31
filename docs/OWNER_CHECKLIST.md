@@ -8,7 +8,95 @@ list, not a history. History lives in `docs/MASTER_PLAN.md` → LOG.
 
 ---
 
-## 1. Chrome Web Store submission — the single biggest blocker
+## 1. Inbound email is dead — fix this before anything else
+
+**Found 2026-07-31 during live verification. This is the most important item in
+this file, and it is ahead of the Chrome Web Store because it silently breaks
+two of the three things the landing page promises.**
+
+### What is broken
+
+The last inbound message arrived **2026-07-22**. 590 before that, **zero since**.
+
+```
+inbox_total = 590
+newest      = 2026-07-22 22:33
+last_7d     = 0
+```
+
+Two DNS facts explain it:
+
+```
+resumeai-bot.ru   MX  9  inbound-smtp.us-east-1.amazonaws.com   (Resend inbound)
+resumeai-bot.ru   MX 10  mx1.hosting.reg.ru
+resumeai-bot.com  MX     (none)
+```
+
+Production still has `INBOX_DOMAIN=resumeai-bot.ru`, and the `.ru` domain was
+removed from Resend during the migration (the free plan allows one domain).
+So mail is still being routed to Resend for a domain Resend no longer accepts,
+and `.com` has no MX record at all — which is why simply switching
+`INBOX_DOMAIN` to `.com` right now would make things worse, not better.
+
+### What it takes down
+
+- **"Every reply lands in one inbox."** No reply has, for nine days.
+- **"Every application is confirmed by the ATS."** It cannot be. Greenhouse
+  confirms by emailing an 8-character security code to the user's alias. The
+  worker log shows exactly this, on live applications today:
+  `careerops.greenhouse.code_not_received` → `careerops.greenhouse.submit_unconfirmed`
+  → the application is recorded **FAILED**. Autoapply is running, tailoring
+  resumes and reaching the submit button, and then failing at the last step.
+
+10 applications were created in the last hour of testing. 9 FAILED, all on
+this. The honesty rules held — nothing was marked applied — but the feature
+cannot work until mail is delivered.
+
+### Fix it in this order (the order matters)
+
+**Step 1 — Resend: add inbound to the `.com` domain**
+
+1. https://resend.com/domains → `resumeai-bot.com`
+2. Enable **Inbound** (or **Receiving**). Resend shows you an MX record —
+   usually `inbound-smtp.us-east-1.amazonaws.com`, priority 10.
+3. Set the inbound webhook to `https://resumeai-bot.com/api/inbox/inbound`.
+   The signing secret already in production is unchanged, so nothing else
+   needs to move.
+
+**Step 2 — Cloudflare: add the MX record**
+
+DNS → `resumeai-bot.com` → Add record → **MX**, name `@` (or `inbox` if Resend
+gave you a subdomain), value and priority exactly as Resend showed. Proxy is
+not applicable to MX.
+
+Check it took effect:
+
+```bash
+dig +short MX resumeai-bot.com @1.1.1.1
+```
+
+**Step 3 — tell me, and I will flip `INBOX_DOMAIN` on the VPS**
+
+One line in `/opt/resumeai/.env` plus a container restart. Doing it before
+steps 1 and 2 would point aliases at a domain that receives nothing, so it has
+deliberately been left alone.
+
+**Step 4 — send yourself a test**
+
+Email the address shown in your dashboard inbox. It should appear within a
+minute. Existing aliases keep working: the handle is stored per user and only
+the domain is appended at parse time.
+
+### It will not rot silently again
+
+Shipped today: the ops self-check now alerts your Telegram when no inbound
+message has arrived for three days. That check is the reason this was found at
+all — every other monitor pokes something and reads the answer, and an empty
+queue looks identical to a quiet week.
+
+---
+
+## 2. Chrome Web Store submission — the biggest blocker after the inbox
 
 **Why it matters:** Phase 2's exit criterion is literally *"extension approved in
 Web Store"*. It also gates the "Add to Chrome" button, which is built and
@@ -53,7 +141,7 @@ landing page with no code change. (You can also set it yourself: add the line to
 
 ---
 
-## 2. Trust assets — the last open Phase 1 item
+## 3. Trust assets — the last open Phase 1 item
 
 **Why it matters:** P1.3 is deliberately unchecked. The vanity counters are gone
 and `/proof` is linked, but there is no *positive* proof on the landing page.
@@ -73,7 +161,7 @@ Drop them in `public/` and tell me; I will place them and re-check P1.3.
 
 ---
 
-## 3. LAUNCH40 — decide what happens to it
+## 4. LAUNCH40 — decide what happens to it
 
 **Live Stripe state:** `promo_1Th6TD…` is ACTIVE, 40% off, **0 redemptions**,
 runs to **2026-09-01**. The banner auto-hides on that date, so nothing is
@@ -91,7 +179,7 @@ Two things to decide:
 
 ---
 
-## 4. Telegram alerts for the uptime monitor (optional, recommended)
+## 5. Telegram alerts for the uptime monitor (optional, recommended)
 
 The uptime monitor is live and probing every 15 minutes from GitHub's runners.
 It already emails you on failure. For phone alerts, add two repo secrets:
@@ -108,7 +196,7 @@ once — Telegram refuses bot-initiated messages otherwise (403).
 
 ---
 
-## 5. Security hygiene — rotate what was shared in chat
+## 6. Security hygiene — rotate what was shared in chat
 
 1. **Revoke the old GitHub PAT.** I removed it from `.git/config`, but it still
    exists on GitHub until you revoke it:
@@ -122,7 +210,7 @@ has appeared in a chat log should not stay valid.
 
 ---
 
-## 6. First users — the actual bottleneck now
+## 7. First users — the actual bottleneck now
 
 Everything technical for Phase 5 distribution is built (301 SEO URLs, `/proof`,
 comparison pages, referral loop). What is missing is people, and that part is
@@ -143,7 +231,7 @@ See `docs/FREE_TRAFFIC_PLAYBOOK.md` for the full ordering.
 
 ---
 
-## 7. Two A/B tests are built and waiting for you to switch them on
+## 8. Two A/B tests are built and waiting for you to switch them on
 
 Both are off. Neither does anything until you turn it on, and turning one on
 costs nothing and needs no redeploy.

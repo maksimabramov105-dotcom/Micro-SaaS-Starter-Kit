@@ -15,6 +15,14 @@ import { prisma } from '@/lib/prisma'
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.com'
 const FIT_CHECK_BUDGET_MS = 5000
 
+/**
+ * How long inbound mail may be silent before it counts as broken.
+ *
+ * Three days, because a genuinely quiet weekend is plausible and a genuinely
+ * broken MX record is not something you want to discover on day nine.
+ */
+const INBOUND_SILENCE_DAYS = 3
+
 export interface SelfCheckResult {
   ok: boolean
   failures: string[]
@@ -90,8 +98,56 @@ async function checkStripeWebhook(): Promise<string | null> {
   }
 }
 
+/**
+ * 4. Inbound mail is still arriving.
+ *
+ * WHY THIS EXISTS: inbound stopped on 2026-07-22 and nobody noticed for nine
+ * days. Nothing threw, nothing 500'd, no page broke — the MX record simply
+ * stopped delivering after the domain migration, and a queue that receives
+ * nothing looks exactly like a quiet week.
+ *
+ * What it silently took down is most of the product's promise. Replies land in
+ * one inbox: no they didn't. Every application is confirmed by the ATS: it
+ * cannot be, because Greenhouse confirms by emailing a security code to the
+ * user's alias, and that code was going nowhere. Autoapply kept running and
+ * kept recording FAILED.
+ *
+ * The check is deliberately about ABSENCE. Every other check here pokes
+ * something and reads the answer; this one is the only failure mode where the
+ * absence of activity IS the alarm, and it is the reason a nine-day outage of a
+ * headline feature produced no signal at all.
+ */
+async function checkInboundMail(): Promise<string | null> {
+  try {
+    const newest = await prisma.inboxMessage.findFirst({
+      orderBy: { receivedAt: 'desc' },
+      select: { receivedAt: true },
+    })
+    // Never received one: nothing to compare against, and a brand-new install
+    // should not page anybody.
+    if (!newest) return null
+
+    const days = (Date.now() - newest.receivedAt.getTime()) / 86_400_000
+    if (days > INBOUND_SILENCE_DAYS) {
+      return (
+        `no inbound mail for ${Math.floor(days)} days (newest ` +
+        `${newest.receivedAt.toISOString().slice(0, 10)}) — check the MX record ` +
+        `for INBOX_DOMAIN and that the domain is still added in Resend`
+      )
+    }
+    return null
+  } catch (err) {
+    return `inbound check failed: ${err instanceof Error ? err.message : String(err)}`
+  }
+}
+
 export async function runOpsSelfCheck(): Promise<SelfCheckResult> {
-  const results = await Promise.all([checkTripwirePage(), checkFitCheckApi(), checkStripeWebhook()])
+  const results = await Promise.all([
+    checkTripwirePage(),
+    checkFitCheckApi(),
+    checkStripeWebhook(),
+    checkInboundMail(),
+  ])
   const failures = results.filter((r): r is string => r !== null)
   return { ok: failures.length === 0, failures }
 }
