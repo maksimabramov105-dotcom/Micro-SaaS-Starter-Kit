@@ -1,0 +1,75 @@
+# External uptime monitor (MASTER_PLAN owner action #11).
+#
+# WHY: the 2026-07-23 -> 07-29 outage ran SIX DAYS. Nothing off-box could tell
+# us, because uptime-kuma runs ON the VPS it is supposed to watch — when the
+# host went unreachable, the monitor went with it. The only signal was scheduled
+# crons turning red, and nobody was watching those.
+#
+# This job runs on GitHub's runners, i.e. genuinely outside the box, and fails
+# loudly the moment the site stops answering. A failing scheduled workflow emails
+# the repo owner by default, so it works even without the Telegram secret below.
+#
+# SETUP (owner, one time):
+#   1. Merge this file. It needs a token with the `workflow` scope — the deploy
+#      token does not have it, which is why this branch was parked instead of
+#      pushed (same as ci/smoke-verify-job-local).
+#   2. OPTIONAL but recommended, for phone alerts: add two repo secrets —
+#        TELEGRAM_BOT_TOKEN   (the ResumeAI bot token)
+#        TELEGRAM_CHAT_ID     (6246429438)
+#      Without them the job still fails visibly; it just won't ping Telegram.
+#   3. Confirm Settings -> Notifications has failed-workflow email enabled.
+name: Uptime monitor
+
+on:
+  schedule:
+    # Every 15 minutes. GitHub's scheduler is not punctual and skips slots under
+    # load, so treat this as "roughly every 15-30 min" — still far better than
+    # the six days it took to notice the last outage.
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: uptime
+  cancel-in-progress: true
+
+jobs:
+  probe:
+    name: Probe public health endpoint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check https://resumeai-bot.com/api/health
+        id: probe
+        run: |
+          # Three attempts, 20s each, 10s apart — rides out a single slow
+          # response or a mid-deploy restart without crying wolf.
+          for attempt in 1 2 3; do
+            STATUS=$(curl -s -o /tmp/body.txt -w '%{http_code}' --max-time 20 \
+              https://resumeai-bot.com/api/health || echo "000")
+            echo "attempt $attempt: HTTP $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              echo "status=200" >> "$GITHUB_OUTPUT"
+              echo "Site is up."
+              exit 0
+            fi
+            [ "$attempt" -lt 3 ] && sleep 10
+          done
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+          echo "::error::resumeai-bot.ru/api/health did not return 200 after 3 attempts (last: $STATUS)"
+          echo "body (truncated):"; head -c 300 /tmp/body.txt || true
+          exit 1
+
+      - name: Alert Telegram on failure
+        # Runs only when the probe failed AND the secret is configured.
+        if: failure() && env.TELEGRAM_BOT_TOKEN != ''
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          TEXT="🚨 ResumeAI is DOWN — https://resumeai-bot.com/api/health did not return 200 (last: ${{ steps.probe.outputs.status }}).
+          Checked from GitHub runners, so this is not a local network problem.
+          If the site is black on 443 AND 22 while the Hetzner console shows the VM running, it is provider-side (null-route / DDoS filter) — see docs/MASTER_PLAN.md 2026-07-30 log entry."
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=${TEXT}" \
+            -o /dev/null -w "telegram: HTTP %{http_code}\n"
