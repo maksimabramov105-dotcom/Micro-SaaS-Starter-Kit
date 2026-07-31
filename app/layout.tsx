@@ -9,9 +9,13 @@ import { StickyCta } from '@/components/sticky-cta'
 
 const inter = Inter({ subsets: ['latin'] })
 
-const SITE_TITLE = 'ResumeAI-Bot — AI Resume Builder + Auto-Apply'
+// Root fallback metadata — used by 404s and any page that does not set its
+// own. It still carried the pre-pivot 'AI Resume Builder + Auto-Apply'
+// framing long after P1.2 repositioned the product, so a shared 404 link
+// advertised the old identity. Matches the homepage now.
+const SITE_TITLE = 'ResumeAI — a resume built for the job you actually want'
 const SITE_DESCRIPTION =
-  'Build an ATS-ready resume with AI and auto-apply to remote-first roles at 160+ companies (AU/NZ/US/EU). Free tier, 30-day money-back guarantee.'
+  'Paste a job posting and get your resume rewritten for that exact role, plus a fit report. Verified applications, replies in one inbox. Free check.'
 
 export const metadata: Metadata = {
   title: SITE_TITLE,
