@@ -91,6 +91,35 @@ async function recordApplication(payload) {
   }
 }
 
+/**
+ * Tailor the user's resume for the job on the current page (P2.1 req 3).
+ *
+ * Deliberately NOT cached client-side: the server keys its own cache on
+ * job+resume so the same pair never bills twice, and a stale local copy would
+ * hide a resume the user just edited.
+ */
+async function tailorResume(payload) {
+  const key = await getApiKey()
+  if (!key) return { ok: false, error: 'not_connected' }
+
+  try {
+    const res = await fetch(`${BASE_URL}/api/extension/tailor`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    if (res.status === 401) return { ok: false, error: 'key_invalid' }
+    if (res.status === 429) {
+      const body = await res.json().catch(() => ({}))
+      return { ok: false, error: 'quota', upgradeUrl: body.upgradeUrl }
+    }
+    if (!res.ok) return { ok: false, error: 'server' }
+    return { ok: true, data: await res.json() }
+  } catch (err) {
+    return { ok: false, error: 'network' }
+  }
+}
+
 // ── Message handler ────────────────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -115,6 +144,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
     case 'GET_RESUME': {
       fetchResume(message.forceRefresh ?? false).then(sendResponse)
+      return true
+    }
+
+    case 'TAILOR_RESUME': {
+      tailorResume(message.payload).then(sendResponse)
       return true
     }
 
