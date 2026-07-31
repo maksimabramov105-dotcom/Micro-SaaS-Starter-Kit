@@ -12,7 +12,7 @@ jobs:
       - name: Trigger seed-surveys cron
         run: |
           HTTP_STATUS=$(curl -s -o /tmp/body.txt -w "%{http_code}" \
-            -X POST "https://resumeai-bot.ru/api/cron/seed-surveys" \
+            -X POST "https://resumeai-bot.com/api/cron/seed-surveys" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             -H "Content-Type: application/json")
           BODY=$(cat /tmp/body.txt)
