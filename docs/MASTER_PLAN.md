@@ -396,36 +396,16 @@ job -> sees it tracked in dashboard within 10 min of first visit.
 
 ---
 
-## REVENUE SPRINT (Session A — money path, inserted 2026-07-16)
+## REVENUE SPRINT — see the completed section above
 
-Goal: a stranger landing on any page can pay us money today, through a
-low-friction tripwire, and every step is measured.
+The original Session A-D specification used to be duplicated here with every
+box unchecked, long after the work shipped. It read as "none of this is done"
+to anyone scrolling, which is exactly what a stale duplicate does — the same
+single-source-of-truth failure this project keeps relearning, applied to its
+own plan. The live section is **REVENUE SPRINT** near the top of this file,
+with per-item evidence, plus **REVENUE SPRINT STATUS** for the summary.
 
-- [ ] **A1 Verify + fix the existing payment path**: audit stripe libs/routes;
-      Stripe LIVE mode + price reconciliation via API (read-only); fix pricing
-      inconsistency (final: Free / Pro $19 per month, annual $180 secondary,
-      Unlimited hidden until demand); funnel events checkout_started /
-      checkout_completed / checkout_abandoned; live $0-promo checkout test on
-      prod with evidence; auto-refund path N/A here (see A2).
-- [ ] **A2 Tripwire — "AI Resume Rescue" ($4.99 one-time)**: /resume-rescue
-      page -> paste job URL/title + upload resume -> Stripe Checkout (one-time,
-      guest ok, account auto-created from email) -> tailored resume (all 5
-      templates for this resume) + fit report (jobfit + critique) delivered
-      <5 min via result page + email; failure -> auto-refund + apology +
-      founder alert; post-purchase upsell "Pro first month $9" (single-use
-      coupon, 72h); events tripwire_view/paid/delivered/upsell_accepted;
-      cost guard: 1 regeneration max, cache by (resume_hash, job_hash).
-- [ ] **A3 CTA wiring**: contextual CTA block on all ~79 SEO pages + FAQ
-      (primary: "Fix my resume for this job — $4.99"; secondary "Start free");
-      Product+Offer JSON-LD on the tripwire page.
-- [ ] **A4 Trust minimum**: founder block (name, photo placeholder, why-note),
-      support email + /contact linked in footer, refund policy next to every
-      price, replace absolute live counters with /proof link + one real ATS
-      confirmation screenshot.
-
-**Exit:** watch a $0-promo live purchase of both Pro and the tripwire complete
-on prod with all funnel events recorded; failed generation auto-refunds; all
-deploys smoke-green.
+Audited against production 2026-07-31; findings in the LOG.
 
 ## Economics guardrails
 
@@ -612,6 +592,40 @@ deploys smoke-green.
   * Remaining in these phases: none. P3.4, P4.1, P4.2 and P5.7 shipped later the
     same day — see the entry below.
 
+
+- 2026-07-31 (late night) — REVENUE SPRINT RE-AUDITED AGAINST PRODUCTION.
+  Sessions A-D shipped 07-17..07-20; this pass verified the claims still hold
+  after the domain migration rather than rebuilding anything. Nearly all did.
+  Two real gaps, both now fixed, plus one piece of doc rot that probably caused
+  the re-audit to be requested in the first place.
+  * **20 thin pages that sold nothing** (#211). A3 claims the tripwire CTA is on
+    "all 4 programmatic templates"; C1 claims the fit check is on every SEO
+    page; B2 sets a 300-word floor. /resume/{profession} had none of the three:
+    235 words, no CTA, no fit-check link — against /apply-to/15five at 547 and
+    /jobs-in/germany at 578, both wired. It was still the original scaffold
+    (inline-styled article, no SiteHeader/SiteFooter so no nav and no crawl
+    mesh, a literal "adjust path" comment) and still carried the pre-pivot
+    "160+ companies" claim #197 removed everywhere else. Rebuilt from the
+    keyword corpus where it covers the role and honest about the scope where it
+    does not; 554-658 words of source copy, 717-836 rendered.
+    ROOT CAUSE: it was the one template the thin-content guard never covered.
+    The guard now covers all three, checks the seo_health title/description
+    limits at TEST time (it immediately caught a 70-char title and a 159-char
+    description), and asserts retired claims are absent.
+  * **/alternatives 404'd.** The ten competitor pages live under
+    /alternatives/{slug} but their hub is /compare, so truncating a URL — a
+    real habit — hit a 404 on the way to the hub. Permanent redirect.
+  * **The plan contradicted itself.** The Session A-D spec was duplicated near
+    the bottom with every box unchecked, months after shipping, so scrolling the
+    plan said "none of this is done". Removed; pointer left in its place. The
+    single-source-of-truth lesson this project keeps relearning about prices and
+    copy, applied to its own planning doc.
+  * Verified unchanged and healthy: 301 sitemap URLs, zero .ru; funnel events
+    (checkout_started/abandoned, tripwire_view/paid/delivered, fitcheck_started,
+    lead_captured) all present; nurture, abandoned-checkout, lifecycle, daily
+    pulse, self-check, SEO automation, weekly snapshot and weekly digest all
+    wired into the hourly cron; unsubscribe + suppression honoured; /compare,
+    /apply-to and /resume-keywords hubs live.
 
 - 2026-07-31 (night) — BOTH A/B TESTS LIVE, AND THE THREE-ROUND FIGHT TO GET
   THERE. Turning the experiments on was supposed to be a config change. It took
