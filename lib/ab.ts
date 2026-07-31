@@ -61,6 +61,25 @@ export function toAbConfig(
  * it and attach the variant, so a purchase traces back to the copy that produced
  * it. Every step is wrapped against a browser with storage disabled; a visitor
  * with cookies blocked must still see a working page, just always the control.
+ *
+ * WHY THE SWAP DEFENDS ITSELF
+ *
+ * The first version swapped the text once, before paint, and that was correct
+ * for about 200 ms. Then React hydrated, reconciled those nodes against the
+ * server-rendered markup, and put the control text back. In production both
+ * experiments assigned correctly, set their cookies and recorded exposures
+ * while every visitor read the control — the most expensive possible failure
+ * for an experiment, because it produces a clean and completely fictional
+ * result rather than an obvious breakage.
+ *
+ * suppressHydrationWarning on the nodes was not enough: the App Router
+ * reconciles from the RSC payload, which carries the control text regardless.
+ *
+ * So the script applies the swap immediately (no flicker), re-applies once the
+ * document is parsed, and keeps a MutationObserver on the nodes for a few
+ * seconds to undo any framework-driven revert. It re-applies only when the text
+ * actually differs, so it cannot loop on its own mutations, and it disconnects
+ * on a timer so nothing is left observing the page.
  */
 export function variantScript(opts: {
   experimentKey: string
@@ -68,9 +87,7 @@ export function variantScript(opts: {
   pct: number
   swaps: VariantSwaps
 }): string {
-  const swaps = Object.entries(opts.swaps)
-    .map(([id, text]) => `s(${JSON.stringify(id)},${JSON.stringify(text)});`)
-    .join('')
+  const pairs = JSON.stringify(Object.entries(opts.swaps))
 
   return `(function(){try{
 var K=${JSON.stringify(ID_KEY)},id=null;
@@ -81,7 +98,15 @@ for(var i=0;i<q.length;i++){h=((h<<5)-h+q.charCodeAt(i))|0}
 var v=(Math.abs(h)%100)<${opts.pct}?'b':'a';
 window.__raiAb=window.__raiAb||{};window.__raiAb[${JSON.stringify(opts.experimentKey)}]=v;
 try{document.cookie=${JSON.stringify(opts.cookieName)}+'='+v+';path=/;max-age=7776000;samesite=lax'}catch(e){}
-if(v==='b'){function s(i,t){var el=document.getElementById(i);if(el){el.textContent=t}}${swaps}}
+if(v==='b'){
+var W=${pairs},mo=null;
+function ap(){for(var j=0;j<W.length;j++){var el=document.getElementById(W[j][0]);if(el&&el.textContent!==W[j][1]){el.textContent=W[j][1]}}}
+function ob(){if(!mo)return;for(var j=0;j<W.length;j++){var el=document.getElementById(W[j][0]);if(el){mo.observe(el,{childList:true,characterData:true,subtree:true})}}}
+ap();
+try{mo=new MutationObserver(ap);ob()}catch(e){}
+document.addEventListener('DOMContentLoaded',function(){ap();ob()});
+setTimeout(function(){try{if(mo){mo.disconnect()}}catch(e){}},8000);
+}
 }catch(e){}})();`
 }
 
