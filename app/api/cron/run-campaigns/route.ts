@@ -1343,7 +1343,7 @@ async function runCampaigns(
       const knockout = eligibilityKnockout(
         eligibility,
         { country: jobLoc.country, isRemote },
-        { text: jobText, targetingV2, profileSeniority },
+        { text: jobText, title: job.title, targetingV2, profileSeniority },
       )
       if (knockout) {
         campaignLog.skipped++

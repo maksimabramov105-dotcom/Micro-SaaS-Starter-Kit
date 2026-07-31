@@ -214,8 +214,14 @@ describe('eligibilityKnockout — targeting_v2', () => {
     authorizedCountries: ['Australia'], needsVisaSponsorship: true,
     willingToRelocate: false, remoteOnly: false, languages: ['English'],
   }
+  // Region detection reads `text` (location + title + description); seniority
+  // reads `title` alone. These fixtures are short enough to be both.
   const v2 = (text: string, p = AU, isRemote = true, profileSeniority: number | null = null) =>
-    eligibilityKnockout(p, { country: null, isRemote }, { text, targetingV2: true, profileSeniority })
+    eligibilityKnockout(
+      p,
+      { country: null, isRemote },
+      { text, title: text, targetingV2: true, profileSeniority },
+    )
 
   it('knocks out a remote US-only role for an AU candidate needing sponsorship', () => {
     expect(v2('Support Specialist — Remote (US only)')).toBe('remote_region')
@@ -248,6 +254,53 @@ describe('eligibilityKnockout — targeting_v2', () => {
   })
   it('no profileSeniority → seniority check skipped', () => {
     expect(v2('Director, Support — work from anywhere', AU, true, null)).toBeNull()
+  })
+
+  // Regression, 2026-07-31: the seniority check was reading location + title +
+  // 1500 chars of DESCRIPTION. extractSeniority is a keyword scan, so any
+  // posting whose blurb mentioned a director or a manager scored as one. Three
+  // live campaigns skipped 518 of 518 scraped jobs on exactly this.
+  describe('seniority is read from the title, never the description', () => {
+    const withDescription = (title: string, description: string, profileSeniority = 2) =>
+      eligibilityKnockout(
+        AU,
+        { country: null, isRemote: true },
+        {
+          text: `work from anywhere ${title} ${description}`,
+          title,
+          targetingV2: true,
+          profileSeniority,
+        },
+      )
+
+    it('an org chart in the description does not make it a director role', () => {
+      expect(
+        withDescription(
+          'Customer Success Manager',
+          'You will report to the Director of Customer Success and partner with account managers across the org. Our VP of Revenue sets quarterly goals.',
+        ),
+      ).toBeNull()
+    })
+
+    it('still knocks out when the TITLE is the senior one', () => {
+      expect(
+        withDescription('Director, Customer Success', 'A hands-on individual contributor role.'),
+      ).toBe('seniority_mismatch')
+    })
+
+    it('skips the check when no title is supplied — never skip on uncertainty', () => {
+      expect(
+        eligibilityKnockout(
+          AU,
+          { country: null, isRemote: true },
+          {
+            text: 'work from anywhere Director of Everything',
+            targetingV2: true,
+            profileSeniority: 2,
+          },
+        ),
+      ).toBeNull()
+    })
   })
 
   // NZ-resident / AU-phone candidate (real profile): apply to NZ/AU + APAC + global,
