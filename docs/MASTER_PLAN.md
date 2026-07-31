@@ -311,7 +311,28 @@ unified; smoke green; Lighthouse >=90 on landing (perf + SEO).
 
 ## PHASE 2 — The wedge: Chrome extension MVP (~2-3 weeks)
 
-- [ ] **P2.1 Audit `extension/`** + MVP scope: detect Greenhouse/Lever/Ashby,
+- [x] **P2.1 Audit `extension/`** — DONE 2026-07-31. It is NOT a stub: 14 files,
+      ~750 lines, Manifest V3, already covering detection (11 ATS platforms),
+      autofill (237 lines), an on-page overlay, a popup, a background service
+      worker with API-key storage, and a connect-bridge pairing flow. Backend
+      endpoints /api/extension/resume and /api/extension/applications are live
+      on .com (both 401 unauthenticated, i.e. present and guarded).
+      TWO REAL DEFECTS FOUND, BOTH FIXED:
+        1. The migration had BROKEN it. Five hardcoded .ru references, and
+           host_permissions was the fatal one — without .com granted, the fetch
+           following the .ru 301 is blocked by the extension permission model,
+           so "the redirect still works" would NOT have saved it (#186).
+        2. Tracked applications were written as source=MANUAL, making the
+           wedge's contribution indistinguishable from hand-entered rows.
+           Phase 2 exists to prove the extension drives activation; that is
+           unmeasurable without attribution. Added JobSource.EXTENSION.
+      STILL MISSING vs the MVP scope (feeds P2.2/P2.3/P2.6):
+        - "Tailor resume for this job" is entirely absent from the extension —
+          no call to tailoring or /jobs/cover-letter anywhere. Requirement 3 of
+          P2.1 is unimplemented.
+        - No E2E fixtures/tests (P2.6), no Web Store assets (P2.4), no
+          "Add to Chrome" CTA on the landing page (P2.5).
+- [ ] ~~P2.1 original scope~~ + MVP scope: detect Greenhouse/Lever/Ashby,
       one-click autofill from profile, "tailor resume for this job" button,
       track application (source=extension).
 - [ ] **P2.2 API surface**: `app/api/ext/*` (token auth, Redis rate-limits, CORS

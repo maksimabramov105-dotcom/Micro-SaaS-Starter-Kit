@@ -632,6 +632,12 @@ model InboxMessage {
 enum JobSource {
   LINKEDIN
   CAREEROPS
+  // Applications the user tracked themselves via the Chrome extension on a job
+  // board we did NOT submit to. Kept distinct from MANUAL so the funnel can
+  // measure what the extension wedge actually contributes — without this the
+  // extension's applications are indistinguishable from hand-entered ones and
+  // Phase 2 cannot be evaluated at all.
+  EXTENSION
   ADZUNA
   ARBEITNOW
   REMOTEOK

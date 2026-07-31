@@ -13,7 +13,8 @@
  *   resumeId?: string  // defaults to user's default resume
  * }
  *
- * Creates a JobApplication with source=MANUAL, status=SUBMITTED, appliedAt=now.
+ * Creates a JobApplication with source=EXTENSION, status=SUBMITTED, appliedAt=now.
+ * EXTENSION (not MANUAL) so the funnel can attribute activations to the wedge.
  */
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
@@ -62,7 +63,7 @@ export async function POST(request: Request) {
       data: {
         userId: auth.userId!,
         resumeId: resolvedResumeId,
-        source: 'MANUAL',
+        source: 'EXTENSION',
         status: 'SUBMITTED',
         jobTitle: String(jobTitle).slice(0, 255),
         company: String(company).slice(0, 255),
