@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth'
 import { revalidatePath } from 'next/cache'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { QuotaBanner } from '@/components/quota-banner'
 import { getPlanByPriceId } from '@/lib/pricing'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -66,6 +67,19 @@ export default async function DashboardPage() {
   const now = new Date()
   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
 
+  // P4.4 — today's usage against the plan allowance, for the upgrade prompt.
+  const startOfToday = new Date()
+  startOfToday.setHours(0, 0, 0, 0)
+  const [appsToday, quotaUser] = await Promise.all([
+    prisma.jobApplication.count({
+      where: { userId, appliedAt: { gte: startOfToday } },
+    }),
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { dailyApplicationLimit: true, stripePriceId: true },
+    }),
+  ])
+
   const totalApps = await prisma.jobApplication.count({ where: { userId } })
   const weekApps = await prisma.jobApplication.count({
     where: { userId, createdAt: { gte: weekAgo } },
@@ -100,6 +114,16 @@ export default async function DashboardPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
         <p className="text-slate-500">Welcome back, {session.user.name ?? session.user.email}!</p>
+      </div>
+
+      {/* P4.4 — upgrade prompt at the quota edge. Renders nothing when the user
+          has plenty left or is already paying, so it never becomes wallpaper. */}
+      <div className="mb-6">
+        <QuotaBanner
+          usedToday={appsToday}
+          dailyLimit={quotaUser?.dailyApplicationLimit ?? 3}
+          isPaid={Boolean(quotaUser?.stripePriceId)}
+        />
       </div>
 
       {/* The product's "aha" moment — celebrate interview requests loudly (P3.14). */}
