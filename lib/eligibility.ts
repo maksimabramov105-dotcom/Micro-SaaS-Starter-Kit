@@ -240,7 +240,18 @@ export function extractSeniority(title: string): number | null {
 export function eligibilityKnockout(
   profile: EligibilityProfile,
   job: { country: string | null; isRemote: boolean },
-  opts?: { text?: string; targetingV2?: boolean; profileSeniority?: number | null },
+  opts?: {
+    /** Location + title + description. Used for REGION detection only. */
+    text?: string
+    /**
+     * The job TITLE, on its own. Seniority is a property of the title and
+     * nothing else — see the seniority block below for what happens when a
+     * description is passed here instead.
+     */
+    title?: string
+    targetingV2?: boolean
+    profileSeniority?: number | null
+  },
 ): KnockoutReason | null {
   const v2 = opts?.targetingV2 === true
   const authorized = new Set(profile.authorizedCountries.map(normalizeCountry))
@@ -251,8 +262,19 @@ export function eligibilityKnockout(
   const unknownAuth = authorized.size === 0
 
   // Seniority distance (both remote + on-site). Skip roles ≥2 levels away.
-  if (v2 && opts?.profileSeniority != null && opts?.text) {
-    const jobLevel = extractSeniority(opts.text)
+  //
+  // Reads the TITLE only, and skips the check entirely without one. This used to
+  // read `opts.text` — location + title + 1500 characters of description — and
+  // extractSeniority() is a keyword scan, so any posting whose blurb happened to
+  // say "reporting to the Director" or "partner with account managers" scored as
+  // a director role. On 2026-07-31 that knocked out 518 of 518 scraped jobs
+  // across three live campaigns: the gate was reading the company's org chart
+  // instead of the job's rank.
+  //
+  // No title means no seniority signal, and the rule for this module is that we
+  // never skip on uncertainty.
+  if (v2 && opts?.profileSeniority != null && opts?.title) {
+    const jobLevel = extractSeniority(opts.title)
     if (jobLevel != null && Math.abs(jobLevel - opts.profileSeniority) >= 2) {
       return 'seniority_mismatch'
     }
