@@ -29,6 +29,7 @@ import { maybeSendWeeklySnapshot } from '@/lib/pmf/weekly-snapshot'
 import { maybeRunSeoAutomation } from '@/lib/seo/health'
 import { maybeRevalidateCompanyPages } from '@/lib/seo/revalidate-company-pages'
 import { processAbandonedCheckouts, processNurtureQueue } from '@/lib/nurture'
+import { processLifecycleEmails } from '@/lib/lifecycle'
 import { maybeSendDailyPulse } from '@/lib/ops/daily-pulse'
 import { maybeRunOpsSelfCheck } from '@/lib/ops/self-check'
 
@@ -82,6 +83,14 @@ export async function POST(req: Request) {
       console.log('[daily-digest] nurture sent:', nurtured, 'abandoned reminders:', reminded)
   } catch (err) {
     console.error('[daily-digest] nurture processing failed', err)
+  }
+
+  // ── User lifecycle emails (P4.3) — welcome/day1/day3/day7, due-based ────
+  try {
+    const lifecycle = await processLifecycleEmails()
+    if (lifecycle > 0) console.log('[daily-digest] lifecycle emails sent:', lifecycle)
+  } catch (err) {
+    console.error('[daily-digest] lifecycle emails failed', err)
   }
 
   // ── Daily founder pulse (Session D1) — self-gates to 9am Sydney ──────────
