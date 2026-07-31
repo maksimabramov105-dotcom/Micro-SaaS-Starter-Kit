@@ -86,11 +86,22 @@ export default async function HomePage() {
             </p>
             {/* P5.7 — the control copy lives in the HTML; the inline script below
                 swaps it for variant B before paint. Crawlers and every visitor
-                whose JS has not run see one stable version of this page. */}
-            <h1 id="hero-headline" className="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
+                whose JS has not run see one stable version of this page.
+                suppressHydrationWarning is load-bearing: without it React
+                reconciles these nodes back to the control during hydration, so
+                the variant is assigned and tracked but never actually shown. */}
+            <h1
+              id="hero-headline"
+              suppressHydrationWarning
+              className="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl"
+            >
               A resume built for the job you actually want.
             </h1>
-            <p id="hero-subhead" className="mt-5 max-w-xl text-lg text-slate-600 lg:mx-0 mx-auto">
+            <p
+              id="hero-subhead"
+              suppressHydrationWarning
+              className="mt-5 max-w-xl text-lg text-slate-600 lg:mx-0 mx-auto"
+            >
               Paste a job posting and get your resume rewritten for <strong>that specific
               role</strong>, with a fit report showing what was getting you filtered out. Every
               application we send is <strong>confirmed by the employer&apos;s ATS</strong>, and

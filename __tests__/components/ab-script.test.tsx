@@ -204,3 +204,43 @@ describe('bucketing behaviour', () => {
     spy.mockRestore()
   })
 })
+
+/**
+ * The swapped nodes must opt out of hydration reconciliation.
+ *
+ * Regression, 2026-07-31: both experiments were live in production, the variant
+ * was assigned, the cookie was set, the exposure was recorded — and every
+ * visitor still read the control headline, because React reconciled the text
+ * back to the server-rendered value during hydration. An A/B test that measures
+ * a change it never actually shows is worse than no test: it produces a clean,
+ * confident, entirely fictional result.
+ *
+ * Asserted against the page source, since the bug lives in the JSX and not in
+ * anything this module renders.
+ */
+describe('pages that a variant script rewrites', () => {
+  const { readFileSync } = require('fs') as typeof import('fs')
+  const path = require('path') as typeof import('path')
+  const read = (p: string) => readFileSync(path.join(process.cwd(), p), 'utf8')
+
+  it.each([
+    ['app/page.tsx', ['hero-headline', 'hero-subhead']],
+    ['app/pricing/page.tsx', ['pricing-headline', 'pricing-subhead']],
+  ])('%s marks every swapped node suppressHydrationWarning', (file, ids) => {
+    const src = read(file)
+    for (const id of ids) {
+      const i = src.indexOf(`id="${id}"`)
+      expect(i).toBeGreaterThan(-1)
+      // The attribute belongs to the same JSX element, so it must appear before
+      // that element's closing bracket.
+      const tagEnd = src.indexOf('>', i)
+      expect(src.slice(i, tagEnd)).toContain('suppressHydrationWarning')
+    }
+  })
+
+  it('every id a swap targets actually exists in its page', () => {
+    expect(read('app/page.tsx')).toContain('id="hero-headline"')
+    expect(Object.keys(HERO_SWAPS)).toEqual(['hero-headline', 'hero-subhead'])
+    expect(Object.keys(PRICING_SWAPS)).toEqual(['pricing-headline', 'pricing-subhead'])
+  })
+})
