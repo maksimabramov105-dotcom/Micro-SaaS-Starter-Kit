@@ -186,6 +186,18 @@ export const authOptions: NextAuthOptions = {
           console.error('[auth] signup event failed for', user.id, err)
         }
 
+        // P4.3 — welcome email. sendWelcomeEmail() existed in lib/email.ts from
+        // the start and was never called, so a new user heard nothing at all.
+        // Lazily imported for the same reason as sendVerificationRequest: the
+        // Resend SDK pulls in react-dom/server and must not load on every
+        // request that touches auth.
+        try {
+          const { sendWelcome } = await import('./lifecycle')
+          await sendWelcome(user.id, user.email, user.name ?? null)
+        } catch (err) {
+          console.error('[auth] welcome email failed for', user.id, err)
+        }
+
         // Capture referral: read the referral_code cookie set by /r/[code]
         // cookies() works here because createUser fires inside a Route Handler context
         try {
