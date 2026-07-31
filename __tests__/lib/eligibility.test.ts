@@ -182,6 +182,30 @@ describe('extractSeniority', () => {
   it('manager=5', () => expect(extractSeniority('Manager, Customer Support')).toBe(5))
   it('director=5', () => expect(extractSeniority('Director of Support')).toBe(5))
   it('VP=6', () => expect(extractSeniority('VP of Customer Experience')).toBe(6))
+
+  // Regression, 2026-07-31: "Manager" was read as the director tier wherever it
+  // appeared, so every "Senior Customer Success Manager" scored 5 against a
+  // mid-level profile's 2 and failed the two-level distance check. Three live
+  // campaigns scraped 518 jobs and applied to none of them.
+  describe('"Manager" as a job family, not a rank', () => {
+    it.each([
+      ['Senior Customer Success Manager', 3],
+      ['Customer Success Manager', 2],
+      ['Account Manager', 2],
+      ['Senior Product Manager', 3],
+      ['Program Manager', 2],
+      ['Engagement Manager', 2],
+      ['Social Media Manager', 2],
+      ['Partner Manager, EMEA', 2],
+    ])('%s -> %i', (title, level) => expect(extractSeniority(title)).toBe(level))
+
+    it.each([
+      'Manager, Customer Success',
+      'Engineering Manager',
+      'Support Manager',
+      'Manager of Customer Experience',
+    ])('%s is still the manager tier', (title) => expect(extractSeniority(title)).toBe(5))
+  })
 })
 
 describe('eligibilityKnockout — targeting_v2', () => {
