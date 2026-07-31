@@ -30,6 +30,7 @@ import { maybeRunSeoAutomation } from '@/lib/seo/health'
 import { maybeRevalidateCompanyPages } from '@/lib/seo/revalidate-company-pages'
 import { processAbandonedCheckouts, processNurtureQueue } from '@/lib/nurture'
 import { processLifecycleEmails } from '@/lib/lifecycle'
+import { maybeSendWeeklyDigests } from '@/lib/lifecycle/weekly'
 import { maybeSendDailyPulse } from '@/lib/ops/daily-pulse'
 import { maybeRunOpsSelfCheck } from '@/lib/ops/self-check'
 
@@ -91,6 +92,14 @@ export async function POST(req: Request) {
     if (lifecycle > 0) console.log('[daily-digest] lifecycle emails sent:', lifecycle)
   } catch (err) {
     console.error('[daily-digest] lifecycle emails failed', err)
+  }
+
+  // ── Weekly user digest (P3.4) — self-gates to Monday 09-11 UTC ──────────
+  try {
+    const weekly = await maybeSendWeeklyDigests()
+    if (weekly > 0) console.log('[daily-digest] weekly user digests sent:', weekly)
+  } catch (err) {
+    console.error('[daily-digest] weekly digest failed', err)
   }
 
   // ── Daily founder pulse (Session D1) — self-gates to 9am Sydney ──────────
