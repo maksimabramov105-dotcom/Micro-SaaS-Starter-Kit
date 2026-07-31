@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { CheckCircle2, Globe, Inbox, ShieldCheck, FileCheck2 } from 'lucide-react'
+import { AddToChromeCta } from '@/components/add-to-chrome-cta'
 import { PRICE, VISIBLE_PLANS, getMonthlyEquivalent } from '@/lib/pricing'
 import { LaunchBanner } from '@/components/launch-banner'
 import { SiteHeader } from '@/components/site-header'
@@ -104,6 +105,7 @@ export default async function HomePage() {
                 >
                   Fix my resume for this job &mdash; {PRICE.rescue}
                 </Link>
+                <AddToChromeCta refTag="home-hero" variant="secondary" />
                 <Link href="/login?ref=home" className="text-sm font-semibold text-slate-700 underline">
                   or start free
                 </Link>
