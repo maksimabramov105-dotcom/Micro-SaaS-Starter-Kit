@@ -21,6 +21,7 @@ import {
   ATS_GUIDE,
 } from '@/lib/seo/apply-companies'
 import { ROLE_KEYWORDS, roleMeta, roleBodyText } from '@/lib/seo/role-keywords'
+import { PROFESSIONS, professionMeta, professionBodyText } from '@/lib/seo/professions'
 
 const MIN_WORDS = 300
 
@@ -47,6 +48,40 @@ describe('SEO pages are substantial (>= 300 words)', () => {
       expect(wordCount(roleBodyText(r))).toBeGreaterThanOrEqual(MIN_WORDS)
     },
   )
+
+  // Added after these 20 pages were found live at ~235 words with no CTA at
+  // all: they were the one template this guard never covered, which is exactly
+  // how they stayed a scaffold while every other template moved on.
+  it.each(PROFESSIONS.map((p) => [p.slug, p] as const))(
+    '/resume/%s clears the thin-content floor',
+    (_slug, p) => {
+      expect(wordCount(professionBodyText(p))).toBeGreaterThanOrEqual(MIN_WORDS)
+    },
+  )
+})
+
+describe('SEO page titles and descriptions fit the seo_health gate', () => {
+  // Same limits scripts/seo_health.ts enforces against the live site. Catching
+  // an over-long title here beats catching it after deploy.
+  it.each(PROFESSIONS.map((p) => [p.slug, p] as const))(
+    '/resume/%s meta fits',
+    (_slug, p) => {
+      const m = professionMeta(p)
+      expect(m.title.length).toBeLessThanOrEqual(65)
+      expect(m.description.length).toBeLessThanOrEqual(155)
+    },
+  )
+})
+
+describe('no page repeats a claim the pivot retired', () => {
+  // #197 removed "160+ companies" and the auto-apply-first framing everywhere,
+  // but this template was missed and kept shipping both for weeks.
+  const RETIRED = [/160\+/, /50\+ countries/i]
+
+  it.each(PROFESSIONS.map((p) => [p.slug, p] as const))('/resume/%s is clean', (_slug, p) => {
+    const text = professionBodyText(p)
+    for (const claim of RETIRED) expect(text).not.toMatch(claim)
+  })
 })
 
 describe('SEO meta descriptions are unique', () => {
