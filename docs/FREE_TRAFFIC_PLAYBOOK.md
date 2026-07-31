@@ -39,7 +39,9 @@ it, the 301s still work but the transfer is slower and leakier. It requires the
 Search Console → `.com` property → **Sitemaps** → submit `sitemap.xml`.
 It now renders per request, so it already emits `.com` URLs (fixed in #180).
 
-### 0.4 Bing Webmaster Tools (2 minutes, do not skip)
+### 0.4 Bing Webmaster Tools — DONE 2026-07-31
+
+Property added and sitemap submitted. Nothing further to do here.
 
 https://www.bing.com/webmasters → **Import from Google Search Console** — it
 copies the property and sitemap in one click. Bing also feeds DuckDuckGo,
@@ -56,7 +58,7 @@ no equivalent ping; the sitemap plus Search Console is the path.
 | # | Channel | Effort | Realistic payoff | Who |
 |---|---|---|---|---|
 | 1 | Search Console + change of address | 15 min | Protects everything already built | You |
-| 2 | Bing import | 2 min | +10-20% of Google volume, ~free | You |
+| 2 | ~~Bing import~~ DONE | 2 min | +10-20% of Google volume, ~free | You |
 | 3 | Chrome Web Store SEO | 1 h at listing time | Store search is a real, uncompeted channel | You |
 | 4 | Reddit / Discord answers | 30 min/day | First 100 users realistically come from here | You |
 | 5 | Build-in-public content | 2 posts/week | Compounds; feeds testimonials | You |
