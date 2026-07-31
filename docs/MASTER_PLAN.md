@@ -60,10 +60,20 @@ explicitly requires it.
       already tracks pageviews/UTM/visitors. Funnel defined once in
       `lib/pmf/user-funnel.ts` (+ `signup` event in auth). Revisit PostHog at
       scale per docs/ARCHITECTURE.md ($5k MRR).
-- [ ] **P0.3 Google Search Console + sitemap**: sitemap live (102 URLs incl.
-      79 programmatic SEO pages), robots.txt correct — verified 2026-07-16.
-      REMAINING (owner): GSC property access -> confirm indexation + record
-      baseline impressions/clicks here.
+- [ ] **P0.3 Google Search Console + sitemap**: sitemap live and correct —
+      **301 URLs, all 200, all emitting resumeai-bot.com** (re-verified
+      2026-07-31 after the domain migration), robots.txt correct, IndexNow
+      accepting every URL.
+      REMAINING (owner, needs your Google/Microsoft accounts — see
+      `docs/FREE_TRAFFIC_PLAYBOOK.md` section 0 for the exact clicks):
+        1. Add the `resumeai-bot.com` property (Domain type, DNS TXT verify).
+        2. **Change of Address** on the OLD `.ru` property -> `.com`. This is
+           the highest-value single click available right now; the 301 it needs
+           is live and verified. Without it the domain move leaks rankings.
+        3. Submit `sitemap.xml` on the new property.
+        4. Bing Webmaster Tools -> "Import from Google Search Console" (2 min;
+           also feeds DuckDuckGo/Ecosia/ChatGPT search).
+        5. Then record baseline impressions/clicks here.
 - [x] **P0.4 Error alerting**: DONE 2026-07-16 (PR #127). Web
       (instrumentation.ts onRequestError) + worker (FastAPI exception handler)
       -> admin_alert on Redis -> founder Telegram. Live-verified end-to-end:
@@ -518,6 +528,52 @@ deploys smoke-green.
    boilerplate. Nothing here is outstanding.
 
 ## LOG
+
+- 2026-07-31 — **DOMAIN MIGRATION COMPLETE: resumeai-bot.ru -> resumeai-bot.com.**
+  Site, email and crons all verified live on the new domain.
+  * Site: `.com` serves 200 with a valid Let's Encrypt cert on every route
+    (home, pricing, ats-check, resume-rescue, proof, apply-to, resume-keywords).
+    `www` -> apex 301. Every `.ru` page 301s to its `.com` equivalent, so the
+    301 indexed URLs transfer instead of 404ing.
+  * Sitemap: **301/301 URLs now emit `.com`** (was 301/301 on `.ru`). Fixed in
+    #180 — deploy.yml bakes NEXT_PUBLIC_APP_URL at BUILD time, so the
+    statically-generated sitemap had frozen the old domain and no env change or
+    restart could move it. sitemap.ts is now force-dynamic off lib/site.ts.
+  * Email: Resend swapped `.ru` -> `.com` (their free plan allows ONE domain, so
+    the delete was forced and mail was down for the gap). DKIM + SPF MX + SPF
+    TXT all verified. Proven end to end: a real magic link went out at 07:01:48
+    from `noreply@resumeai-bot.com` with subject "Sign in to resumeai-bot.com",
+    2s after the request.
+  * `INBOX_DOMAIN` deliberately stays on `.ru` — 9 users hold
+    `@inbox.resumeai-bot.ru` handles and repointing it would silently kill their
+    inbound replies. The `.ru` MX must keep accepting mail indefinitely.
+
+  THREE THINGS BROKE DURING THE CUTOVER, ALL FOUND AND FIXED:
+  * **Prod was rolled back ~4 months.** A manual `docker compose up -d web`
+    picked up stale `WEB_IMAGE`/`WORKER_IMAGE`/`NOTIFIER_IMAGE` pins in
+    `/opt/resumeai/.env` (frozen at d1f06adc, PR #35). `/apply-to/*` 404'd and
+    the sitemap collapsed to 86 URLs. The deploy pipeline passes fresh tags
+    inline so this never surfaced before. Repinned to the current SHA and rolled
+    forward; that landmine is now defused for future manual restarts.
+  * **Deploy went red.** The post-deploy smoke asserts `.../login` returns 2xx
+    against a hardcoded `resumeai-bot.ru`, which now correctly 301s. The URL
+    lives in deploy.yml (needs the `workflow` scope), so `BASE_URL` was set in
+    `/etc/environment` on the VPS — SSH sessions inherit it via PAM. Verified,
+    re-ran, green.
+  * **The digest and run-campaigns crons went red**, i.e. the autonomous machine
+    stopped. They POST to `.ru/api/cron/*` and curl does not follow redirects on
+    POST without `-L`, so the 301 silently killed them. Caddy now SERVES
+    `/api/*` on `.ru` while still redirecting every human/crawler path. Both
+    crons re-run green. `/api/*` is never indexed, so no SEO cost.
+
+  STILL OPEN (owner):
+  * `deploy.yml:51` still bakes `NEXT_PUBLIC_APP_URL='https://resumeai-bot.ru'`,
+    so client bundles embed the old origin and ISR-cached page canonicals lag
+    until their revalidate windows lapse. One-line fix, needs `workflow` scope.
+  * Google/Bing Search Console — see P0.3.
+  * Optional but recommended: add the DMARC record Resend suggests
+    (TXT `_dmarc` -> `v=DMARC1; p=none;`) to improve deliverability.
+
 
 - 2026-07-30 (late) — "DO ALL": every owner action an agent can close, closed.
   * **#9 Stripe orphans archived.** Live mode 14 active prices -> **5**, exactly
