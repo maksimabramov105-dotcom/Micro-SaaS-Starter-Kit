@@ -19,6 +19,10 @@ const nextConfig = {
       // these are permanent redirects, not a parallel section.
       { source: '/companies', destination: '/apply-to', permanent: true },
       { source: '/companies/:slug', destination: '/apply-to/:slug', permanent: true },
+      // The competitor-comparison hub lives at /compare, but the pages it links
+      // to are under /alternatives/*. Anyone truncating one of those URLs — a
+      // habit search users genuinely have — hit a 404 on the way to the hub.
+      { source: '/alternatives', destination: '/compare', permanent: true },
     ]
   },
 }
