@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { FitReport } from '@/components/fit-report'
 
 /**
  * /dashboard/applications/[id]
@@ -71,6 +72,15 @@ export default async function ApplicationDetailPage({
           {app.appliedAt ? ` · Applied ${new Date(app.appliedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}
         </p>
       </div>
+
+      {/* ── Fit report (P3.2) ───────────────────────────────────────────────
+          Placed directly under the header because it is the answer to the only
+          question a user with no replies actually has: why. */}
+      <FitReport
+        score={app.fitScore}
+        reasons={app.fitReasons ?? []}
+        breakdown={app.fitBreakdown as Record<string, number> | null}
+      />
 
       {/* ── Tailoring metadata ──────────────────────────────────────────────── */}
       {hasTailoring && app.tailoringModelUsed && (
