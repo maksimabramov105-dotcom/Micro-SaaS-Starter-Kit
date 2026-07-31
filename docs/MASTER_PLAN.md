@@ -283,20 +283,27 @@ parallel; engineering starts P2 (extension) next.
 
 ## PHASE 1 — Trust & positioning (~1 week)
 
-- [ ] **P1.1 Domain migration to .com/.ai** (owner buys domain; prep checklist in
+- [x] **P1.1 Domain migration to .com/.ai** (owner buys domain; prep checklist in
       `docs/runbooks/domain-migration.md`: Caddy, 301s, NEXTAUTH_URL, OAuth
       callbacks, Stripe webhook, canonicals, sitemap, GSC).
-- [ ] **P1.2 Reposition landing copy**: "honest job-search copilot" — tailored
+- [x] **P1.2 Reposition landing copy**: "honest job-search copilot" — tailored
       resume per role + apply assist on any job + verified tracking + one inbox.
       Auto-apply becomes a feature bullet. Remove unbackable claims.
 - [ ] **P1.3 Fix empty-room signals**: replace absolute counters with non-count
       proof (real ATS confirmations from `/proof`, tailored-resume diff, demo).
-- [ ] **P1.4 Pricing overhaul**: Free = 3 assisted apps/day + 1 tailored
+      PARTIAL, verified live 2026-07-31: the absolute counters ARE gone and the
+      landing links to `/proof` (twice), so the anti-social-proof problem is
+      solved. What is still missing is the POSITIVE proof: no demo GIF/video and
+      no ATS-confirmation screenshot on the landing page. That is blocked on
+      owner action #6 (a permissioned real ATS confirmation screenshot + founder
+      photo) — it cannot be fabricated, and inventing it would break the one
+      thing the brand sells. Stays unchecked until those assets exist.
+- [x] **P1.4 Pricing overhaul**: Free = 3 assisted apps/day + 1 tailored
       resume/day + inbox. Pro $19/mo ($15/mo annual): unlimited tailoring, 25
       auto-applies/day, all templates. Monthly first. 30-day guarantee prominent.
-- [ ] **P1.5 Trust block**: founder name+photo+note, support email <24h, refund
+- [x] **P1.5 Trust block**: founder name+photo+note, support email <24h, refund
       policy linked, contact in footer, privacy wording. Beta-for-testimonials.
-- [ ] **P1.6 UI/usability pass**: consistent palette, WCAG AA, real screenshots,
+- [x] **P1.6 UI/usability pass**: consistent palette, WCAG AA, real screenshots,
       mobile audit, CTA above fold, truthful comparison vs alive competitors.
 
 **Exit:** new domain live w/ redirects; copilot story on landing; pricing
