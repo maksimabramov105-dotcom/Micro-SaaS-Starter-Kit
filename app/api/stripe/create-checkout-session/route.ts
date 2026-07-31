@@ -5,6 +5,7 @@ import { getStripeSession } from '@/lib/stripe'
 import { prisma } from '@/lib/prisma'
 import { getPlanById, getPlanForCheckout, isHiddenPlan, type BillingInterval } from '@/lib/pricing'
 import { trackEvent } from '@/lib/analytics-advanced'
+import { HERO_COOKIE, HERO_EXPERIMENT } from '@/lib/hero-experiment'
 
 export async function POST(req: Request) {
   try {
@@ -64,6 +65,14 @@ export async function POST(req: Request) {
 
     // ── Analytics: checkout_started ─────────────────────────────────────────
     // Fire-and-forget — never block the redirect on analytics.
+    //
+    // The landing-hero variant rides along on a cookie the hero script set
+    // (P5.7). Without it the experiment has exposures but no conversions, which
+    // makes it an experiment that cannot conclude anything.
+    const heroVariant = req.headers
+      .get('cookie')
+      ?.match(new RegExp(`(?:^|; )${HERO_COOKIE}=(a|b)`))?.[1]
+
     trackEvent({
       event: 'checkout_started',
       userId: session.user.id,
@@ -71,6 +80,9 @@ export async function POST(req: Request) {
         planId: body.planId ?? null,
         interval,
         priceId,
+        ...(heroVariant
+          ? { experiment_key: HERO_EXPERIMENT, variant: heroVariant }
+          : {}),
       },
     }).catch((err: unknown) =>
       console.warn('[checkout] analytics track failed:', err)

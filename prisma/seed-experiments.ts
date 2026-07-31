@@ -20,6 +20,9 @@ async function main() {
     { key: 'pdf_templates_v1',   description: 'WeasyPrint + Jinja2 template picker (Prompt 03)' },
     { key: 'annual_plans_v1',    description: 'Monthly/yearly pricing toggle (Prompt 05)' },
     { key: 'referral_program_v1',description: 'Referral program (Prompt 07)' },
+    // P5.7 — landing hero copy test. rolloutPct is the share seeing variant B;
+    // 0 or 100 turns the split off entirely (everyone sees one thing).
+    { key: 'landing_hero_b',     description: 'Landing hero A/B: verified-applications headline (P5.7)' },
   ]
 
   for (const f of flags) {
