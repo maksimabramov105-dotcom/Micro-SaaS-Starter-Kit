@@ -5,7 +5,7 @@ import { RescueCtaBlock } from '@/components/rescue-cta-block'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { SUPPORT_EMAIL } from '@/lib/site'
 
-const SITE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
+const SITE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.com'
 
 export const metadata: Metadata = {
   title: 'FAQ — ResumeAI-Bot',

@@ -9,7 +9,7 @@ import { SiteFooter } from '@/components/site-footer'
 import { RescueForm } from '@/components/rescue-form'
 import { PRICE, RESCUE_PRICE_USD } from '@/lib/pricing'
 
-const SITE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
+const SITE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.com'
 
 export const metadata = {
   title: `AI Resume Rescue — tailored for one job, ${PRICE.rescue}`,

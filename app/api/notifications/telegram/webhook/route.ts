@@ -17,7 +17,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyTelegramToken } from '@/lib/telegram-token'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.com'
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 
 async function sendTelegramMessage(chatId: string | number, text: string, url?: string) {

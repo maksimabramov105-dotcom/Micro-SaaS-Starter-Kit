@@ -25,7 +25,7 @@ import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
 import type { Lead } from '@prisma/client'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.com'
 const DAY_MS = 86_400_000
 
 /** Days to wait AFTER each stage (stage 1 = t0 report already sent). */
@@ -67,7 +67,7 @@ function footer(email: string): string {
   const token = createLeadUnsubscribeToken(email)
   return (
     `\n\n—\nMaxim, founder of ResumeAI\n` +
-    `You're getting this because you ran a free fit check on resumeai-bot.ru and opted in.\n` +
+    `You're getting this because you ran a free fit check on resumeai-bot.com and opted in.\n` +
     `Unsubscribe (one click, immediate): ${APP_URL}/api/nurture/unsubscribe?token=${encodeURIComponent(token)}\n` +
     `Privacy: ${APP_URL}/privacy`
   )

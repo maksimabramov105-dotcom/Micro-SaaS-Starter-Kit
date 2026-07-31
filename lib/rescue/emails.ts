@@ -6,7 +6,7 @@ import { sendEmail } from '@/lib/email'
 import { PRICE } from '@/lib/pricing'
 import type { RescueOrder } from '@prisma/client'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.com'
 
 export async function sendRescueDeliveryEmail(order: RescueOrder): Promise<void> {
   const resultUrl = `${APP_URL}/resume-rescue/result?order=${order.id}`

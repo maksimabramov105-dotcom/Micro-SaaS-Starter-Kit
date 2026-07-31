@@ -4,7 +4,7 @@
  */
 import { NextResponse } from 'next/server'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.com'
 
 export function GET() {
   return NextResponse.redirect(`${APP_URL}/ats-check`, 308)

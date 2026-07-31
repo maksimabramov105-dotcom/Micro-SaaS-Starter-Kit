@@ -3,7 +3,7 @@ import { SiteHeader } from '@/components/site-header'
 import { SiteFooter } from '@/components/site-footer'
 import { getVerifiedStats } from '@/lib/stats/verified'
 
-const SITE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
+const SITE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.com'
 
 // Render at runtime (the DB isn't available during the CI build, so static
 // generation would cache empty numbers). The DB query itself is cached 1h via

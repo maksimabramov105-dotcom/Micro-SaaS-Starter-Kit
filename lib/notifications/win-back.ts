@@ -15,7 +15,7 @@ import { prisma } from '@/lib/prisma'
 import { sendEmail } from '@/lib/email'
 import { isPromoActive, PROMO } from '@/lib/promo'
 
-const SITE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
+const SITE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.com'
 const MAX_PER_RUN = 200 // safety cap per run
 
 export interface WinBackResult {

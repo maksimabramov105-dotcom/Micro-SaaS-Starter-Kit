@@ -100,7 +100,7 @@ export async function POST(req: Request) {
     console.error('[daily-digest] ops self-check failed', err)
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.com'
 
   // ── Find paying users with digest enabled ───────────────────────────────
   const candidates = await prisma.user.findMany({

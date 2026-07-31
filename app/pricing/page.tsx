@@ -8,7 +8,7 @@ import { LaunchBanner } from '@/components/launch-banner'
 import { PRICE, VISIBLE_PLANS } from '@/lib/pricing'
 import { PROMO, isPromoActive, promoEndLabel } from '@/lib/promo'
 
-const SITE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
+const SITE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.com'
 
 export const metadata = {
   title: 'Pricing — ResumeAI',

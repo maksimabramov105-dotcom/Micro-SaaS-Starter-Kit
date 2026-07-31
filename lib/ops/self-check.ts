@@ -12,7 +12,7 @@ import { sendAdminAlert } from '@/lib/alerts'
 import { trackEvent } from '@/lib/analytics-advanced'
 import { prisma } from '@/lib/prisma'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.com'
 const FIT_CHECK_BUDGET_MS = 5000
 
 export interface SelfCheckResult {

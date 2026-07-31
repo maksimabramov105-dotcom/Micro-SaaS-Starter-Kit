@@ -14,7 +14,7 @@ import { sendEmail } from '@/lib/email'
 import type { InboxClassification } from './classify'
 
 const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || 'ResumeAI'
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://resumeai-bot.ru'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://resumeai-bot.com'
 
 // Which classifications are worth interrupting the user for.
 const NOTIFY: Record<string, { label: string; emoji: string; blurb: string }> = {

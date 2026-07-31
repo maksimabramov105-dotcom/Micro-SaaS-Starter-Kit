@@ -17,7 +17,7 @@ import { getRedis } from '@/lib/redis'
 import { stripe } from '@/lib/stripe'
 import { callWorker, WorkerError } from '@/lib/worker-client'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.com'
 const RATE_LIMIT_PER_HOUR = 10
 
 // Linear-time email shape check (no regex — user-provided input, ReDoS-safe).
