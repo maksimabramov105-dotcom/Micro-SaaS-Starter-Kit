@@ -3,6 +3,8 @@ import { revalidatePath } from 'next/cache'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { QuotaBanner } from '@/components/quota-banner'
+import { GetStarted } from '@/components/get-started'
+import { CHROME_STORE_URL } from '@/lib/site'
 import { getPlanByPriceId } from '@/lib/pricing'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -181,7 +183,19 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {/* KPI strip */}
+      {/* P4.2 — first-run path. Renders nothing once there is a resume and an
+          application, so it never becomes permanent furniture. */}
+      <GetStarted
+        resumes={resumes.length}
+        applications={totalApps}
+        campaigns={campaigns.length}
+        extensionUrl={CHROME_STORE_URL}
+      />
+
+      {/* KPI strip. Hidden before the first application: five zeros is a status
+          report on having achieved nothing, and GetStarted above answers the
+          only question a new user actually has. */}
+      {totalApps > 0 && (
       <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardHeader className="pb-2">
@@ -231,6 +245,7 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+      )}
 
       <div className="grid gap-8 lg:grid-cols-2">
         {/* Resumes */}
@@ -308,7 +323,10 @@ export default async function DashboardPage() {
         </section>
       </div>
 
-      {/* Recent applications */}
+      {/* Recent applications. Hidden entirely for a user with no applications and
+          no campaign — GetStarted above already tells them what to do, and a
+          second "nothing here yet" card underneath it just repeats the bad news. */}
+      {(recentApplications.length > 0 || campaigns.length > 0) && (
       <section className="mt-8">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-xl font-semibold text-slate-900">Recent Applications</h2>
@@ -319,23 +337,10 @@ export default async function DashboardPage() {
         {recentApplications.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
-              {campaigns.length === 0 ? (
-                <>
-                  <p className="text-slate-600">No applications yet — you don&apos;t have a campaign running.</p>
-                  <Button asChild size="sm">
-                    <Link href="/dashboard/campaigns/new">Create your first campaign</Link>
-                  </Button>
-                  <p className="max-w-md text-xs text-slate-400">
-                    Pick keywords + locations and we auto-apply to matching jobs. Applications
-                    show up here as <strong>queued → submitted → confirmed</strong>.
-                  </p>
-                </>
-              ) : (
-                <p className="max-w-md text-slate-500">
-                  Your campaign is active. New applications appear here after the next
-                  run (within ~30&nbsp;minutes), with honest per-stage status.
-                </p>
-              )}
+              <p className="max-w-md text-slate-500">
+                Your campaign is active. New applications appear here after the next
+                run (within ~30&nbsp;minutes), with honest per-stage status.
+              </p>
             </CardContent>
           </Card>
         ) : (
@@ -416,6 +421,7 @@ export default async function DashboardPage() {
           </p>
         )}
       </section>
+      )}
     </div>
   )
 }

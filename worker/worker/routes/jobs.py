@@ -205,6 +205,11 @@ class ExtractResumeRequest(BaseModel):
     filename: str = "resume.pdf"
 
 
+class ParseResumeRequest(BaseModel):
+    """POST /jobs/parse-resume — resume text -> structured profile fields."""
+    resume_text: str
+
+
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @router.post("/resume/generate", dependencies=[Depends(verify_bearer)])
@@ -457,6 +462,25 @@ async def extract_resume(body: ExtractResumeRequest) -> dict:
         )
     logger.info("job.extract_resume.done", chars=len(text))
     return {"text": text[:20000]}
+
+
+@router.post("/parse-resume", dependencies=[Depends(verify_bearer)])
+async def parse_resume(body: ParseResumeRequest) -> dict:
+    """
+    Structure an existing resume so the create-resume form arrives prefilled
+    (P4.1). Returns {"parsed": null} rather than an error when the text cannot
+    be understood — the web side falls back to the empty form, which is the
+    behaviour that existed before this endpoint.
+    """
+    from worker.ai.parse import parse_resume_text
+
+    logger.info("job.parse_resume.started", chars=len(body.resume_text))
+    if len(body.resume_text.strip()) < 100:
+        raise HTTPException(status_code=422, detail="resume text is too short to parse")
+
+    parsed = await parse_resume_text(body.resume_text)
+    logger.info("job.parse_resume.done", ok=parsed is not None)
+    return {"parsed": parsed}
 
 
 @router.post("/autoapply/linkedin", dependencies=[Depends(verify_bearer)])

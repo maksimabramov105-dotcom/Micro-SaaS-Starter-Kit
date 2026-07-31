@@ -100,6 +100,27 @@ jobs:
           path: playwright-report/
           retention-days: 7
 
+  worker-tests:
+    name: Worker tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      # The worker's 190+ tests — scrapers, jobfit scoring, resume rendering,
+      # autoapply — ran on nobody's machine but mine. The Python half of the
+      # product could break on a PR and CI would stay green, which is how a
+      # scraper change reaches production untested.
+      - name: Install worker with dev extras
+        working-directory: worker
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[dev]'
+      - name: pytest
+        working-directory: worker
+        run: python -m pytest -q
+
   cyrillic-guard:
     name: No Cyrillic in source
     runs-on: ubuntu-latest
