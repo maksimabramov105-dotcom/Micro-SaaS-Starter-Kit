@@ -244,3 +244,50 @@ describe('pages that a variant script rewrites', () => {
     expect(Object.keys(PRICING_SWAPS)).toEqual(['pricing-headline', 'pricing-subhead'])
   })
 })
+
+/**
+ * The swap has to survive the framework putting the control text back.
+ * See lib/ab.ts — in production the swap ran, then hydration reverted it, and
+ * every visitor read the control while the experiment happily recorded
+ * exposures for both arms.
+ */
+describe('the swap defends itself', () => {
+  const script = scriptText(hero({ active: true, pct: 100 }))
+
+  it('re-applies after the document is parsed', () => {
+    expect(script).toContain("addEventListener('DOMContentLoaded'")
+  })
+
+  it('watches the nodes for a framework-driven revert', () => {
+    expect(script).toContain('MutationObserver')
+  })
+
+  it('only writes when the text actually differs, so it cannot loop on itself', () => {
+    expect(script).toContain('el.textContent!==W[j][1]')
+  })
+
+  it('stops observing on a timer rather than watching forever', () => {
+    expect(script).toContain('mo.disconnect()')
+  })
+
+  it('undoes a revert in a real DOM', () => {
+    document.body.innerHTML =
+      '<h1 id="hero-headline">control</h1><p id="hero-subhead">control sub</p>'
+    localStorage.setItem('rai_ab_id', 'x')
+    eval(script)
+    const h1 = document.getElementById('hero-headline')!
+    expect(h1.textContent).toBe(HERO_B.headline)
+
+    // Simulate hydration reconciling the node back to the server-rendered text.
+    h1.textContent = 'control'
+    return new Promise<void>((resolve) => {
+      // MutationObserver callbacks are microtask-scheduled.
+      queueMicrotask(() => {
+        expect(h1.textContent).toBe(HERO_B.headline)
+        localStorage.clear()
+        document.body.innerHTML = ''
+        resolve()
+      })
+    })
+  })
+})
