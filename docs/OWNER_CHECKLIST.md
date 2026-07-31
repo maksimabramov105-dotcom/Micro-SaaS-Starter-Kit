@@ -8,6 +8,49 @@ list, not a history. History lives in `docs/MASTER_PLAN.md` → LOG.
 
 ---
 
+## 1. Chrome Web Store submission — the single biggest blocker
+
+**Why it matters:** Phase 2's exit criterion is literally *"extension approved in
+Web Store"*. It also gates the "Add to Chrome" button, which is built and
+waiting. Nothing else in Phase 2 is outstanding — the code is done, deployed and
+tested.
+
+**Time:** ~1 hour to prepare, then 1–5 business days of Google review.
+
+1. Go to **https://chrome.google.com/webstore/devconsole** and sign in.
+2. Pay the **one-time $5 developer registration fee** if you have not already.
+3. Package the extension:
+   ```bash
+   cd ~/code/Micro-SaaS-Starter-Kit && zip -r ../resumeai-extension.zip extension -x "*.DS_Store"
+   ```
+4. **New item** → upload `resumeai-extension.zip`.
+5. Fill the listing. These fields carry ranking weight in store search, so use
+   the words people actually type:
+   - **Name:** `ResumeAI — Job Application Autofill & Resume Tailoring`
+   - **Short description** (132 chars max, most important field):
+     `Autofill job applications on Greenhouse, Lever, Ashby and more. Tailor your resume for the exact role in one click.`
+   - **Category:** Productivity
+   - **Screenshots (1280×800):** show the extension *doing the thing* on a real
+     Greenhouse form — the overlay button mid-autofill, and the tailor button.
+     Do not use a logo or an abstract graphic; screenshots are the conversion
+     lever on a store listing.
+   - **Privacy policy URL:** `https://resumeai-bot.com/privacy`
+6. **Privacy practices tab** — you must justify each permission or review
+   bounces. Truthful answers:
+   - `storage` → stores the user's ResumeAI API key locally.
+   - `activeTab` / `scripting` → reads the job posting the user is looking at, to
+     autofill and to tailor for it.
+   - host permissions → the ATS domains the extension fills, plus
+     resumeai-bot.com for the user's own resume data.
+   - Data use: state that resume data is sent to resumeai-bot.com only, is not
+     sold, and is not used for advertising.
+7. Submit for review.
+
+**When it is approved, tell me the extension ID** and I will set
+`NEXT_PUBLIC_CHROME_EXTENSION_ID` — the "Add to Chrome" CTA then appears on the
+landing page with no code change. (You can also set it yourself: add the line to
+`/opt/resumeai/.env` and run `docker compose up -d web`.)
+
 ---
 
 ## 2. Trust assets — the last open Phase 1 item
@@ -48,9 +91,38 @@ Two things to decide:
 
 ---
 
+## 4. Telegram alerts for the uptime monitor (optional, recommended)
+
+The uptime monitor is live and probing every 15 minutes from GitHub's runners.
+It already emails you on failure. For phone alerts, add two repo secrets:
+
+**https://github.com/maksimabramov105-dotcom/Micro-SaaS-Starter-Kit/settings/secrets/actions**
+
+| Secret | Value |
+|---|---|
+| `TELEGRAM_BOT_TOKEN` | your ResumeAI bot token |
+| `TELEGRAM_CHAT_ID` | `6246429438` |
+
+Also: if you have never pressed **Start** on the ResumeAI bot in Telegram, do it
+once — Telegram refuses bot-initiated messages otherwise (403).
+
 ---
 
-## 7. First users — the actual bottleneck now
+## 5. Security hygiene — rotate what was shared in chat
+
+1. **Revoke the old GitHub PAT.** I removed it from `.git/config`, but it still
+   exists on GitHub until you revoke it:
+   **https://github.com/settings/tokens** → find the old `ghp_…` → Delete.
+2. **Rotate the Cloudflare API token** you created for the migration:
+   **https://dash.cloudflare.com/profile/api-tokens** → Roll or Delete.
+3. **Rotate the R2 keys** if they were pasted in chat.
+
+None of these are currently exploitable through the app, but a credential that
+has appeared in a chat log should not stay valid.
+
+---
+
+## 6. First users — the actual bottleneck now
 
 Everything technical for Phase 5 distribution is built (301 SEO URLs, `/proof`,
 comparison pages, referral loop). What is missing is people, and that part is
@@ -71,4 +143,46 @@ See `docs/FREE_TRAFFIC_PLAYBOOK.md` for the full ordering.
 
 ---
 
-##
+## 7. Two A/B tests are built and waiting for you to switch them on
+
+Both are off. Neither does anything until you turn it on, and turning one on
+costs nothing and needs no redeploy.
+
+**Dashboard → Admin → Feature Flags**, then set the rollout % and toggle:
+
+| flag | what variant B changes | suggested % |
+|---|---|---|
+| `landing_hero_b` | Homepage headline leads with "every application is confirmed by the employer" instead of the resume artifact | 50 |
+| `pricing_headline_b` | `/pricing` headline leads with the 30-day refund instead of "Simple, Transparent Pricing" | 50 |
+
+A rollout of 0 or 100 means everyone sees one thing, so nothing is recorded —
+use 50 to actually run a test. Changes take effect within 5 minutes, or
+instantly with **Bust cache**.
+
+To read the result once traffic has accumulated:
+
+```bash
+npx tsx scripts/experiment_results.ts landing_hero
+```
+
+It prints exposures, conversions and a p-value. Under p < 0.05 you have a
+winner; ship it by setting that flag to 100 (or 0 to keep the control).
+
+**Honest expectation:** with current traffic this will take weeks to reach
+significance, and possibly longer than it takes to just pick one. It is here so
+that when traffic does arrive, the measurement already exists.
+
+---
+
+## Done recently — no action needed
+
+Domain migration to `.com` (site, email, crons, sitemap, canonicals) · Search
+Console change-of-address confirmed and running · **Bing sitemap submitted** ·
+Resend verified on `.com` · DMARC added · OAuth redirect URIs updated ·
+`workflow` scope granted · all 10 dependency PRs merged · 9 orphaned Stripe
+prices archived · uptime monitor live · scraper description capture shipped ·
+**`/pricing` speed fix shipped** (was Lighthouse 72 / LCP 5.4 s because it
+rendered dynamically to assign an A/B variant; assignment moved client-side and
+the page is static again) · **autoapply seniority bug fixed** (every "… Manager"
+title was read as the director rank, so three live campaigns scraped 518 jobs
+and applied to none of them).
