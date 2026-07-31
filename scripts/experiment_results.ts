@@ -68,37 +68,76 @@ async function main() {
   }
 
   const exp = await prisma.experiment.findUnique({ where: { key: experimentKey } })
-  if (!exp) {
-    console.error(`Experiment "${experimentKey}" not found.`)
+
+  // Client-assigned experiments (P5.7) have no Experiment row and no
+  // ExperimentAssignment rows: assignment happens in the browser so the landing
+  // page can stay statically rendered. Their denominator is the exposure event
+  // instead. Without this branch the only tool for reading experiment results
+  // would refuse to read half of the experiments.
+  const exposures = await prisma.analyticsEvent.findMany({
+    where: { event: 'experiment_exposure' },
+    select: { userId: true, sessionId: true, properties: true },
+  })
+  const exposureByVariant: Record<string, number> = {}
+  for (const e of exposures) {
+    const props = e.properties as Record<string, unknown> | null
+    if (props?.experiment_key !== experimentKey) continue
+    const v = typeof props?.variant === 'string' ? props.variant : null
+    if (!v) continue
+    exposureByVariant[v] = (exposureByVariant[v] ?? 0) + 1
+  }
+  const clientAssigned = !exp && Object.keys(exposureByVariant).length > 0
+
+  if (!exp && !clientAssigned) {
+    console.error(
+      `Experiment "${experimentKey}" not found — no Experiment row and no ` +
+      `experiment_exposure events recorded for that key.`,
+    )
     process.exit(1)
   }
 
-  console.log(`\n═══ Experiment: ${exp.key} ═══`)
-  console.log(`Description : ${exp.description ?? '—'}`)
-  console.log(`Status      : ${exp.active ? 'ACTIVE' : 'ENDED'}`)
-  console.log(`Started     : ${exp.startedAt.toISOString().slice(0, 10)}`)
-  if (exp.endedAt) console.log(`Ended       : ${exp.endedAt.toISOString().slice(0, 10)}`)
+  const variantNames = exp ? exp.variants : Object.keys(exposureByVariant).sort()
+
+  console.log(`\n═══ Experiment: ${experimentKey} ═══`)
+  if (exp) {
+    console.log(`Description : ${exp.description ?? '—'}`)
+    console.log(`Status      : ${exp.active ? 'ACTIVE' : 'ENDED'}`)
+    console.log(`Started     : ${exp.startedAt.toISOString().slice(0, 10)}`)
+    if (exp.endedAt) console.log(`Ended       : ${exp.endedAt.toISOString().slice(0, 10)}`)
+  } else {
+    console.log(`Description : client-assigned (exposure-based)`)
+  }
   console.log(`Conversion  : ${conversionEvent}\n`)
 
   // ── Assignments per variant ──────────────────────────────────────────────
-  const assignmentCounts = await prisma.experimentAssignment.groupBy({
-    by: ['variant'],
-    where: { experimentKey },
-    _count: { variant: true },
-  })
-  const totalAssignments = assignmentCounts.reduce((s, r) => s + r._count.variant, 0)
+  const assignmentCounts = exp
+    ? await prisma.experimentAssignment.groupBy({
+        by: ['variant'],
+        where: { experimentKey },
+        _count: { variant: true },
+      })
+    : []
 
   const variantData: Record<string, { n: number; conversions: number }> = {}
-  for (const r of assignmentCounts) {
-    variantData[r.variant] = { n: r._count.variant, conversions: 0 }
+  if (clientAssigned) {
+    for (const [v, n] of Object.entries(exposureByVariant)) {
+      variantData[v] = { n, conversions: 0 }
+    }
+  } else {
+    for (const r of assignmentCounts) {
+      variantData[r.variant] = { n: r._count.variant, conversions: 0 }
+    }
   }
+  const totalAssignments = Object.values(variantData).reduce((s, d) => s + d.n, 0)
 
   // ── Conversions: AnalyticsEvent rows where properties->>'experiment_key' matches ──
   // We look for analytics events where the user/anonId was assigned to this experiment.
-  const assignments = await prisma.experimentAssignment.findMany({
-    where: { experimentKey },
-    select: { variant: true, userId: true, anonId: true },
-  })
+  const assignments = exp
+    ? await prisma.experimentAssignment.findMany({
+        where: { experimentKey },
+        select: { variant: true, userId: true, anonId: true },
+      })
+    : []
 
   // Build a map: userId/anonId → variant
   const userVariant = new Map<string, string>()
@@ -134,10 +173,10 @@ async function main() {
 
   // ── Report ───────────────────────────────────────────────────────────────
   console.log('┌────────────────────┬──────────┬─────────────┬──────────────┐')
-  console.log('│ Variant            │ Assigned │ Conversions │ Conv. Rate   │')
+  console.log(`│ Variant            │ ${clientAssigned ? ' Exposed' : 'Assigned'} │ Conversions │ Conv. Rate   │`)
   console.log('├────────────────────┼──────────┼─────────────┼──────────────┤')
 
-  const variantRows = exp.variants.map((v: string) => {
+  const variantRows = variantNames.map((v: string) => {
     const d = variantData[v] ?? { n: 0, conversions: 0 }
     const rate = d.n > 0 ? (d.conversions / d.n) * 100 : 0
     return { variant: v, ...d, rate }

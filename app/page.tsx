@@ -8,6 +8,8 @@ import { SiteFooter } from '@/components/site-footer'
 import { HeroDemo } from '@/components/hero-demo'
 import { testimonials, replyScreenshots } from '@/lib/proof'
 import { SITE_URL, SUPPORT_EMAIL } from '@/lib/site'
+import { getHeroExperiment } from '@/lib/hero-experiment.server'
+import { HeroVariantScript, HeroExposure } from '@/components/hero-experiment'
 
 // ISR: regenerated hourly so proof/testimonial content stays fresh while
 // the page stays fully server-rendered + indexable.
@@ -60,6 +62,8 @@ const HOMEPAGE_PLANS = VISIBLE_PLANS.filter(
 )
 
 export default async function HomePage() {
+  // P5.7 — read once per render, on the page's existing hourly ISR window.
+  const heroExperiment = await getHeroExperiment()
   return (
     <main className="flex min-h-screen flex-col bg-white">
       <script
@@ -79,16 +83,20 @@ export default async function HomePage() {
             <p className="mb-4 text-sm font-semibold uppercase tracking-wide text-emerald-600">
               Tailored per role · verified submitted · replies in one inbox
             </p>
-            <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
+            {/* P5.7 — the control copy lives in the HTML; the inline script below
+                swaps it for variant B before paint. Crawlers and every visitor
+                whose JS has not run see one stable version of this page. */}
+            <h1 id="hero-headline" className="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
               A resume built for the job you actually want.
             </h1>
-            <p className="mt-5 max-w-xl text-lg text-slate-600 lg:mx-0 mx-auto">
+            <p id="hero-subhead" className="mt-5 max-w-xl text-lg text-slate-600 lg:mx-0 mx-auto">
               Paste a job posting and get your resume rewritten for <strong>that specific
               role</strong>, with a fit report showing what was getting you filtered out. Every
               application we send is <strong>confirmed by the employer&apos;s ATS</strong>, and
               every reply lands in <strong>one inbox</strong>. Optional auto-apply handles the
               volume &mdash; only where you&apos;re genuinely eligible.
             </p>
+            <HeroVariantScript experiment={heroExperiment} />
 
             {/* Two money paths + free signup, all ref-tagged for attribution */}
             <div className="mt-8 flex flex-col items-center gap-3 lg:items-start">
@@ -460,6 +468,9 @@ export default async function HomePage() {
       </section>
 
       <SiteFooter />
+
+      {/* Exposure beacon last: nothing above it waits on analytics. */}
+      <HeroExposure experiment={heroExperiment} />
     </main>
   )
 }
