@@ -60,20 +60,16 @@ explicitly requires it.
       already tracks pageviews/UTM/visitors. Funnel defined once in
       `lib/pmf/user-funnel.ts` (+ `signup` event in auth). Revisit PostHog at
       scale per docs/ARCHITECTURE.md ($5k MRR).
-- [ ] **P0.3 Google Search Console + sitemap**: sitemap live and correct —
-      **301 URLs, all 200, all emitting resumeai-bot.com** (re-verified
-      2026-07-31 after the domain migration), robots.txt correct, IndexNow
-      accepting every URL.
-      REMAINING (owner, needs your Google/Microsoft accounts — see
-      `docs/FREE_TRAFFIC_PLAYBOOK.md` section 0 for the exact clicks):
-        1. Add the `resumeai-bot.com` property (Domain type, DNS TXT verify).
-        2. **Change of Address** on the OLD `.ru` property -> `.com`. This is
-           the highest-value single click available right now; the 301 it needs
-           is live and verified. Without it the domain move leaks rankings.
-        3. Submit `sitemap.xml` on the new property.
-        4. Bing Webmaster Tools -> "Import from Google Search Console" (2 min;
-           also feeds DuckDuckGo/Ecosia/ChatGPT search).
-        5. Then record baseline impressions/clicks here.
+- [x] **P0.3 Google Search Console + sitemap**: DONE 2026-07-31. Sitemap live
+      and correct — **301 URLs, all 200, all emitting resumeai-bot.com**
+      (re-verified after the domain migration), robots.txt correct, IndexNow
+      accepting every URL. Owner completed: `.com` property added and verified,
+      **Change of Address** from the old `.ru` property confirmed (it initially
+      failed on a stale crawl from the six-day outage; "Request indexing" on the
+      root fixed it), sitemap submitted, and **Bing sitemap submitted** — Bing
+      also feeds DuckDuckGo, Ecosia and ChatGPT search.
+      Only follow-up left is passive: record baseline impressions/clicks once
+      Search Console has accumulated a few weeks of post-migration data.
 - [x] **P0.4 Error alerting**: DONE 2026-07-16 (PR #127). Web
       (instrumentation.ts onRequestError) + worker (FastAPI exception handler)
       -> admin_alert on Redis -> founder Telegram. Live-verified end-to-end:
