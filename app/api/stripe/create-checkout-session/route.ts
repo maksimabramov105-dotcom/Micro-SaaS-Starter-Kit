@@ -5,7 +5,9 @@ import { getStripeSession } from '@/lib/stripe'
 import { prisma } from '@/lib/prisma'
 import { getPlanById, getPlanForCheckout, isHiddenPlan, type BillingInterval } from '@/lib/pricing'
 import { trackEvent } from '@/lib/analytics-advanced'
+import { readVariantCookie } from '@/lib/ab'
 import { HERO_COOKIE, HERO_EXPERIMENT } from '@/lib/hero-experiment'
+import { PRICING_COOKIE, PRICING_EXPERIMENT } from '@/lib/pricing-experiment'
 
 export async function POST(req: Request) {
   try {
@@ -66,12 +68,22 @@ export async function POST(req: Request) {
     // ── Analytics: checkout_started ─────────────────────────────────────────
     // Fire-and-forget — never block the redirect on analytics.
     //
-    // The landing-hero variant rides along on a cookie the hero script set
-    // (P5.7). Without it the experiment has exposures but no conversions, which
-    // makes it an experiment that cannot conclude anything.
-    const heroVariant = req.headers
-      .get('cookie')
-      ?.match(new RegExp(`(?:^|; )${HERO_COOKIE}=(a|b)`))?.[1]
+    // Experiment variants ride along on cookies the inline scripts set (P5.7).
+    // Without them the experiments have exposures but no conversions, which
+    // makes them experiments that cannot conclude anything.
+    //
+    // `experiment_key`/`variant` stay singular because that is the shape
+    // scripts/experiment_results.ts reads. The pricing test wins the slot when
+    // both are present: it is the nearer cause of a checkout on /pricing, and
+    // the hero variant is still recoverable from the exposure events.
+    const cookies = req.headers.get('cookie')
+    const heroVariant = readVariantCookie(cookies, HERO_COOKIE)
+    const pricingVariant = readVariantCookie(cookies, PRICING_COOKIE)
+    const attributed = pricingVariant
+      ? { experiment_key: PRICING_EXPERIMENT, variant: pricingVariant }
+      : heroVariant
+        ? { experiment_key: HERO_EXPERIMENT, variant: heroVariant }
+        : {}
 
     trackEvent({
       event: 'checkout_started',
@@ -80,9 +92,8 @@ export async function POST(req: Request) {
         planId: body.planId ?? null,
         interval,
         priceId,
-        ...(heroVariant
-          ? { experiment_key: HERO_EXPERIMENT, variant: heroVariant }
-          : {}),
+        ...attributed,
+        ...(heroVariant ? { hero_variant: heroVariant } : {}),
       },
     }).catch((err: unknown) =>
       console.warn('[checkout] analytics track failed:', err)

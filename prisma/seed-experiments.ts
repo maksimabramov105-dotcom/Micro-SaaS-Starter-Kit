@@ -23,6 +23,7 @@ async function main() {
     // P5.7 — landing hero copy test. rolloutPct is the share seeing variant B;
     // 0 or 100 turns the split off entirely (everyone sees one thing).
     { key: 'landing_hero_b',     description: 'Landing hero A/B: verified-applications headline (P5.7)' },
+    { key: 'pricing_headline_b', description: 'Pricing headline A/B: refund-guarantee lead (client-assigned)' },
   ]
 
   for (const f of flags) {

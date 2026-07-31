@@ -11,7 +11,8 @@
  */
 import { cache } from 'react'
 import { prisma } from '@/lib/prisma'
-import { HERO_FLAG, type HeroExperiment } from '@/lib/hero-experiment'
+import { toAbConfig, type AbConfig } from '@/lib/ab'
+import { HERO_FLAG } from '@/lib/hero-experiment'
 
 /**
  * Whether the hero test is live, and at what rollout.
@@ -20,17 +21,14 @@ import { HERO_FLAG, type HeroExperiment } from '@/lib/hero-experiment'
  * database error returns "off" — a landing page must render when the DB is
  * unhappy, and the control copy is the safe default.
  */
-export const getHeroExperiment = cache(async (): Promise<HeroExperiment> => {
+export const getHeroExperiment = cache(async (): Promise<AbConfig> => {
   try {
-    const flag = await prisma.featureFlag.findUnique({
-      where: { key: HERO_FLAG },
-      select: { enabled: true, rolloutPct: true },
-    })
-    if (!flag?.enabled) return { active: false, pct: 0 }
-    const pct = Math.max(0, Math.min(100, flag.rolloutPct))
-    // 0% and 100% are both "everyone sees one thing" — no need to run the
-    // client-side split, and no exposure events worth recording.
-    return { active: pct > 0 && pct < 100, pct }
+    return toAbConfig(
+      await prisma.featureFlag.findUnique({
+        where: { key: HERO_FLAG },
+        select: { enabled: true, rolloutPct: true },
+      }),
+    )
   } catch {
     return { active: false, pct: 0 }
   }
