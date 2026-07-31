@@ -18,26 +18,39 @@
  */
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { validateExtensionRequest } from '@/lib/extension-auth'
+import {
+  guardExtensionRequest,
+  enforceApplicationQuota,
+  extensionPreflight,
+  withCors,
+} from '@/lib/extension-guard'
+
+export function OPTIONS(request: Request) {
+  return extensionPreflight(request)
+}
 
 export async function POST(request: Request) {
-  const auth = await validateExtensionRequest(request)
-  if (!auth.valid) {
-    return new NextResponse(auth.error ?? 'Unauthorized', { status: 401 })
-  }
+  const guard = await guardExtensionRequest(request)
+  if (!guard.ok) return guard.response
+  const auth = { userId: guard.userId }
 
   let body: Record<string, any>
   try {
     body = await request.json()
   } catch {
-    return new NextResponse('Invalid JSON body', { status: 400 })
+    return withCors(request, new NextResponse('Invalid JSON body', { status: 400 }))
   }
 
   const { jobTitle, company, jobUrl, location, resumeId } = body
 
   if (!jobTitle || !company || !jobUrl) {
-    return new NextResponse('jobTitle, company, and jobUrl are required', { status: 400 })
+    return withCors(request, new NextResponse('jobTitle, company, and jobUrl are required', { status: 400 }))
   }
+
+  // P2.3 — the free tier is enforced HERE, not in the UI. Without this an
+  // extension key could record unlimited applications straight to the API.
+  const overQuota = await enforceApplicationQuota(request, auth.userId!)
+  if (overQuota) return overQuota
 
   try {
     // Resolve resume: use provided resumeId or fall back to default
@@ -80,9 +93,9 @@ export async function POST(request: Request) {
       },
     })
 
-    return NextResponse.json({ success: true, application }, { status: 201 })
+    return withCors(request, NextResponse.json({ success: true, application }, { status: 201 }))
   } catch (err: any) {
     console.error('[extension/applications] error:', err)
-    return new NextResponse('Internal Server Error', { status: 500 })
+    return withCors(request, new NextResponse('Internal Server Error', { status: 500 }))
   }
 }

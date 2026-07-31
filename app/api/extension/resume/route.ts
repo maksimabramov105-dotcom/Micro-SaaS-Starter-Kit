@@ -13,13 +13,16 @@
  */
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { validateExtensionRequest } from '@/lib/extension-auth'
+import { guardExtensionRequest, extensionPreflight, withCors } from '@/lib/extension-guard'
+
+export function OPTIONS(request: Request) {
+  return extensionPreflight(request)
+}
 
 export async function GET(request: Request) {
-  const auth = await validateExtensionRequest(request)
-  if (!auth.valid) {
-    return new NextResponse(auth.error ?? 'Unauthorized', { status: 401 })
-  }
+  const guard = await guardExtensionRequest(request)
+  if (!guard.ok) return guard.response
+  const auth = { userId: guard.userId }
 
   try {
     // Prefer the default resume; fall back to the most recently created one
@@ -29,10 +32,10 @@ export async function GET(request: Request) {
     })
 
     if (!resume) {
-      return NextResponse.json(
+      return withCors(request, NextResponse.json(
         { error: 'No resume found. Create one at resumeai-bot.com/dashboard/resumes.' },
         { status: 404 },
-      )
+      ))
     }
 
     // `generated` is a JSON blob from the AI resume builder.
@@ -76,9 +79,9 @@ export async function GET(request: Request) {
       resumeTitle: resume.title,
     }
 
-    return NextResponse.json(flat)
+    return withCors(request, NextResponse.json(flat))
   } catch (err: any) {
     console.error('[extension/resume] error:', err)
-    return new NextResponse('Internal Server Error', { status: 500 })
+    return withCors(request, new NextResponse('Internal Server Error', { status: 500 }))
   }
 }
