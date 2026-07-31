@@ -1,12 +1,24 @@
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { getOrAssignVariant } from '@/lib/experiments'
 import { SiteHeader } from '@/components/site-header'
 import { SiteFooter } from '@/components/site-footer'
 import { PricingCards } from '@/components/pricing-cards'
 import { LaunchBanner } from '@/components/launch-banner'
 import { PRICE, VISIBLE_PLANS } from '@/lib/pricing'
 import { PROMO, isPromoActive, promoEndLabel } from '@/lib/promo'
+import { VariantScript, ExposureBeacon } from '@/components/ab-script'
+import { getPricingExperiment } from '@/lib/pricing-experiment.server'
+import {
+  PRICING_CONTROL,
+  PRICING_COOKIE,
+  PRICING_EXPERIMENT,
+  PRICING_SWAPS,
+} from '@/lib/pricing-experiment'
+
+// Static shell + hourly ISR. /pricing used to be server-rendered on demand
+// purely because it assigned an A/B variant server-side, and that cost it every
+// bit of static caching: Lighthouse 72 and LCP 5.4 s on the page that takes the
+// money, against 99 on the landing page. Assignment now happens in the browser
+// (lib/ab.ts) and the page is static again.
+export const revalidate = 3600
 
 const SITE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.com'
 
@@ -45,22 +57,8 @@ const pricingJsonLd = {
   })),
 }
 
-// Headline copy for each pricing_headline_v1 variant
-const HEADLINE = {
-  control: {
-    h1: 'Simple, Transparent Pricing',
-    sub: 'Start free. Upgrade when you need more applications.',
-  },
-  guarantee: {
-    h1: 'Land your next job in 30 days — or your money back.',
-    sub: 'Try Pro or Unlimited risk-free. If you don\'t get interviews, we refund you in full.',
-  },
-}
-
 export default async function PricingPage() {
-  const session = await getServerSession(authOptions)
-  const variant = await getOrAssignVariant('pricing_headline_v1', session?.user?.id)
-  const copy = HEADLINE[variant as keyof typeof HEADLINE] ?? HEADLINE.control
+  const experiment = await getPricingExperiment()
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -74,12 +72,24 @@ export default async function PricingPage() {
         <section className="w-full py-12 md:py-24 lg:py-32">
           <div className="container px-4 md:px-6">
             <div className="mb-12 text-center">
-              <h1 className="mb-4 text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-6xl">
-                {copy.h1}
+              <h1
+                id="pricing-headline"
+                className="mb-4 text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-6xl"
+              >
+                {PRICING_CONTROL.h1}
               </h1>
-              <p className="mx-auto max-w-[700px] text-gray-500 md:text-xl dark:text-gray-400">
-                {copy.sub}
+              <p
+                id="pricing-subhead"
+                className="mx-auto max-w-[700px] text-gray-500 md:text-xl dark:text-gray-400"
+              >
+                {PRICING_CONTROL.sub}
               </p>
+              <VariantScript
+                config={experiment}
+                experimentKey={PRICING_EXPERIMENT}
+                cookieName={PRICING_COOKIE}
+                swaps={PRICING_SWAPS}
+              />
             </div>
 
             {/* 30-day money-back guarantee banner */}
@@ -115,6 +125,11 @@ export default async function PricingPage() {
         </section>
       </main>
       <SiteFooter />
+      <ExposureBeacon
+        config={experiment}
+        experimentKey={PRICING_EXPERIMENT}
+        page="/pricing"
+      />
     </div>
   )
 }

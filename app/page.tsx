@@ -9,7 +9,8 @@ import { HeroDemo } from '@/components/hero-demo'
 import { testimonials, replyScreenshots } from '@/lib/proof'
 import { SITE_URL, SUPPORT_EMAIL } from '@/lib/site'
 import { getHeroExperiment } from '@/lib/hero-experiment.server'
-import { HeroVariantScript, HeroExposure } from '@/components/hero-experiment'
+import { VariantScript, ExposureBeacon } from '@/components/ab-script'
+import { HERO_COOKIE, HERO_EXPERIMENT, HERO_SWAPS } from '@/lib/hero-experiment'
 
 // ISR: regenerated hourly so proof/testimonial content stays fresh while
 // the page stays fully server-rendered + indexable.
@@ -96,7 +97,12 @@ export default async function HomePage() {
               every reply lands in <strong>one inbox</strong>. Optional auto-apply handles the
               volume &mdash; only where you&apos;re genuinely eligible.
             </p>
-            <HeroVariantScript experiment={heroExperiment} />
+            <VariantScript
+              config={heroExperiment}
+              experimentKey={HERO_EXPERIMENT}
+              cookieName={HERO_COOKIE}
+              swaps={HERO_SWAPS}
+            />
 
             {/* Two money paths + free signup, all ref-tagged for attribution */}
             <div className="mt-8 flex flex-col items-center gap-3 lg:items-start">
@@ -470,7 +476,7 @@ export default async function HomePage() {
       <SiteFooter />
 
       {/* Exposure beacon last: nothing above it waits on analytics. */}
-      <HeroExposure experiment={heroExperiment} />
+      <ExposureBeacon config={heroExperiment} experimentKey={HERO_EXPERIMENT} page="/" />
     </main>
   )
 }
