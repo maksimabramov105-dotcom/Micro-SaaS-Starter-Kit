@@ -8,91 +8,70 @@ list, not a history. History lives in `docs/MASTER_PLAN.md` → LOG.
 
 ---
 
-## 1. Inbound email is dead — fix this before anything else
+## 1. Inbound email — ONE DNS record left
 
-**Found 2026-07-31 during live verification. This is the most important item in
-this file, and it is ahead of the Chrome Web Store because it silently breaks
-two of the three things the landing page promises.**
+**Status: webhook done (thank you), MX record still missing. Until it exists,
+inbound mail cannot be delivered and this stays broken.**
 
-### What is broken
+### Done
 
-The last inbound message arrived **2026-07-22**. 590 before that, **zero since**.
+Resend webhook created and enabled, listening for `email.received`, pointing at
+`https://resumeai-bot.com/api/inbox/inbound`. I have already updated the signing
+secret in production to match it, so that side is wired.
 
-```
-inbox_total = 590
-newest      = 2026-07-22 22:33
-last_7d     = 0
-```
+### Not done — this is the blocker
 
-Two DNS facts explain it:
+`resumeai-bot.com` has **no MX record**. Checked just now:
 
 ```
-resumeai-bot.ru   MX  9  inbound-smtp.us-east-1.amazonaws.com   (Resend inbound)
-resumeai-bot.ru   MX 10  mx1.hosting.reg.ru
-resumeai-bot.com  MX     (none)
+resumeai-bot.com        MX   (none)
+inbox.resumeai-bot.com  MX   (none)
+send.resumeai-bot.com   MX   10 feedback-smtp.us-east-1.amazonses.com
+resumeai-bot.ru         MX    9 inbound-smtp.us-east-1.amazonaws.com
 ```
 
-Production still has `INBOX_DOMAIN=resumeai-bot.ru`, and the `.ru` domain was
-removed from Resend during the migration (the free plan allows one domain).
-So mail is still being routed to Resend for a domain Resend no longer accepts,
-and `.com` has no MX record at all — which is why simply switching
-`INBOX_DOMAIN` to `.com` right now would make things worse, not better.
+The record on `send.` is the **outbound bounce** record Resend adds for sending.
+It does not receive anything. The `.ru` record is the old inbound one — the
+domain Resend no longer accepts, which is why mail has gone nowhere since
+22 July.
 
-### What it takes down
+### What to do
 
-- **"Every reply lands in one inbox."** No reply has, for nine days.
-- **"Every application is confirmed by the ATS."** It cannot be. Greenhouse
-  confirms by emailing an 8-character security code to the user's alias. The
-  worker log shows exactly this, on live applications today:
-  `careerops.greenhouse.code_not_received` → `careerops.greenhouse.submit_unconfirmed`
-  → the application is recorded **FAILED**. Autoapply is running, tailoring
-  resumes and reaching the submit button, and then failing at the last step.
+1. **Resend → Domains → `resumeai-bot.com`**, find the **Inbound / Receiving**
+   section. It will show you an MX record, almost certainly
+   `inbound-smtp.us-east-1.amazonaws.com` priority `10`, and tell you which
+   hostname to put it on (`@` or a subdomain).
+2. **Cloudflare → DNS → Add record → MX**, exactly as Resend shows. Proxy does
+   not apply to MX records.
+3. Check it:
 
-10 applications were created in the last hour of testing. 9 FAILED, all on
-this. The honesty rules held — nothing was marked applied — but the feature
-cannot work until mail is delivered.
+   ```bash
+   dig +short MX resumeai-bot.com @1.1.1.1
+   ```
 
-### Fix it in this order (the order matters)
+4. **Tell me** and I will flip `INBOX_DOMAIN` on the VPS and send a test through.
 
-**Step 1 — Resend: add inbound to the `.com` domain**
+I have deliberately not flipped `INBOX_DOMAIN` to `.com` yet: with no MX record
+it would point every user's alias at a domain that receives nothing, which is
+worse than the current state.
 
-1. https://resend.com/domains → `resumeai-bot.com`
-2. Enable **Inbound** (or **Receiving**). Resend shows you an MX record —
-   usually `inbound-smtp.us-east-1.amazonaws.com`, priority 10.
-3. Set the inbound webhook to `https://resumeai-bot.com/api/inbox/inbound`.
-   The signing secret already in production is unchanged, so nothing else
-   needs to move.
+### Why it is worth doing before launch
 
-**Step 2 — Cloudflare: add the MX record**
+It is what makes "every application is confirmed by the employer" true.
+Greenhouse confirms by emailing an 8-character security code to the user's
+alias. Right now autoapply tailors the resume, fills the form, reaches the
+submit button, and fails — honestly recorded as FAILED, never as applied, but
+failed. Fixing this turns those into confirmed submissions.
 
-DNS → `resumeai-bot.com` → Add record → **MX**, name `@` (or `inbox` if Resend
-gave you a subdomain), value and priority exactly as Resend showed. Proxy is
-not applicable to MX.
+### It cannot rot silently again
 
-Check it took effect:
+The ops self-check now alerts your Telegram if no inbound message arrives for
+three days. It is live and currently firing, correctly:
 
-```bash
-dig +short MX resumeai-bot.com @1.1.1.1
 ```
-
-**Step 3 — tell me, and I will flip `INBOX_DOMAIN` on the VPS**
-
-One line in `/opt/resumeai/.env` plus a container restart. Doing it before
-steps 1 and 2 would point aliases at a domain that receives nothing, so it has
-deliberately been left alone.
-
-**Step 4 — send yourself a test**
-
-Email the address shown in your dashboard inbox. It should appear within a
-minute. Existing aliases keep working: the handle is stored per user and only
-the domain is appended at parse time.
-
-### It will not rot silently again
-
-Shipped today: the ops self-check now alerts your Telegram when no inbound
-message has arrived for three days. That check is the reason this was found at
-all — every other monitor pokes something and reads the answer, and an empty
-queue looks identical to a quiet week.
+{"ok": false, "failures": ["no inbound mail for 8 days (newest 2026-07-22) —
+ check the MX record for INBOX_DOMAIN and that the domain is still added in Resend"]}
+```
 
 ---
 
@@ -210,6 +189,13 @@ has appeared in a chat log should not stay valid.
 
 ---
 
+**Added 2026-07-31:** the new Resend inbound webhook signing secret was visible
+in a screenshot shared in chat. It is set correctly in production and everything
+works, so this is not urgent — but rotate it in Resend when convenient, and tell
+me so I can update the VPS at the same time.
+
+---
+
 ## 7. First users — the actual bottleneck now
 
 Everything technical for Phase 5 distribution is built (301 SEO URLs, `/proof`,
@@ -231,34 +217,28 @@ See `docs/FREE_TRAFFIC_PLAYBOOK.md` for the full ordering.
 
 ---
 
-## 8. Two A/B tests are built and waiting for you to switch them on
+## 8. Both A/B tests are now RUNNING — nothing to do, just know they exist
 
-Both are off. Neither does anything until you turn it on, and turning one on
-costs nothing and needs no redeploy.
+I turned both on at 50% and verified both arms in a real browser.
 
-**Dashboard → Admin → Feature Flags**, then set the rollout % and toggle:
-
-| flag | what variant B changes | suggested % |
+| flag | variant B | status |
 |---|---|---|
-| `landing_hero_b` | Homepage headline leads with "every application is confirmed by the employer" instead of the resume artifact | 50 |
-| `pricing_headline_b` | `/pricing` headline leads with the 30-day refund instead of "Simple, Transparent Pricing" | 50 |
+| `landing_hero_b` | Homepage headline: *"Every application here is confirmed by the employer. Or it does not count."* | live, 50% |
+| `pricing_headline_b` | `/pricing` headline: *"30 days to change your mind. No questions asked."* | live, 50% |
 
-A rollout of 0 or 100 means everyone sees one thing, so nothing is recorded —
-use 50 to actually run a test. Changes take effect within 5 minutes, or
-instantly with **Bust cache**.
-
-To read the result once traffic has accumulated:
+Read the result once traffic accumulates:
 
 ```bash
 npx tsx scripts/experiment_results.ts landing_hero
 ```
 
 It prints exposures, conversions and a p-value. Under p < 0.05 you have a
-winner; ship it by setting that flag to 100 (or 0 to keep the control).
+winner — ship it by setting that flag to 100 (variant B) or 0 (control) in
+**Dashboard → Admin → Feature Flags**.
 
-**Honest expectation:** with current traffic this will take weeks to reach
-significance, and possibly longer than it takes to just pick one. It is here so
-that when traffic does arrive, the measurement already exists.
+**Honest expectation:** at current traffic this needs weeks, possibly longer
+than it is worth waiting. It exists so that when traffic arrives the
+measurement is already running, not so you can check it daily.
 
 ---
 

@@ -617,6 +617,38 @@ deploys smoke-green.
     same day — see the entry below.
 
 
+- 2026-07-31 (night) — BOTH A/B TESTS LIVE, AND THE THREE-ROUND FIGHT TO GET
+  THERE. Turning the experiments on was supposed to be a config change. It took
+  four PRs, and the bug it exposed is the most instructive one in this log.
+  * **The experiments assigned, tracked, and showed nobody anything.** Verified
+    in a real browser: variant b assigned, rai_pricing=b set, exposure recorded
+    — and the visitor reading "Simple, Transparent Pricing", the control. An
+    experiment that measures a change it never displays is the most expensive
+    failure available: it does not look broken. Both tests would have reached
+    significance and concluded that headline copy does not matter, because both
+    arms were reading the same headline.
+  * Three rounds, each a correct diagnosis and an insufficient fix:
+    (#208) suppressHydrationWarning — insufficient, the App Router reconciles
+    from the RSC payload, which carries the control text regardless.
+    (#209) MutationObserver on the swapped nodes — insufficient, and the reason
+    is the interesting part: hydration does not edit those nodes' text, it
+    REPLACES the elements, so the observer was orphaned by the exact event it
+    existed to catch.
+    (#210) Observe document.documentElement instead — a node that cannot be
+    replaced — plus re-apply on DOMContentLoaded, load, and observer disconnect.
+    Verified live in both arms on both pages.
+  * The tell that cracked it: a manual textContent write in the console AFTER
+    load sticks. So React had finished and was not re-reverting; the single
+    revert had simply gone unseen. That ruled out "still hydrating" and pointed
+    straight at node replacement.
+  * **#207** — / and /pricing also needed adding to the post-deploy revalidation
+    set. Both read their flag from the database, the image builds without one,
+    so both were baked flag-off; restarting the container REVERTS to that build
+    output rather than fixing it.
+  * Lesson worth keeping: every test in this repo passed throughout. The bug was
+    only ever visible by opening the deployed page and reading the h1, which is
+    the one check the suite does not perform.
+
 - 2026-07-31 (evening) — LIVE VERIFICATION FOUND FOUR REAL BUGS. Phases 3-5 are
   code-complete and deployed; verifying them against production is what turned
   these up, none of which any test or monitor was catching.
