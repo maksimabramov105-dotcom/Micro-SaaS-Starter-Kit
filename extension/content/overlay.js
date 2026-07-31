@@ -65,6 +65,92 @@
   btn.setAttribute('aria-label', 'ResumeAI Autofill')
   shadow.appendChild(btn)
 
+  // ── Tailor button (P2.1 req 3) ─────────────────────────────────────────────
+  // Separate from Autofill on purpose: autofill is instant and local, tailoring
+  // costs an LLM call and takes seconds, so collapsing them into one button
+  // would make every autofill slow and every tailor accidental.
+  const tailorBtn = document.createElement('button')
+  tailorBtn.className = 'btn'
+  tailorBtn.setAttribute('aria-label', 'Tailor resume for this job')
+  tailorBtn.style.marginTop = '8px'
+  shadow.appendChild(tailorBtn)
+
+  let tailorState = 'idle'
+  let tailorTimer = null
+
+  function setTailorState(s, label) {
+    tailorState = s
+    tailorBtn.className = `btn ${s === 'idle' ? '' : s}`
+    tailorBtn.innerHTML = ''
+    if (s === 'loading') {
+      const sp = document.createElement('span')
+      sp.className = 'spinner'
+      tailorBtn.appendChild(sp)
+    } else {
+      const icon = document.createElement('span')
+      icon.textContent = s === 'done' ? '✓' : s === 'error' ? '✕' : '🎯'
+      tailorBtn.appendChild(icon)
+    }
+    const t = document.createElement('span')
+    t.textContent = label || (
+      { idle: 'Tailor for this job', loading: 'Tailoring…', done: 'Tailored!', error: 'Retry' }[s]
+      || 'Tailor for this job'
+    )
+    tailorBtn.appendChild(t)
+  }
+  setTailorState('idle')
+
+  tailorBtn.addEventListener('click', async () => {
+    if (tailorState === 'loading') return
+    clearTimeout(tailorTimer)
+
+    const job = window.__resumeai_job || {}
+    if (!job.title || !job.company) {
+      setTailorState('error', 'Job not detected')
+      tailorTimer = setTimeout(() => setTailorState('idle'), 3000)
+      return
+    }
+
+    setTailorState('loading')
+    let res
+    try {
+      res = await chrome.runtime.sendMessage({
+        type: 'TAILOR_RESUME',
+        payload: {
+          jobTitle: job.title,
+          company: job.company,
+          jobDescription: job.description,
+          jobUrl: location.href,
+        },
+      })
+    } catch {
+      setTailorState('error', 'Extension error')
+      tailorTimer = setTimeout(() => setTailorState('idle'), 3000)
+      return
+    }
+
+    if (!res?.ok) {
+      if (res?.error === 'not_connected' || res?.error === 'key_invalid') {
+        setTailorState('error', 'Connect ResumeAI first')
+        await chrome.runtime.sendMessage({ type: 'OPEN_CONNECT' })
+      } else if (res?.error === 'quota') {
+        // The wall IS the upgrade prompt — send them straight to pricing.
+        setTailorState('error', 'Daily limit reached')
+        if (res.upgradeUrl) window.open(res.upgradeUrl, '_blank', 'noopener')
+      } else {
+        setTailorState('error', 'Tailoring failed')
+      }
+      tailorTimer = setTimeout(() => setTailorState('idle'), 5000)
+      return
+    }
+
+    setTailorState('done', res.data?.tailoringSkipped ? 'Already tailored' : 'Tailored!')
+    document.dispatchEvent(
+      new CustomEvent('resumeai:tailored', { detail: res.data }),
+    )
+    tailorTimer = setTimeout(() => setTailorState('idle'), 4000)
+  })
+
   let state = 'idle'
   let resetTimer = null
 
