@@ -18,6 +18,12 @@ jobs:
           cache: 'npm'
       - run: npm ci --legacy-peer-deps
       - run: npm run lint
+      # Unit tests run HERE, on the PR, not only in the deploy pipeline.
+      # Before this they ran only on deploy, so the price/claim/thin-page guards
+      # blocked RELEASES but not MERGES — proven live on 2026-07-20 when PR #151
+      # merged green and its deploy then failed on the pricing guard. A guard
+      # that only fires after merge is a guard you find out about too late.
+      - run: npm run test:ci
       - run: npm run build
         env:
           SKIP_ENV_VALIDATION: true
