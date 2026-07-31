@@ -1,6 +1,6 @@
 /**
- * lib/seo/revalidate-company-pages.ts — keep the live open-role enrichment
- * actually visible (G1 follow-up).
+ * lib/seo/revalidate-company-pages.ts — make statically-built pages reflect the
+ * database after a deploy (G1 follow-up, extended for the A/B flags).
  *
  * WHY THIS EXISTS: the Docker image is built with a dummy DATABASE_URL
  * (deploy.yml passes postgresql://x:x@localhost:5432/x), so every
@@ -9,8 +9,12 @@
  * enrichment only appears when each page's 6h ISR window lapses, so a fresh
  * deploy serves editorial-only pages for hours.
  *
- * Fix: after a deploy (and every ~6h after), mark the apply-to routes stale so
- * the next request re-renders them WITH database access. Called from the hourly
+ * The same is true of any statically-rendered page that reads the database at
+ * render time, which now includes / and /pricing — both read their A/B rollout
+ * from the FeatureFlag table.
+ *
+ * Fix: after a deploy (and every ~6h after), mark those routes stale so the
+ * next request re-renders them WITH database access. Called from the hourly
  * daily-digest cron — the same self-gated pattern the rest of the scheduled
  * work uses, because the deploy token can't add GitHub workflow files.
  */
@@ -58,6 +62,16 @@ export async function maybeRevalidateCompanyPages(): Promise<'ran' | 'skipped'> 
     // the route, not just one company.
     revalidatePath('/apply-to/[company]', 'page')
     revalidatePath('/apply-to')
+
+    // Same failure, different pages: / and /pricing read their A/B flag from
+    // the FeatureFlag table, and the build has no database, so both are
+    // pre-rendered with the experiment OFF. Turning a flag on in the admin
+    // revalidates them (see the flags page), but a DEPLOY re-bakes the flag-off
+    // HTML and a container restart reverts to it — observed live on 2026-07-31,
+    // when both experiments were enabled and neither page served the variant
+    // script until this ran.
+    revalidatePath('/')
+    revalidatePath('/pricing')
 
     await trackEvent({ event: MARKER, properties: { windowHours: WINDOW_HOURS } }).catch(() => {})
     return 'ran'
