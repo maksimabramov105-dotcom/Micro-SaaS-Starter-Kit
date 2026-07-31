@@ -2,21 +2,30 @@
   "manifest_version": 3,
   "name": "ResumeAI Autofill",
   "short_name": "ResumeAI",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Autofill job applications instantly using your ResumeAI resume.",
-
-  "permissions": ["storage", "activeTab", "scripting"],
-  "host_permissions": ["https://resumeai-bot.ru/*"],
-
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://resumeai-bot.com/*",
+    "https://resumeai-bot.ru/*"
+  ],
   "background": {
     "service_worker": "background.js",
     "type": "module"
   },
-
   "content_scripts": [
     {
-      "matches": ["https://resumeai-bot.ru/extension/connect*"],
-      "js": ["content/connect-bridge.js"],
+      "matches": [
+        "https://resumeai-bot.com/extension/connect*",
+        "https://resumeai-bot.ru/extension/connect*"
+      ],
+      "js": [
+        "content/connect-bridge.js"
+      ],
       "run_at": "document_idle"
     },
     {
@@ -39,11 +48,12 @@
         "content/autofill.js",
         "content/overlay.js"
       ],
-      "css": ["content/overlay.css"],
+      "css": [
+        "content/overlay.css"
+      ],
       "run_at": "document_idle"
     }
   ],
-
   "action": {
     "default_popup": "popup/popup.html",
     "default_title": "ResumeAI Autofill",
@@ -53,7 +63,6 @@
       "128": "icons/icon128.png"
     }
   },
-
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
