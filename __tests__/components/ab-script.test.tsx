@@ -258,8 +258,15 @@ describe('the swap defends itself', () => {
     expect(script).toContain("addEventListener('DOMContentLoaded'")
   })
 
-  it('watches the nodes for a framework-driven revert', () => {
+  it('watches for a framework-driven revert', () => {
     expect(script).toContain('MutationObserver')
+  })
+
+  it('observes a stable ancestor, not the swapped nodes themselves', () => {
+    // Hydration REPLACES the elements rather than editing their text, so an
+    // observer attached to the original node is orphaned by the exact event it
+    // exists to catch. This is what made the first self-healing attempt fail.
+    expect(script).toContain('mo.observe(document.documentElement')
   })
 
   it('only writes when the text actually differs, so it cannot loop on itself', () => {
@@ -268,6 +275,24 @@ describe('the swap defends itself', () => {
 
   it('stops observing on a timer rather than watching forever', () => {
     expect(script).toContain('mo.disconnect()')
+  })
+
+  it('undoes a revert that REPLACES the element, not just its text', async () => {
+    document.body.innerHTML = '<div id="wrap"><h1 id="hero-headline">control</h1></div>'
+    localStorage.setItem('rai_ab_id', 'x')
+    eval(script)
+    expect(document.getElementById('hero-headline')!.textContent).toBe(HERO_B.headline)
+
+    // How hydration actually reverts it: a brand-new element in place of ours.
+    const fresh = document.createElement('h1')
+    fresh.id = 'hero-headline'
+    fresh.textContent = 'control'
+    document.getElementById('wrap')!.replaceChildren(fresh)
+
+    await new Promise<void>((r) => queueMicrotask(r))
+    expect(document.getElementById('hero-headline')!.textContent).toBe(HERO_B.headline)
+    localStorage.clear()
+    document.body.innerHTML = ''
   })
 
   it('undoes a revert in a real DOM', () => {

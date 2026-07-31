@@ -75,11 +75,17 @@ export function toAbConfig(
  * suppressHydrationWarning on the nodes was not enough: the App Router
  * reconciles from the RSC payload, which carries the control text regardless.
  *
- * So the script applies the swap immediately (no flicker), re-applies once the
- * document is parsed, and keeps a MutationObserver on the nodes for a few
- * seconds to undo any framework-driven revert. It re-applies only when the text
- * actually differs, so it cannot loop on its own mutations, and it disconnects
- * on a timer so nothing is left observing the page.
+ * So the script applies the swap immediately (no flicker), re-applies at several
+ * points while the page settles, and watches for a framework-driven revert.
+ *
+ * The watcher observes documentElement, NOT the swapped nodes. Hydration does
+ * not edit those nodes' text — it REPLACES the elements — so an observer
+ * attached to the original node is orphaned by the very event it exists to
+ * catch. That is why the first attempt at self-healing still lost: the observer
+ * was watching a node that was no longer in the document.
+ *
+ * It re-applies only when the text actually differs, so it cannot loop on its
+ * own mutations, and it disconnects on a timer so nothing is left observing.
  */
 export function variantScript(opts: {
   experimentKey: string
@@ -101,11 +107,11 @@ try{document.cookie=${JSON.stringify(opts.cookieName)}+'='+v+';path=/;max-age=77
 if(v==='b'){
 var W=${pairs},mo=null;
 function ap(){for(var j=0;j<W.length;j++){var el=document.getElementById(W[j][0]);if(el&&el.textContent!==W[j][1]){el.textContent=W[j][1]}}}
-function ob(){if(!mo)return;for(var j=0;j<W.length;j++){var el=document.getElementById(W[j][0]);if(el){mo.observe(el,{childList:true,characterData:true,subtree:true})}}}
 ap();
-try{mo=new MutationObserver(ap);ob()}catch(e){}
-document.addEventListener('DOMContentLoaded',function(){ap();ob()});
-setTimeout(function(){try{if(mo){mo.disconnect()}}catch(e){}},8000);
+try{mo=new MutationObserver(ap);mo.observe(document.documentElement,{childList:true,characterData:true,subtree:true})}catch(e){}
+document.addEventListener('DOMContentLoaded',ap);
+window.addEventListener('load',ap);
+setTimeout(function(){try{if(mo){mo.disconnect()}}catch(e){}ap()},8000);
 }
 }catch(e){}})();`
 }
