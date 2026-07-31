@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { ResumeImport, type ParsedResume } from '@/components/resume-import'
 
 // ---------------------------------------------------------------------------
 // Schema
@@ -72,15 +73,19 @@ const defaultValues: FormValues = {
 
 export default function NewResumePage() {
   const router = useRouter()
-  const [step, setStep] = useState(1)
+  // Step 0 is the import screen (P4.1). Retyping a resume you already have is
+  // where new users quit, so the form offers to read it first.
+  const [step, setStep] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [imported, setImported] = useState(false)
 
   const {
     register,
     handleSubmit,
     control,
     watch,
+    reset,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -104,6 +109,39 @@ export default function NewResumePage() {
     append: appendSkill,
     remove: removeSkill,
   } = useFieldArray({ control, name: 'skills' as never })
+
+  /**
+   * Merge a parsed resume over the empty defaults and jump into the form.
+   *
+   * Merged rather than assigned: the parser omits fields it could not find, and
+   * the form's field arrays need at least one row to render an input. `remote`
+   * and `tone` are preferences, not resume content, so they keep their defaults.
+   */
+  function applyImport(parsed: ParsedResume) {
+    reset({
+      ...defaultValues,
+      fullName: parsed.fullName || '',
+      email: parsed.email || '',
+      phone: parsed.phone || '',
+      linkedin: parsed.linkedin || '',
+      targetRole: parsed.targetRole || '',
+      yearsExp: parsed.yearsExp || 0,
+      location: parsed.location || '',
+      workHistory: parsed.workHistory?.length
+        ? parsed.workHistory.map((w) => ({
+            company: w.company || '',
+            role: w.role || '',
+            startDate: w.startDate || '',
+            endDate: w.endDate || '',
+            bullets: w.bullets?.length ? w.bullets : [''],
+          }))
+        : defaultValues.workHistory,
+      education: parsed.education?.length ? parsed.education : defaultValues.education,
+      skills: parsed.skills?.length ? parsed.skills : [''],
+    })
+    setImported(true)
+    setStep(1)
+  }
 
   async function onSubmit(data: FormValues) {
     setSubmitting(true)
@@ -132,15 +170,28 @@ export default function NewResumePage() {
     <div className="container mx-auto max-w-2xl py-10 px-4">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900">Create a new resume</h1>
-        <p className="text-slate-500">Step {step} of {TOTAL_STEPS}</p>
-        {/* Progress bar */}
-        <div className="mt-3 h-2 w-full rounded-full bg-slate-100">
-          <div
-            className="h-2 rounded-full bg-emerald-500 transition-all"
-            style={{ width: `${(step / TOTAL_STEPS) * 100}%` }}
-          />
-        </div>
+        {step > 0 && (
+          <>
+            <p className="text-slate-500">Step {step} of {TOTAL_STEPS}</p>
+            {/* Progress bar */}
+            <div className="mt-3 h-2 w-full rounded-full bg-slate-100">
+              <div
+                className="h-2 rounded-full bg-emerald-500 transition-all"
+                style={{ width: `${(step / TOTAL_STEPS) * 100}%` }}
+              />
+            </div>
+          </>
+        )}
       </div>
+
+      {/* An import the user cannot verify is worse than no import: they would be
+          applying with fields they never read. Say where the values came from. */}
+      {imported && step === 1 && (
+        <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+          Prefilled from your resume — your wording, copied across. Check each step as you
+          go; everything here is editable.
+        </div>
+      )}
 
       {submitting ? (
         <Card>
@@ -150,6 +201,8 @@ export default function NewResumePage() {
             <p className="text-sm text-slate-400">This usually takes ~15 s</p>
           </CardContent>
         </Card>
+      ) : step === 0 ? (
+        <ResumeImport onImported={applyImport} onSkip={() => setStep(1)} />
       ) : (
         <form onSubmit={handleSubmit(onSubmit)} noValidate>
           {/* ------------------------------------------------------------------ */}
@@ -369,15 +422,13 @@ export default function NewResumePage() {
             </Card>
           )}
 
-          {/* Navigation */}
+          {/* Navigation. Back from step 1 returns to the import screen — someone
+              who skipped it by mistake should not have to start over. Values
+              already typed survive, since react-hook-form keeps them. */}
           <div className="mt-6 flex justify-between">
-            {step > 1 ? (
-              <Button type="button" variant="outline" onClick={() => setStep((s) => s - 1)}>
-                Back
-              </Button>
-            ) : (
-              <div />
-            )}
+            <Button type="button" variant="outline" onClick={() => setStep((s) => s - 1)}>
+              Back
+            </Button>
             {step < TOTAL_STEPS ? (
               <Button type="button" onClick={() => setStep((s) => s + 1)}>
                 Next
