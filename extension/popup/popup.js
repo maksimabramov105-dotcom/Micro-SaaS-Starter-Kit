@@ -72,7 +72,7 @@ async function init() {
   } else if (result.error === 'no_resume') {
     const card = el('resume-info')
     if (card)
-      card.innerHTML = `<div class="resume-missing">No resume yet — <a href="https://resumeai-bot.ru/dashboard/resumes" target="_blank">create one</a></div>`
+      card.innerHTML = `<div class="resume-missing">No resume yet — <a href="https://resumeai-bot.com/dashboard/resumes" target="_blank">create one</a></div>`
   }
 }
 

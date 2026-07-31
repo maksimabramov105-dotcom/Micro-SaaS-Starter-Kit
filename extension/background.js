@@ -8,7 +8,7 @@
  *   - Open the /extension/connect tab when the user needs to sign in
  */
 
-const BASE_URL = 'https://resumeai-bot.ru'
+const BASE_URL = 'https://resumeai-bot.com'
 const STORAGE_KEY = 'resumeai_api_key'
 const RESUME_CACHE_TTL_MS = 10 * 60 * 1000 // 10 minutes
 
