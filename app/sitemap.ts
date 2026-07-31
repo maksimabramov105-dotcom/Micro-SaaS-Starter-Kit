@@ -3,9 +3,22 @@ import seo from '@/lib/seo-data.json'
 import { REMOTE_GUIDES } from '@/lib/remote-guides'
 import { APPLY_COMPANIES } from '@/lib/seo/apply-companies'
 import ROLE_KEYWORDS from '@/lib/seo/role-keywords.json'
+import { SITE_URL } from '@/lib/site'
+
+/**
+ * Rendered per request, not baked at build.
+ *
+ * The Docker image is built with NEXT_PUBLIC_APP_URL hardcoded in deploy.yml, so
+ * a statically generated sitemap freezes whatever domain was set at BUILD time.
+ * During the .ru -> .com migration that meant the live site served 301 URLs all
+ * still pointing at the old domain, with no way to fix it short of a rebuild.
+ * The data here is a handful of in-memory arrays, so generating it per request
+ * costs nothing and the sitemap now always matches the running env.
+ */
+export const dynamic = 'force-dynamic'
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
+  const baseUrl = SITE_URL
   // Honest lastmod (B1): a stable content-release date for pages whose copy
   // only changes with deploys. Stamping `new Date()` on every request told
   // crawlers everything changed constantly — a credibility-burning signal.
