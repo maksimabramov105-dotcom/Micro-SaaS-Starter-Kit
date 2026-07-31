@@ -27,7 +27,7 @@ export async function sendRefundConfirmationEmail({
   }).format(amountCents / 100)
 
   const appName = process.env.NEXT_PUBLIC_APP_NAME ?? 'ResumeAI'
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.com'
 
   const subject = `Your refund of ${formattedAmount} is on the way`
   const html = `
@@ -54,7 +54,7 @@ export async function sendRefundConfirmationEmail({
       </a>
       <p style="color:#666;font-size:13px">
         If you did not request this refund, please contact us immediately at
-        <a href="mailto:support@resumeai-bot.ru">support@resumeai-bot.ru</a>.
+        <a href="mailto:support@resumeai-bot.com">support@resumeai-bot.com</a>.
       </p>
       <p>Best regards,<br>The ${appName} Team</p>
     </div>

@@ -64,7 +64,7 @@ function buildEmail(name: string | null, apps: StaleApp[], now: Date): { subject
     <p style="color:#475569;font-size:13px;margin-top:18px">We don't promise interviews — recruiters
     decide that. We just make sure you only apply where you're eligible, and we tell you when it's
     worth a nudge.</p>
-    <p style="color:#94a3b8;font-size:12px">You're getting this because you have active applications on resumeai-bot.ru.</p>
+    <p style="color:#94a3b8;font-size:12px">You're getting this because you have active applications on resumeai-bot.com.</p>
   </div>`
   return { subject, html }
 }

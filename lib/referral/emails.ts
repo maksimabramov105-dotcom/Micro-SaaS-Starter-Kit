@@ -9,7 +9,7 @@
 import { sendEmail } from '@/lib/email'
 
 const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? 'ResumeAI'
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.com'
 
 // ── Referrer: "you earned a free month of Pro" ───────────────────────────────
 
@@ -47,7 +47,7 @@ export async function sendReferralQualifiedEmail({
       </a>
       <p style="color:#666;font-size:13px">
         Questions? Reply to this email or contact
-        <a href="mailto:support@resumeai-bot.ru">support@resumeai-bot.ru</a>.
+        <a href="mailto:support@resumeai-bot.com">support@resumeai-bot.com</a>.
       </p>
       <p>Best,<br>The ${APP_NAME} Team</p>
     </div>

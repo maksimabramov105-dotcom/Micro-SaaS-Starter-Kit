@@ -95,7 +95,10 @@ export async function buildDailyPulse(now: Date = new Date()): Promise<{ title: 
   const topReferrers = topN(
     pageViews.map((p) => p.referrer),
     3,
-    (s) => s.includes('resumeai-bot.ru') || s === 'direct',
+    // Exclude BOTH domains: .ru still 301s to .com, so traffic arriving via the
+    // old domain shows up as a referrer and would otherwise read as an external
+    // source in the pulse. Keep .ru here for as long as the redirect lives.
+    (s) => s.includes('resumeai-bot.com') || s.includes('resumeai-bot.ru') || s === 'direct',
   )
   const submitted = apps.filter((a) => (SENT_STATUSES as readonly string[]).includes(a.status)).reduce((s, a) => s + a._count._all, 0)
   const failed = apps.find((a) => a.status === 'FAILED')?._count._all ?? 0

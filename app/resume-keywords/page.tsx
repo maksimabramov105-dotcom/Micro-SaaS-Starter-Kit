@@ -6,7 +6,7 @@ import roleData from '@/lib/seo/role-keywords.json'
 import { SiteHeader } from '@/components/site-header'
 import { SiteFooter } from '@/components/site-footer'
 
-const SITE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
+const SITE = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.com'
 
 interface RoleKeywords {
   slug: string

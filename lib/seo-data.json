@@ -1,7 +1,7 @@
 {
  "_meta": {
   "description": "Programmatic SEO dataset for ResumeAI-Bot. Each array drives one page template. Slugs are URL-safe. Content fields are fed into the page templates to produce unique 600-900 word pages. Edit freely.",
-  "site": "https://resumeai-bot.ru",
+  "site": "https://resumeai-bot.com",
   "brand": "ResumeAI-Bot",
   "valueProp": "AI builds your resume and auto-applies to remote-first roles at 160+ companies (AU/NZ/US/EU)",
   "freeTier": "3 applications/day, 1 AI resume, Adzuna + RemoteOK",

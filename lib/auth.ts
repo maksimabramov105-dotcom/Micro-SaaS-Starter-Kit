@@ -68,7 +68,7 @@ export const authOptions: NextAuthOptions = {
       // in the Resend dashboard like everything else. `server` is still required
       // by the provider's types, so it stays as an unused placeholder.
       server: { host: 'api.resend.com', port: 443 },
-      from: process.env.RESEND_FROM ?? 'noreply@resumeai-bot.ru',
+      from: process.env.RESEND_FROM ?? 'noreply@resumeai-bot.com',
       async sendVerificationRequest({ identifier, url }) {
         // Imported lazily on purpose: lib/email.ts pulls in the Resend SDK (and
         // through it react-dom/server). At module scope that would load on every

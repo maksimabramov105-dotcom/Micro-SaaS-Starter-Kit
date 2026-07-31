@@ -28,7 +28,7 @@ export default async function ReferralsPage() {
   if (!session?.user) redirect('/login')
 
   const stats = await getReferralStats(session.user.id)
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.com'
   const shareUrl = `${appUrl}/r/${stats.code}`
   const monthLabel = REFERRAL_FREE_MONTHS === 1 ? '1 free month' : `${REFERRAL_FREE_MONTHS} free months`
 

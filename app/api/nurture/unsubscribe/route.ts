@@ -9,7 +9,7 @@ import { NextResponse } from 'next/server'
 import { suppressEmail } from '@/lib/nurture'
 import { verifyLeadUnsubscribeToken } from '@/lib/nurture/token'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.com'
 
 export async function GET(req: Request) {
   const token = new URL(req.url).searchParams.get('token') ?? ''

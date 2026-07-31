@@ -21,7 +21,7 @@ export interface IndexNowResult {
 
 /** Submit up to 10,000 URLs in one call. Never throws. */
 export async function submitIndexNow(urls: string[]): Promise<IndexNowResult> {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.com'
   const host = new URL(appUrl).host
   const list = urls.filter((u) => u.includes(host)).slice(0, 10000)
   if (list.length === 0) return { submitted: 0, status: null, ok: true }
@@ -52,7 +52,7 @@ export async function submitIndexNow(urls: string[]): Promise<IndexNowResult> {
 
 /** Fetch our own sitemap and return every <loc> URL. Throws on fetch/parse failure. */
 export async function getSitemapUrls(): Promise<string[]> {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.ru'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://resumeai-bot.com'
   const res = await fetch(`${appUrl}/sitemap.xml`, { cache: 'no-store' })
   if (!res.ok) throw new Error(`sitemap.xml returned ${res.status}`)
   const xml = await res.text()

@@ -30,7 +30,7 @@ export async function GET(request: Request) {
 
     if (!resume) {
       return NextResponse.json(
-        { error: 'No resume found. Create one at resumeai-bot.ru/dashboard/resumes.' },
+        { error: 'No resume found. Create one at resumeai-bot.com/dashboard/resumes.' },
         { status: 404 },
       )
     }

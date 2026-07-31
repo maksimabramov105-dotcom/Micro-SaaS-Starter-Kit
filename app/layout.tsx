@@ -16,7 +16,7 @@ const SITE_DESCRIPTION =
 export const metadata: Metadata = {
   title: SITE_TITLE,
   description: SITE_DESCRIPTION,
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://resumeai-bot.ru'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://resumeai-bot.com'),
   openGraph: {
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
