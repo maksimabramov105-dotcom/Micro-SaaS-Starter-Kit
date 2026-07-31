@@ -19,12 +19,29 @@ import { Badge } from '@/components/ui/badge'
 
 // ── Server Actions ────────────────────────────────────────────────────────────
 
+/**
+ * Pages whose CONTENT depends on a flag and which are statically cached.
+ *
+ * The 5-minute promise in this page's subtitle was only ever true for flags read
+ * on a dynamic route. /pricing and / are static with a 1-hour ISR window, so
+ * flipping landing_hero_b or pricing_headline_b changed nothing a visitor could
+ * see for up to an hour: invalidateFlagCache() clears the in-memory flag cache,
+ * not Next's page cache. Revalidating them here makes the promise true — and it
+ * is cheap, since a stale render is regenerated on the next request either way.
+ */
+const FLAG_DEPENDENT_PAGES = ['/', '/pricing']
+
+function revalidateFlagDependentPages() {
+  for (const path of FLAG_DEPENDENT_PAGES) revalidatePath(path)
+}
+
 async function toggleFlag(formData: FormData) {
   'use server'
   const key = formData.get('key') as string
   const enabled = formData.get('enabled') === '1'
   const rolloutPct = Math.max(0, Math.min(100, Number(formData.get('rolloutPct')) || 0))
   await setFlag(key, !enabled, rolloutPct)
+  revalidateFlagDependentPages()
   revalidatePath('/dashboard/admin/flags')
 }
 
@@ -34,12 +51,14 @@ async function updateRollout(formData: FormData) {
   const enabled = formData.get('enabled') === '1'
   const rolloutPct = Math.max(0, Math.min(100, Number(formData.get('rolloutPct')) || 0))
   await setFlag(key, enabled, rolloutPct)
+  revalidateFlagDependentPages()
   revalidatePath('/dashboard/admin/flags')
 }
 
 async function bustCache() {
   'use server'
   invalidateFlagCache()
+  revalidateFlagDependentPages()
   revalidatePath('/dashboard/admin/flags')
 }
 
@@ -60,7 +79,9 @@ export default async function FlagsPage() {
         <div>
           <h1 className="text-2xl font-bold">Feature Flags & Experiments</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Changes take effect within 5 min (TTL cache). Use &ldquo;Bust cache&rdquo; for instant effect.
+            Toggling a flag takes effect immediately — the statically cached pages
+            that depend on one ({FLAG_DEPENDENT_PAGES.join(', ')}) are revalidated
+            for you. &ldquo;Bust cache&rdquo; does the same without changing a flag.
           </p>
         </div>
         <form action={bustCache}>
