@@ -617,6 +617,44 @@ deploys smoke-green.
     same day — see the entry below.
 
 
+- 2026-07-31 (evening) — LIVE VERIFICATION FOUND FOUR REAL BUGS. Phases 3-5 are
+  code-complete and deployed; verifying them against production is what turned
+  these up, none of which any test or monitor was catching.
+  * **INBOUND EMAIL DEAD SINCE 07-22** (#206), and this is the big one. 590
+    messages historically, zero in nine days. Resend's free plan allows one
+    domain, so migrating to .com deleted .ru — but INBOX_DOMAIN was still .ru
+    and .com has no MX record at all. It silently broke two of the three
+    landing-page promises: replies did not land in the inbox, and ATS
+    confirmation COULD NOT WORK, because Greenhouse confirms by emailing a
+    security code to the user's alias. Autoapply was reaching the submit button
+    and recording FAILED (careerops.greenhouse.code_not_received ->
+    submit_unconfirmed). The honesty rules held — nothing was ever marked
+    applied — but the feature was dead. Owner checklist item 1; needs DNS +
+    Resend. Shipped an absence-is-the-alarm check: every other monitor pokes
+    something and reads the answer, which is exactly why an empty queue looked
+    like a quiet week for nine days.
+  * **Autoapply applied to NOTHING for 24h** — two separate bugs, both in the
+    seniority gate, found by reading a live run: 518 scraped, 0 eligible.
+    (#203) extractSeniority matched /manager/ before /senior/, so every
+    "Senior Customer Success Manager" scored as a director. A Customer Success
+    campaign could never apply to a Customer Success Manager role.
+    (#205) The call site passed location + title + 1500 chars of DESCRIPTION to
+    a keyword scanner, so any posting whose blurb said "report to the Director"
+    scored as a director role. The gate was reading the company's org chart.
+    After both: 10 applications in an hour, all 10 carrying a fitBreakdown —
+    which also verified P3.2 in production for the first time.
+  * **/pricing was Lighthouse 72** (#202) with LCP 5.4s, on the page that takes
+    the money, purely because server-side A/B assignment opted it out of static
+    rendering. Moved to the P5.7 client-assignment pattern; now ○ Static with
+    1h ISR, x-nextjs-cache HIT. Both experiments now share lib/ab.ts.
+  * **Flag flips did nothing for up to an hour** (#204). The admin page promised
+    5 minutes, but / and /pricing are ISR-cached and invalidateFlagCache clears
+    the flag cache, not Next's page cache. Found by enabling the pricing A/B in
+    prod and seeing no variant script in the HTML.
+  * **CI let a type error merge** — `next build` does not typecheck __tests__ and
+    CI never ran type-check, so #200 merged green and its deploy failed on tsc.
+    Same shape as the test:ci gap from 07-20. CI now runs type-check.
+
 - 2026-07-31 (late) — PHASES 3-5 CODE-COMPLETE. Every remaining code item in
   Phases 3, 4 and 5 is merged. What is left in those phases is owner-only:
   P2.4 Web Store submission, P5.4 beta cohort, P5.5 Product Hunt, P5.6 content.
