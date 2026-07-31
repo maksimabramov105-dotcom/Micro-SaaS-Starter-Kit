@@ -369,16 +369,16 @@ job -> sees it tracked in dashboard within 10 min of first visit.
       `ai/critique.py` -> per-application report. Paid feature.
 - [x] **P3.3 Inbox polish**: classify replies (ack/rejection/interview/question),
       notify email+Telegram on non-ack. "0 fake applied" ledger front and center.
-- [ ] **P3.4 Weekly user digest email** (Resend): applications, replies, fit tips.
+- [x] **P3.4 Weekly user digest email** (Resend): applications, replies, fit tips.
 
 **Exit:** a paying user gets weekly tangible artifacts regardless of interviews.
 
 ## PHASE 4 — Activation & onboarding (~1 week)
 
-- [ ] **P4.1 Onboarding to first value <10 min**: upload resume -> AI parse ->
+- [x] **P4.1 Onboarding to first value <10 min**: upload resume -> AI parse ->
       prefilled profile -> 5 matching jobs or extension prompt -> first tailored
       resume same session.
-- [ ] **P4.2 Empty states that sell** (dashboard at 0 applications shows next step).
+- [x] **P4.2 Empty states that sell** (dashboard at 0 applications shows next step).
 - [x] **P4.3 Email lifecycle** (Resend): welcome, day-1, day-3, day-7. Founder voice.
 - [x] **P4.4 In-app upgrade prompts** at quota edges; conversion tracked per prompt.
 
@@ -393,7 +393,7 @@ job -> sees it tracked in dashboard within 10 min of first visit.
 - [ ] **P5.4 (owner) Beta cohort**: 10-20 users, free Pro for feedback/testimonials.
 - [ ] **P5.5 (owner) Product Hunt launch** (code: PH landing variant, banner, badge).
 - [ ] **P5.6 (owner) Content channel**: 2 posts/week build-in-public + honest data.
-- [ ] **P5.7 (code) A/B measure everything**: hero variants via `FeatureFlag` +
+- [x] **P5.7 (code) A/B measure everything**: hero variants via `FeatureFlag` +
       `rolloutPct`, decided by analytics.
 
 **Exit = G1:** 100 activated users. Then push conversion to G2/G3.
@@ -613,9 +613,50 @@ deploys smoke-green.
     of 90 in 0.53s; live tripwire checkout created; exactly 5 active Stripe
     prices; worker healthy; 8 SUBMITTED / 4 FAILED applications in 7d; 15
     resumes; 479 jobs cached with 293 carrying bodies.
-  * Remaining in these phases: P4.1 (onboarding <10 min), P4.2 (empty states),
-    P3.4 (weekly user digest — the daily digest exists), P5.7 (landing A/B).
+  * Remaining in these phases: none. P3.4, P4.1, P4.2 and P5.7 shipped later the
+    same day — see the entry below.
 
+
+- 2026-07-31 (late) — PHASES 3-5 CODE-COMPLETE. Every remaining code item in
+  Phases 3, 4 and 5 is merged. What is left in those phases is owner-only:
+  P2.4 Web Store submission, P5.4 beta cohort, P5.5 Product Hunt, P5.6 content.
+  * **P3.4 weekly user digest** (#199). Distinct from the paid-only daily digest:
+    this goes to anyone who used the product that week, because a free user who
+    never hears from us churns silently. The differentiator is the FIT TIP —
+    P3.2 persists a per-factor breakdown on every application, so aggregating a
+    week of those, normalised by each factor's maximum from ai/jobfit.py, names
+    the one thing most likely to be costing replies. Comparing raw points would
+    be wrong (30/50 skills is weaker than 20/25 seniority) and there is a test
+    for exactly that. A factor is only called weak below 0.75 of its max, so a
+    strong week says "nothing stands out" rather than inventing a problem.
+    ISO-week marker, shared suppression, and silence when there was no activity.
+  * **P4.1 resume import** (#200). Time-to-first-value was bounded by typing
+    speed: creating a resume meant a four-step form asking for every job, every
+    bullet, every date, and someone who already HAS a resume was being asked to
+    retype it. worker/ai/parse.py + /api/resumes/parse now take the PDF or the
+    pasted text and prefill the form. Two rules the prompt enforces because both
+    failures are worse than an empty field: nothing is invented, and bullets are
+    copied verbatim — tailoring is a separate explicit step, and a silent
+    rewrite is one the user has no way to review. A failed parse is a 200 with
+    parsed:null, so the worst case is that the import did not help.
+  * **P4.2 first-run path** (#200). The new-user dashboard was five zeros and
+    three "nothing here yet" cards — a status report on having achieved nothing,
+    shown at the moment someone decides whether this is worth their time.
+    Replaced with three steps, one live CTA, ticked steps kept visible. EVERY
+    STEP IS OBSERVABLE (resume, campaign, application are all DB rows); the
+    anonymous fit check is a standing offer underneath rather than a step that
+    can never tick. A test caught the first draft making step 3 unreachable.
+  * **P5.7 landing hero A/B** (#201). Server decides whether the test runs and
+    at what percentage (FeatureFlag via React cache() + the page's ISR); client
+    decides which visitor sees which variant (localStorage id, inline script
+    before paint). The homepage stays ○ Static with 1h revalidate — verified in
+    the build output — which is the whole point, after server-side assignment
+    dropped /pricing to Lighthouse 72. checkout_started now carries
+    experiment_key + variant, and experiment_results.ts learned to read
+    client-assigned experiments whose denominator is the exposure event.
+  * **Worker tests were running nowhere.** 193 pytest tests — scrapers, jobfit,
+    resume rendering, autoapply — had no CI job. The Python half of the product
+    could break on a PR and CI stayed green. Added the worker-tests job.
 
 - 2026-07-31 (night) — PHASE 2 CODE-COMPLETE. Only P2.4 (Web Store submission,
   owner) remains, and it blocks the phase exit criterion.
