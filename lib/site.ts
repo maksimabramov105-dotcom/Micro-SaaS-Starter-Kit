@@ -38,3 +38,15 @@ export const HELLO_EMAIL = `hello@${EMAIL_DOMAIN}`
 export function absoluteUrl(path = '/'): string {
   return `${SITE_URL}${path.startsWith('/') ? path : `/${path}`}`
 }
+
+/**
+ * Chrome Web Store listing URL, or '' while the extension is unpublished.
+ *
+ * Derived from NEXT_PUBLIC_CHROME_EXTENSION_ID so there is exactly one switch:
+ * set the ID once the listing is approved (P2.4) and every "Add to Chrome" CTA
+ * appears. Until then they render nothing rather than linking to a 404.
+ */
+export const CHROME_EXTENSION_ID = process.env.NEXT_PUBLIC_CHROME_EXTENSION_ID ?? ''
+export const CHROME_STORE_URL = CHROME_EXTENSION_ID
+  ? `https://chromewebstore.google.com/detail/${CHROME_EXTENSION_ID}`
+  : ''
