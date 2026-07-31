@@ -477,6 +477,11 @@ model JobApplication {
   // Phase 3: job-fit score (0–100) + reasons, copied from JobListing at apply time.
   fitScore    Int?
   fitReasons  String[]  @default([])
+  // P3.2 — per-factor fit breakdown {skills, seniority, eligibility, language}
+  // from ai/jobfit.py. Stored so the user-facing fit report can explain the
+  // score instead of just asserting it. Nullable: rows scored before this
+  // existed keep working and simply render without the bars.
+  fitBreakdown Json?
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt

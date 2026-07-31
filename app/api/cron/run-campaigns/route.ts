@@ -290,6 +290,76 @@ async function careeropsApply(
 // letter (candidate's real wins → why this role) is the single biggest response-
 // rate lever for non-traditional candidates. Best-effort: any failure returns ''
 // so the apply still proceeds with no cover letter (no regression).
+/**
+ * P3.1 — tailor the resume AND the cover letter for THIS job in one worker call.
+ *
+ * The apply path used to send the base resume with only a tailored cover letter,
+ * so every application shipped the same resume no matter the role. That is the
+ * single biggest quality gap in paid auto-apply: the fit report tells the user
+ * their resume misses the posting's keywords, and then we submit the untailored
+ * one anyway.
+ *
+ * /jobs/autoapply/prepare returns both, is cached by the worker on job+resume
+ * (so the same pair never bills twice — the <$0.05/application guardrail), and
+ * gates tailoring by plan_tier internally.
+ *
+ * Best-effort by design: on any failure we return nulls and the caller falls
+ * back to the base resume + a separately generated cover letter. A tailoring
+ * outage must never stop applications going out.
+ */
+async function prepareApplication(
+  workerUrl: string,
+  workerSecret: string,
+  baseResume: unknown,
+  jobTitle: string,
+  company: string,
+  jobDescription: string,
+  jobId: string,
+  planTier: string,
+  timeoutMs = 30_000,
+): Promise<{ resumeText: string | null; coverLetter: string | null; tokensUsed: number }> {
+  if (!jobTitle || !baseResume) return { resumeText: null, coverLetter: null, tokensUsed: 0 }
+  try {
+    const res = await fetch(`${workerUrl}/jobs/autoapply/prepare`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${workerSecret}` },
+      body: JSON.stringify({
+        base_resume: baseResume,
+        job: { title: jobTitle, company, description: (jobDescription ?? '').slice(0, 8000), id: jobId },
+        plan_tier: planTier,
+        application_count: 0,
+        job_id: jobId,
+      }),
+      signal: AbortSignal.timeout(timeoutMs),
+    })
+    if (!res.ok) {
+      console.warn('[run-campaigns] prepare returned', res.status)
+      return { resumeText: null, coverLetter: null, tokensUsed: 0 }
+    }
+    const data = (await res.json()) as {
+      result?: {
+        tailored_resume?: unknown
+        tailored_cover_letter?: string
+        tokens_used?: number
+        tailoring_skipped?: boolean
+      }
+    }
+    const r = data.result ?? {}
+    // The worker returns the tailored resume as the same JSON shape as
+    // Resume.generated, so reuse the existing extractor rather than inventing
+    // a second flattening path that could drift from it.
+    const tailoredText = r.tailored_resume ? extractResumeText(r.tailored_resume) : null
+    return {
+      resumeText: tailoredText && tailoredText.trim() ? tailoredText : null,
+      coverLetter: r.tailored_cover_letter?.trim() ? r.tailored_cover_letter : null,
+      tokensUsed: r.tokens_used ?? 0,
+    }
+  } catch (err) {
+    console.warn('[run-campaigns] prepare error:', err instanceof Error ? err.message : String(err))
+    return { resumeText: null, coverLetter: null, tokensUsed: 0 }
+  }
+}
+
 async function generateCoverLetter(
   workerUrl: string,
   workerSecret: string,
@@ -328,7 +398,7 @@ async function generateCoverLetter(
 
 // ── Job-fit scoring call (Phase 3) ─────────────────────────────────────────────
 
-interface FitScore { score: number; reasons: string[] }
+interface FitScore { score: number; reasons: string[]; breakdown?: Record<string, number> }
 
 /** Batch-score scraped jobs via the worker's deterministic scorer (no LLM spend). */
 async function scoreJobs(
@@ -460,7 +530,7 @@ async function runCampaigns(
     where: { isActive: true, source: { in: ['CAREEROPS', 'LINKEDIN'] } },
     include: {
       user: {
-        select: { id: true, name: true, email: true, dailyApplicationLimit: true, inboxHandle: true },
+        select: { id: true, name: true, email: true, dailyApplicationLimit: true, inboxHandle: true, stripePriceId: true },
       },
       resume: {
         select: { id: true, generated: true, input: true, title: true },
@@ -1357,19 +1427,33 @@ async function runCampaigns(
           status: 'QUEUED',
           fitScore: fit?.score ?? null,
           fitReasons: fit?.reasons ?? [],
+          fitBreakdown: fit?.breakdown ?? undefined,
         },
       })
 
       // Mark URL as applied to prevent duplicates in this run
       appliedUrls.add(applyUrl)
 
-      // Generate a tailored cover letter for THIS role before applying — the
-      // careerops path otherwise sends none, and a bare resume from a
-      // non-traditional candidate is a top reason recruiters skip. Best-effort.
-      const coverLetter = await generateCoverLetter(
-        workerUrl, workerSecret, user.id, resumeText,
-        job.title, job.company, job.description ?? '',
+      // P3.1 — tailor the RESUME and the cover letter for this exact role.
+      // Falls back to the base resume + a standalone cover letter if tailoring
+      // is unavailable, so a tailoring outage never stops applications.
+      const prepared = await prepareApplication(
+        workerUrl, workerSecret, resume.generated,
+        job.title, job.company, job.description ?? '', applyUrl,
+        user.stripePriceId ? (user.dailyApplicationLimit >= 9999 ? 'unlimited' : 'pro') : 'free',
       )
+      const coverLetter =
+        prepared.coverLetter ??
+        (await generateCoverLetter(
+          workerUrl, workerSecret, user.id, resumeText,
+          job.title, job.company, job.description ?? '',
+        ))
+      const appliedResumeText = prepared.resumeText ?? resumeText
+      if (prepared.resumeText) {
+        console.log('[run-campaigns] applied with TAILORED resume', {
+          job: job.title, company: job.company, tokens: prepared.tokensUsed,
+        })
+      }
 
       // Call the CareerOps worker (timeout dynamically capped to remaining budget).
       // Pass the company so the worker can match Greenhouse's emailed security
@@ -1378,6 +1462,7 @@ async function runCampaigns(
         workerUrl, workerSecret, applyUrl,
         {
           ...userData,
+          resume_text: appliedResumeText,
           cover_letter: coverLetter,
           _company: job.company,
           eligibility,
