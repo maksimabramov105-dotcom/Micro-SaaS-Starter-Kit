@@ -332,14 +332,21 @@ unified; smoke green; Lighthouse >=90 on landing (perf + SEO).
           P2.1 is unimplemented.
         - No E2E fixtures/tests (P2.6), no Web Store assets (P2.4), no
           "Add to Chrome" CTA on the landing page (P2.5).
-- [ ] ~~P2.1 original scope~~ + MVP scope: detect Greenhouse/Lever/Ashby,
-      one-click autofill from profile, "tailor resume for this job" button,
-      track application (source=extension).
-- [ ] **P2.2 API surface**: `app/api/ext/*` (token auth, Redis rate-limits, CORS
-      locked to extension ID).
-- [ ] **P2.3 Free-tier limits enforced server-side** (`lib/quota.ts`).
+      MVP scope status: detection DONE, autofill DONE, track application DONE
+      (source=EXTENSION), **"tailor resume for this job" NOT BUILT** — the one
+      requirement of P2.1 with no implementation anywhere in extension/.
+- [x] **P2.2 API surface** (token auth, Redis rate-limits, CORS locked to the
+      extension). Lives at `app/api/extension/*`, NOT `app/api/ext/*` as the
+      plan wrote — the shipped extension already calls the former, and renaming
+      a live endpoint to match a doc would break every installed copy for no
+      gain. `lib/extension-guard.ts` is the single gate (#188).
+- [x] **P2.3 Free-tier limits enforced server-side** (`lib/quota.ts`) — was
+      entirely unenforced before #188; the UI was the only limit.
 - [ ] **P2.4 Chrome Web Store listing** + submit for review (owner account).
-- [ ] **P2.5 Landing "Add to Chrome — free" primary CTA.**
+      Blocks P2.5 from being switched on and blocks the Phase 2 exit criterion.
+- [x] **P2.5 Landing "Add to Chrome — free" primary CTA** — built and wired,
+      renders only once `NEXT_PUBLIC_CHROME_EXTENSION_ID` is set (#189). One env
+      var turns it on the moment P2.4 lands.
 - [ ] **P2.6 E2E test**: fixture pages for Greenhouse/Lever/Ashby autofill in CI.
 
 **Exit:** extension approved; new user installs -> autofills a real Greenhouse
@@ -556,6 +563,46 @@ deploys smoke-green.
    boilerplate. Nothing here is outstanding.
 
 ## LOG
+
+- 2026-07-31 (evening) — PHASE 2 STARTED. P2.1, P2.2, P2.3, P2.5 done; PRs #186,
+  #187, #188, #189. Change of Address CONFIRMED and running (.ru -> .com,
+  start date 2026-07-31).
+  * P2.1 audit: the extension is NOT a stub — 14 files, ~750 lines, MV3, with
+    detection across 11 ATS platforms, autofill, overlay, popup, background
+    worker and pairing. It found TWO real defects, both fixed:
+      - the migration had silently BROKEN it. Five hardcoded .ru references, and
+        host_permissions was the fatal one: without .com granted, the fetch that
+        follows the .ru 301 is blocked by Chrome's extension permission model,
+        so "the redirect still works" would NOT have saved it (#186).
+      - tracked applications were written as source=MANUAL, indistinguishable
+        from hand-typed rows. Phase 2 exists to prove the wedge drives
+        activation; that is unmeasurable without attribution. Added
+        JobSource.EXTENSION, verified live in the prod enum (#187).
+  * P2.2/P2.3 (#188): the endpoints had Bearer auth and nothing else. The real
+    gap was not the missing rate limit — THE FREE TIER WAS NOT ENFORCED
+    SERVER-SIDE AT ALL, so any extension key could POST unlimited applications
+    and never touch the daily limit the backend apply path respects.
+    lib/extension-guard.ts is now one gate: scoped Bearer auth, a REDIS rate
+    limit (60/min per API key — deliberately not the in-memory limiter, whose
+    state dies with the container and is per-instance), and CORS that echoes
+    ONLY chrome-extension:// origins. Fails OPEN on a Redis outage so an outage
+    cannot disable the extension. Over-quota returns 429 with an upgradeUrl so
+    the extension can surface the upgrade at the moment the wall is hit.
+    10 tests cover the paid boundary as behaviour. Verified live: preflight 204,
+    ACAO echoed for a chrome-extension origin, REFUSED for https://evil.example,
+    unauthenticated GET 401.
+  * P2.5 (#189): the CTA exists but renders NOTHING until
+    NEXT_PUBLIC_CHROME_EXTENSION_ID is set — the extension is not in the Web
+    Store yet, and a primary "Add to Chrome" linking to a listing that does not
+    exist is the exact dark pattern the positioning cannot afford. One env var
+    switches it on everywhere. Verified live: 0 occurrences on the landing page.
+  * STILL OPEN in Phase 2:
+      - P2.1 requirement 3, "Tailor resume for this job", does not exist in the
+        extension at all — no call to tailoring or /jobs/cover-letter anywhere.
+        This is the feature that makes the wedge more than an autofiller.
+      - P2.4 Web Store listing — owner (submission + review).
+      - P2.6 E2E fixtures for Greenhouse/Lever/Ashby autofill in CI.
+
 
 - 2026-07-31 — **DOMAIN MIGRATION COMPLETE: resumeai-bot.ru -> resumeai-bot.com.**
   Site, email and crons all verified live on the new domain.
