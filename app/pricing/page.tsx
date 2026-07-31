@@ -72,14 +72,22 @@ export default async function PricingPage() {
         <section className="w-full py-12 md:py-24 lg:py-32">
           <div className="container px-4 md:px-6">
             <div className="mb-12 text-center">
+              {/* suppressHydrationWarning is load-bearing, not cosmetic: the inline
+                  script below rewrites this text before hydration, and without
+                  it React reconciles the node back to the server-rendered
+                  control during hydration. Observed live on 2026-07-31 — the
+                  variant was assigned and the cookie set, and the visitor still
+                  read the control headline. */}
               <h1
                 id="pricing-headline"
+                suppressHydrationWarning
                 className="mb-4 text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-6xl"
               >
                 {PRICING_CONTROL.h1}
               </h1>
               <p
                 id="pricing-subhead"
+                suppressHydrationWarning
                 className="mx-auto max-w-[700px] text-gray-500 md:text-xl dark:text-gray-400"
               >
                 {PRICING_CONTROL.sub}
