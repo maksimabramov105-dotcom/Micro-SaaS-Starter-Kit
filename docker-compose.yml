@@ -119,6 +119,17 @@ services:
   worker:
     # WORKER_IMAGE is set in production to the GHCR image.
     image: ${WORKER_IMAGE:-resumeai-worker:local}
+    # HARD memory ceiling. routes/jobs.py documents this container as "limited
+    # to ~1500 MB" and _available_memory_mb() says it "prefers the CONTAINER's
+    # cgroup limit" — but no limit was ever set here, so that lookup silently
+    # fell through to HOST memory and the documented protection did not exist.
+    #
+    # Without it a runaway browser count starves the whole box instead of just
+    # this container: 2026-08-01, nine chromiums took the host to load 32 with
+    # 67 MB free and web, health and SSH all became unreachable. Capped, the
+    # worker gets OOM-killed and restarts on its own while the site stays up —
+    # one container failing is always better than the host failing.
+    mem_limit: ${WORKER_MEM_LIMIT:-1500m}
     build:
       context: worker
       dockerfile: Dockerfile
