@@ -15,7 +15,19 @@ const mockRedis = { incr: jest.fn(), expire: jest.fn() }
 
 jest.mock('next-auth', () => ({ getServerSession: (...a: unknown[]) => mockGetServerSession(...a) }))
 jest.mock('@/lib/auth', () => ({ authOptions: {} }))
-jest.mock('@/lib/redis', () => ({ getRedis: () => mockRedis }))
+// redisTry wraps the command with a deadline (see lib/redis.ts). The mock
+// mirrors that contract: run the command, fall back on throw — so these tests
+// still exercise the rate-limit logic through mockRedis.
+jest.mock('@/lib/redis', () => ({
+  getRedis: () => mockRedis,
+  redisTry: async (fn: (c: unknown) => Promise<unknown>, fallback: unknown) => {
+    try {
+      return await fn(mockRedis)
+    } catch {
+      return fallback
+    }
+  },
+}))
 jest.mock('@/lib/worker-client', () => {
   class WorkerError extends Error {
     constructor(public status: number, public path: string, message: string) {
