@@ -1,6 +1,12 @@
 import { SiteHeader } from '@/components/site-header'
+import { SITE_URL, SUPPORT_EMAIL } from '@/lib/site'
 import { SiteFooter } from '@/components/site-footer'
-import { SUPPORT_EMAIL } from '@/lib/site'
+
+export const metadata = {
+  title: 'Privacy Policy — ResumeAI',
+  description: 'What data ResumeAI collects, why, how long it is kept, and how to have it deleted.',
+  alternates: { canonical: `${SITE_URL}/privacy` },
+}
 
 // Bump this date on any meaningful policy edit.
 const LAST_UPDATED = new Date('2026-05-25')

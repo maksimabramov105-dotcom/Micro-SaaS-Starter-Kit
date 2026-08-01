@@ -1,5 +1,12 @@
 import { SiteHeader } from '@/components/site-header'
+import { SITE_URL } from '@/lib/site'
 import { SiteFooter } from '@/components/site-footer'
+
+export const metadata = {
+  title: 'Terms of Service — ResumeAI',
+  description: 'The terms that govern your use of ResumeAI, including accounts, payment, acceptable use and liability.',
+  alternates: { canonical: `${SITE_URL}/terms` },
+}
 
 // Bump this date on any meaningful policy edit.
 const LAST_UPDATED = new Date('2026-05-25')
