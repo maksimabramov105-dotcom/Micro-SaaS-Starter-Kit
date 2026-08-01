@@ -12,6 +12,8 @@ import { getRevenueMetrics } from '@/lib/pmf/queries'
 import { getRevenueFunnel } from '@/lib/pmf/revenue-funnel'
 import { getUserFunnel, getWeek2Retention } from '@/lib/pmf/user-funnel'
 import { prisma } from '@/lib/prisma'
+import { getTrafficSnapshot, formatTrafficBlock } from '@/lib/pmf/traffic'
+import { getSitemapUrls } from '@/lib/seo/indexnow'
 
 const WEEK_MS = 7 * 86_400_000
 
@@ -28,13 +30,30 @@ export interface WeeklySnapshot {
   text: string
 }
 
+/** Sitemap URL count — the closest proxy for "indexed pages" we own. */
+async function sitemapSize(): Promise<number | undefined> {
+  try {
+    const urls = await getSitemapUrls()
+    return urls.length
+  } catch {
+    return undefined
+  }
+}
+
 export async function buildWeeklySnapshot(): Promise<WeeklySnapshot> {
-  const [week, retention, revenue, sprint] = await Promise.all([
+  const [week, retention, revenue, sprint, thisWeek, lastWeek] = await Promise.all([
     getUserFunnel(new Date(Date.now() - WEEK_MS)),
     getWeek2Retention(),
     getRevenueMetrics(),
     getRevenueFunnel(new Date(Date.now() - WEEK_MS)),
+    // T4: where the people came from. Computed from events we already write —
+    // no new tracking, no third-party script, no consent implications.
+    getTrafficSnapshot(7, await sitemapSize()),
+    getTrafficSnapshot(14).catch(() => undefined),
   ])
+  // 14d minus 7d is not the prior week, but it is the only comparison available
+  // without storing history, and it is directionally right for a WoW arrow.
+  const traffic = formatTrafficBlock(thisWeek, lastWeek)
 
   const lines = [
     `ResumeAI weekly metrics — ${new Date().toISOString().slice(0, 10)}`,
@@ -54,6 +73,8 @@ export async function buildWeeklySnapshot(): Promise<WeeklySnapshot> {
     'Week-2 retention (decision-gate metric):',
     `  cohort (signed up 14-28d ago)  ${retention.cohortSize}`,
     `  active in their week 2        ${retention.retained} (${pctOrDash(retention.rate)})`,
+    '',
+    ...traffic,
     '',
     'Revenue Sprint funnel (7d · capture -> convert):',
     `  SEO visits             ${sprint.seoVisit}`,
