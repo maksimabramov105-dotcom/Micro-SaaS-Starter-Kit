@@ -11,7 +11,7 @@
 export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
-import { getRedis } from '@/lib/redis'
+import { redisTry } from '@/lib/redis'
 import { trackEvent } from '@/lib/analytics-advanced'
 
 const RATE_LIMIT = 5 // teardowns per IP per hour
@@ -24,14 +24,19 @@ Be honest and specific. "score" reflects how likely the resume passes an ATS for
 export async function POST(req: Request) {
   const ip = (req.headers.get('x-forwarded-for') ?? '').split(',')[0].trim() || 'unknown'
   // ── Rate limit (fail-open) ───────────────────────────────────────────────
-  try {
-    const redis = getRedis()
-    const n = await redis.incr(`teardown-rl:${ip}`)
-    if (n === 1) await redis.expire(`teardown-rl:${ip}`, 3600)
-    if (n > RATE_LIMIT) {
-      return NextResponse.json({ error: 'Too many teardowns this hour. Please try again later.' }, { status: 429 })
-    }
-  } catch { /* Redis down → skip limiting */ }
+  // redisTry, not try/catch: the client queues commands while Redis is down, so
+  // an await here hangs instead of throwing and the fail-open never runs.
+  const n = await redisTry(
+    async (redis) => {
+      const hits = await redis.incr(`teardown-rl:${ip}`)
+      if (hits === 1) await redis.expire(`teardown-rl:${ip}`, 3600)
+      return hits
+    },
+    0,
+  )
+  if (n > RATE_LIMIT) {
+    return NextResponse.json({ error: 'Too many teardowns this hour. Please try again later.' }, { status: 429 })
+  }
 
   let body: { resumeText?: string; targetRole?: string }
   try {
