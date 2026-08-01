@@ -28,11 +28,17 @@ import { SITE_URL, SUPPORT_EMAIL } from '@/lib/site'
 const MARKER = 'weekly_digest_sent'
 const BATCH = 50
 
-/** Points each factor can contribute — mirrors ai/jobfit.py. */
+/**
+ * Points each factor can contribute — these MUST mirror ai/jobfit.py.
+ *
+ * They did not: seniority was 25 and eligibility 15 here against 20/20 there,
+ * so a perfect seniority score normalised to 0.8 and looked like a weakness.
+ * Caught by reading a real fit report's breakdown against the scorer.
+ */
 const FACTOR_MAX: Record<string, number> = {
   skills: 50,
-  seniority: 25,
-  eligibility: 15,
+  seniority: 20,
+  eligibility: 20,
   language: 10,
 }
 

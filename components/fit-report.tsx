@@ -19,8 +19,8 @@
 /** Max points each factor can contribute, mirroring ai/jobfit.py. */
 const FACTOR_MAX: Record<string, number> = {
   skills: 50,
-  seniority: 25,
-  eligibility: 15,
+  seniority: 20,
+  eligibility: 20,
   language: 10,
 }
 
