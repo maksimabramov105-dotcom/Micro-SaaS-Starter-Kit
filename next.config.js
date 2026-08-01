@@ -11,6 +11,34 @@ const nextConfig = {
     root: __dirname,
   },
   output: 'standalone',
+  // Security headers. Before this only HSTS was set (by Caddy) — found by the
+  // launch audit. CSP is deliberately NOT here yet: the A/B tests render inline
+  // <script> tags, so a strict policy needs nonces threaded through them first,
+  // and shipping a broken CSP is worse than shipping none.
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          // Stop the browser second-guessing declared content types — the
+          // cheapest defence against a user-supplied file being run as script.
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          // Nothing here is ever meant to be framed. The extension overlays
+          // OTHER sites; it never embeds ours.
+          { key: 'X-Frame-Options', value: 'DENY' },
+          // Send the origin cross-site, never the full path: job URLs and
+          // ?ref= tags should not leak into third-party referrer logs.
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          { key: 'X-DNS-Prefetch-Control', value: 'on' },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
+          },
+        ],
+      },
+    ]
+  },
+
   async redirects() {
     return [
       // The /companies/* namespace resolves to the canonical per-company

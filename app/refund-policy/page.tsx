@@ -1,8 +1,9 @@
 import { SiteHeader } from '@/components/site-header'
+import { SITE_URL, SUPPORT_EMAIL } from '@/lib/site'
 import { SiteFooter } from '@/components/site-footer'
-import { SUPPORT_EMAIL } from '@/lib/site'
 
 export const metadata = {
+  alternates: { canonical: `${SITE_URL}/refund-policy` },
   title: 'Refund Policy — ResumeAI',
   description: '30-day money-back guarantee, no questions asked. Cancel any paid plan within 30 days of your first payment for a full refund.',
 }

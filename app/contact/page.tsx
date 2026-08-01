@@ -1,8 +1,9 @@
 import { SiteHeader } from '@/components/site-header'
+import { SITE_URL, SUPPORT_EMAIL } from '@/lib/site'
 import { SiteFooter } from '@/components/site-footer'
-import { SUPPORT_EMAIL } from '@/lib/site'
 
 export const metadata = {
+  alternates: { canonical: `${SITE_URL}/contact` },
   title: 'Contact — ResumeAI',
   description: 'How to reach the ResumeAI team for support, privacy, and data requests.',
 }
