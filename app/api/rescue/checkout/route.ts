@@ -115,7 +115,16 @@ export async function POST(req: Request) {
       line_items: [{ price: priceId, quantity: 1 }],
       allow_promotion_codes: true,
       metadata: { rescueOrderId: order.id, kind: 'resume_rescue' },
-      payment_intent_data: { metadata: { rescueOrderId: order.id } },
+      payment_intent_data: {
+        metadata: { rescueOrderId: order.id },
+        // Override the account descriptor for this charge. The Stripe account's
+        // default reads "MAXIM", so a $4.99 impulse buy from a stranger showed a
+        // person's first name on their bank statement — the single most common
+        // reason a card charge gets disputed. The account-level setting can only
+        // be changed in the Stripe dashboard (the API refuses it on your own
+        // account), so this covers the purchase most exposed to it.
+        statement_descriptor: 'RESUMEAI',
+      },
       success_url: `${APP_URL}/resume-rescue/result?order=${order.id}`,
       cancel_url: `${APP_URL}/resume-rescue?canceled=1`,
     })
