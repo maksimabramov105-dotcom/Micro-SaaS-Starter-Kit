@@ -18,6 +18,7 @@ import { trackEvent } from '@/lib/analytics-advanced'
 import { sendAdminAlert, sendAdminMessage } from '@/lib/alerts'
 import { prisma } from '@/lib/prisma'
 import { getSitemapUrls, submitIndexNow } from '@/lib/seo/indexnow'
+import { runIndexNowDelta } from '@/lib/seo/indexnow-delta'
 
 const CONCURRENCY = 5
 
@@ -92,6 +93,20 @@ export async function maybeRunSeoAutomation(): Promise<'ran' | 'skipped'> {
 
   const report = await runSeoHealthCheck()
 
+  // Daily delta first (T1): a new page should not wait up to seven days for the
+  // Monday full push before any engine is told it exists.
+  let delta: Awaited<ReturnType<typeof runIndexNowDelta>> | null = null
+  if (report.sitemapError === null) {
+    try {
+      delta = await runIndexNowDelta()
+      if (delta.newUrls > 0) {
+        console.log('[seo] indexnow delta', delta.status, delta.newUrls, 'new URLs')
+      }
+    } catch (err) {
+      console.warn('[seo] indexnow delta failed:', err)
+    }
+  }
+
   let indexnow: { submitted: number; ok: boolean } | null = null
   if (now.getUTCDay() === 1 && report.sitemapError === null) {
     try {
@@ -109,6 +124,7 @@ export async function maybeRunSeoAutomation(): Promise<'ran' | 'skipped'> {
       failures: report.failures.length,
       sitemapError: report.sitemapError,
       ...(indexnow ? { indexnowSubmitted: indexnow.submitted, indexnowOk: indexnow.ok } : {}),
+      ...(delta ? { deltaStatus: delta.status, deltaNew: delta.newUrls } : {}),
     },
   }).catch(() => {})
 
@@ -120,6 +136,7 @@ export async function maybeRunSeoAutomation(): Promise<'ran' | 'skipped'> {
       `Sitemap URLs    ${report.checked}`,
       `Pages non-200   ${nonOk}${nonOk > 0 ? ` (${report.failures.slice(0, 3).map((f) => f.status).join(',')}…)` : ''}`,
       `IndexNow push   ${indexnow ? `${indexnow.submitted} URLs, ${indexnow.ok ? 'accepted' : 'REJECTED'}` : 'n/a'}`,
+      `New URLs (7d)   ${delta ? `${delta.newUrls} submitted today` : 'n/a'}`,
       `GSC clicks/impr pending owner GSC API access`,
     ]
     await sendAdminMessage(lines.join('\n'), {
