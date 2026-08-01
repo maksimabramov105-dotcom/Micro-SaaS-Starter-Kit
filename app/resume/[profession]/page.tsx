@@ -9,6 +9,7 @@
 // Copy lives in lib/seo/professions.ts so the thin-content guard asserts against
 // the same builders this page renders.
 import type { Metadata } from 'next'
+import { relatedBySlug } from '@/lib/seo/related'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { RescueCtaBlock } from '@/components/rescue-cta-block'
@@ -60,7 +61,7 @@ export default async function Page({
   const body = professionBody(p)
   const faq = professionFaq(p)
   const role = corpusRole(p)
-  const related = PROFESSIONS.filter((x) => x.slug !== p.slug).slice(0, 8)
+  const related = relatedBySlug(PROFESSIONS, p.slug, 8)
 
   const jsonLd = {
     '@context': 'https://schema.org',
