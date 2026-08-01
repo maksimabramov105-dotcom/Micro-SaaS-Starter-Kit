@@ -7,6 +7,7 @@
  * the nurture sequence). Unlock-beyond = the $4.99 tripwire.
  */
 import { useState } from 'react'
+import { ExitIntent } from '@/components/exit-intent'
 import Link from 'next/link'
 import { PRICE } from '@/lib/pricing'
 
@@ -252,6 +253,11 @@ export function AtsCheckForm() {
           <p className="mt-4 text-center text-xs text-slate-400">{result.remaining} free checks left today</p>
         </div>
       )}
+
+      {/* T3: one last honest offer, and only once the visitor has a result
+          worth finishing. Armed only when the report is still gated — someone
+          who already unlocked it has nothing left to be offered. */}
+      <ExitIntent source="ats-check-exit" enabled={Boolean(result) && !result?.unlocked} />
     </div>
   )
 }
