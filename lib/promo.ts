@@ -41,5 +41,10 @@ export function isPromoActive(now: Date = new Date(), promo: Promo = PROMO): boo
 export function promoEndLabel(promo: Promo = PROMO): string {
   const ends = new Date(promo.endsAt)
   if (Number.isNaN(ends.getTime())) return ''
-  return ends.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
+  // UTC explicitly. Without a timeZone this renders in the RUNTIME's zone, so
+  // the client-rendered banner and the server-rendered pricing copy disagreed —
+  // "Ends September 2" above "(ends September 1)" on the same page, because
+  // endsAt is 23:59:59Z and the browser was an hour ahead. Same data, two
+  // answers, side by side.
+  return ends.toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' })
 }

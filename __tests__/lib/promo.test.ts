@@ -32,3 +32,37 @@ describe('promoEndLabel', () => {
     expect(promoEndLabel(BAD)).toBe('')
   })
 })
+
+describe('promoEndLabel is timezone-stable', () => {
+  // Found on the live pricing page: the banner read "Ends September 2" directly
+  // above body copy reading "(ends September 1)". Same promo, same page, same
+  // function — but the banner renders on the CLIENT and the copy on the SERVER,
+  // and with no timeZone the label followed each runtime's zone. endsAt is
+  // 23:59:59Z, so an hour of offset flips the date.
+  const LATE: Promo = {
+    code: 'X', discountLabel: '40% off', endsAt: '2026-09-01T23:59:59Z',
+  } as Promo
+
+  const withTz = (tz: string) => {
+    const prev = process.env.TZ
+    process.env.TZ = tz
+    try {
+      return promoEndLabel(LATE)
+    } finally {
+      process.env.TZ = prev
+    }
+  }
+
+  it('reads the same regardless of the runtime timezone', () => {
+    const labels = ['UTC', 'Australia/Sydney', 'America/Los_Angeles', 'Europe/Berlin'].map(withTz)
+    expect(new Set(labels).size).toBe(1)
+  })
+
+  it('reports the UTC date the promo actually ends on', () => {
+    expect(promoEndLabel(LATE)).toBe('September 1')
+  })
+
+  it('still returns empty for an unparseable date', () => {
+    expect(promoEndLabel({ code: 'X', discountLabel: 'y', endsAt: 'nonsense' } as Promo)).toBe('')
+  })
+})
