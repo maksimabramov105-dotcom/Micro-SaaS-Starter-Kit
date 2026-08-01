@@ -30,8 +30,62 @@ import { recordFunnel } from '@/lib/funnel'
 import { notifyHumanReply, shouldNotify } from '@/lib/inbox/notify'
 import { verifyResendSignature, parseFrom, parseToAddress, extractCompanyFromSubject, isConfirmationSubject } from '@/lib/inbox/inbound-utils'
 import { publishEvent } from '@/lib/redis'
+import { EMAIL_DOMAIN } from '@/lib/site'
 
-const INBOX_DOMAIN = process.env.INBOX_DOMAIN ?? 'inbox.resumeai-bot.ru'
+const INBOX_DOMAIN = process.env.INBOX_DOMAIN ?? EMAIL_DOMAIN
+
+/**
+ * Addresses that belong to the business rather than to a user's reply handle.
+ * Published in the footer, on /contact, and as the reply-to on every email we
+ * send — so they must reach a human, not the floor.
+ */
+const ROLE_HANDLES = new Set(['support', 'hello', 'help', 'billing', 'privacy', 'legal', 'abuse'])
+
+/** Where role mail goes. Falls back to the first ADMIN_EMAILS entry. */
+function founderInbox(): string | null {
+  const explicit = process.env.OWNER_EMAIL?.trim()
+  if (explicit) return explicit
+  const first = (process.env.ADMIN_EMAILS ?? '').split(',')[0]?.trim()
+  return first || null
+}
+
+/**
+ * Forward a role-address email to a real mailbox, and alert Telegram.
+ *
+ * Both, deliberately: email is the durable copy you can reply to, Telegram is
+ * the thing that actually gets noticed. A refund request that waits three days
+ * for someone to check an inbox has already become a chargeback.
+ */
+async function forwardToFounder(
+  handle: string,
+  from: string,
+  subject: string,
+  body: string,
+): Promise<void> {
+  const to = founderInbox()
+  const preview = body.slice(0, 4000)
+  try {
+    if (to) {
+      const { sendEmail } = await import('@/lib/email')
+      await sendEmail({
+        to,
+        subject: `[${handle}@] ${subject}`,
+        html: `<p><strong>From:</strong> ${from.replace(/</g, '&lt;')}</p><p><strong>To:</strong> ${handle}@${INBOX_DOMAIN}</p><hr><div style="white-space:pre-wrap">${preview.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</div>`,
+        replyTo: from,
+      })
+    } else {
+      console.warn('[inbox/inbound] role mail received but no OWNER_EMAIL/ADMIN_EMAILS set')
+    }
+  } catch (err) {
+    console.error('[inbox/inbound] forward failed', err)
+  }
+  try {
+    const { sendAdminAlert } = await import('@/lib/alerts')
+    await sendAdminAlert(`Mail to ${handle}@ from ${from}\nSubject: ${subject}\n\n${preview.slice(0, 500)}`)
+  } catch {
+    // Alerting is best-effort; never fail the webhook over it.
+  }
+}
 
 // ── Handler ────────────────────────────────────────────────────────────────
 
@@ -115,6 +169,17 @@ export async function POST(req: Request) {
     select: { id: true, email: true, name: true },
   })
   if (!user) {
+    // Not a per-user reply handle. Before this, everything here was dropped on
+    // the floor — including mail to support@, which is published in the site
+    // footer, on /contact, and as the reply-to on EVERY email we send. A
+    // customer asking for a refund under the 30-day guarantee got silence,
+    // which is how you turn a refund request into a chargeback.
+    //
+    // Forward the role addresses to a human instead of discarding them.
+    if (ROLE_HANDLES.has(parsed.handle)) {
+      await forwardToFounder(parsed.handle, rawFrom, subject, bodyText || bodyHtml || '')
+      return NextResponse.json({ ok: true, forwarded: parsed.handle })
+    }
     console.warn('[inbox/inbound] no user for handle', parsed.handle)
     return NextResponse.json({ ok: true, skipped: 'unknown_handle' })
   }

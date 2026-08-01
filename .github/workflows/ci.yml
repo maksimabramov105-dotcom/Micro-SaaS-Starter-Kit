@@ -72,6 +72,11 @@ jobs:
       WORKER_URL: http://localhost:8000
       WORKER_SECRET: ci-worker-secret
       ENCRYPTION_KEY: bV4UmliwP4xFApJTnq5O5XxJ4mltOC4bjrQQ7EdCUtc=
+      # Pinned so the app and the inbound spec agree on the mail domain. Both
+      # used to carry the same hardcoded .ru fallback; when the app's changed,
+      # they silently diverged and every inbound assertion failed with
+      # "unknown_domain".
+      INBOX_DOMAIN: resumeai-bot.com
       GOOGLE_CLIENT_ID: ci
       GOOGLE_CLIENT_SECRET: ci
       GITHUB_ID: ci

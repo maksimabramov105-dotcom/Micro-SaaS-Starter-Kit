@@ -29,7 +29,7 @@ export const SITE_HOST = SITE_URL.replace(/^https?:\/\//, '')
  * during a migration: mail keeps flowing from the verified Resend domain until
  * the new one is verified. Override with EMAIL_DOMAIN when they differ.
  */
-const EMAIL_DOMAIN = process.env.EMAIL_DOMAIN ?? SITE_HOST
+export const EMAIL_DOMAIN = process.env.EMAIL_DOMAIN ?? SITE_HOST
 
 export const SUPPORT_EMAIL = `support@${EMAIL_DOMAIN}`
 export const HELLO_EMAIL = `hello@${EMAIL_DOMAIN}`

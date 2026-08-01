@@ -9,7 +9,7 @@ import { TEST_USER } from './global-setup'
  * and the Stripe test key — no real charges. Needs CI secrets:
  *   STRIPE_SECRET_KEY (sk_test_…), RESEND_WEBHOOK_SECRET (whsec_…).
  */
-const INBOX_DOMAIN = process.env.INBOX_DOMAIN ?? 'inbox.resumeai-bot.ru'
+const INBOX_DOMAIN = process.env.INBOX_DOMAIN ?? 'resumeai-bot.com'
 
 // ── 5 · Stripe webhook signature gate (money-path entry) ────────────────────
 test('Stripe webhook: rejects unsigned, accepts validly-signed', async ({ request }) => {
