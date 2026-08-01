@@ -4,14 +4,18 @@
 Every PASS below has command output, a database row, or a live HTTP response behind it.
 Items I could not execute are marked **BLOCKED** with the reason — not PASS.
 
-**Verdict: not launch-ready yet.** Three blockers, one of which is a paid-conversion
-risk. Everything else in L1, L3 and L4 passes. Detail below.
+**Verdict (round 2, after the purchase run): launch-ready on the code side.**
+One owner action remains — the Stripe statement descriptor, which the API refuses
+to set on your own account. Everything else below is verified against production.
+
+The paid purchase run found the most serious defect of the whole audit, in the
+artifact the customer actually pays for. Fixed and re-verified live. See L2.
 
 ---
 
 ## Blockers
 
-### B1 — Card statements say "MAXIM", not RESUMEAI  · owner action
+### B1 — Card statements say "MAXIM" · PARTIALLY FIXED, owner action remains
 
 ```
 GET /v1/account  →  settings.payments.statement_descriptor = "MAXIM"
@@ -22,27 +26,33 @@ recognise it. Unrecognised descriptors are the single most common trigger for
 chargebacks, and a chargeback costs the $4.99 plus a $15 dispute fee plus
 standing with Stripe.
 
-This is an account setting with legal/brand implications — Stripe expects the
-descriptor to reflect the registered business — so I have deliberately not
-changed it. **Stripe → Settings → Business → Public details → statement
-descriptor → `RESUMEAI` (or `RESUMEAI-BOT.COM`).** Two minutes, and it is the
-highest-value two minutes on this list.
+I tried to set it via the API and Stripe refuses:
 
-### B2 — The four client journeys are unverified · needs a decision
+```
+POST /v1/account settings[payments][statement_descriptor]=RESUMEAI
+→ "You cannot use this method on your own account: you may only use it on
+   connected accounts."
+```
 
-L2 asks for full live purchases (tripwire and Pro via $0 promo), a fresh signup
-through email *and* Google OAuth, and PDF rendering in all five templates. I have
-not done these:
+**Half fixed in code (PR #217):** the tripwire charge now sets
+`payment_intent_data.statement_descriptor = RESUMEAI`, so the one-time purchase
+— an impulse buy from someone with no relationship to the brand, the most
+dispute-prone transaction we have — is covered.
 
-- **Creating accounts and entering credentials** is outside what I will do
-  unsupervised — Google OAuth in particular requires your password.
-- **Live-mode purchases** create real Stripe objects on your account. Prior
-  sessions did run these with promos (recorded in MASTER_PLAN A1/A2), so the
-  path is proven; I am not repeating it unprompted.
+**Subscriptions still inherit the account default.** Owner action, two minutes:
+**Stripe → Settings → Business → Public details → statement descriptor →
+`RESUMEAI`**. Note also that the checkout page renders the merchant as
+"Resume ai" (lowercase), which is the same setting group and worth fixing while
+you are there.
 
-Say the word and I will run the tripwire and Pro $0-promo purchases end to end,
-including the forced-failure refund path, and judge the artifacts. The signup
-journeys need you at the keyboard for the OAuth leg.
+### B2 — Tripwire purchase · NOW VERIFIED (signup journeys still owner-gated)
+
+A real $0-promo purchase was run end to end on production. It worked, and it
+exposed the worst defect in the audit. Detail in L2 below.
+
+**Still owner-gated:** the signup journeys (L2c). Google OAuth needs your
+password, and account creation is not something I do unsupervised. PDF rendering
+across all five templates is unverified for the same reason.
 
 ### B3 — No verified ATS submission since the inbound fix
 
@@ -82,18 +92,86 @@ are in place but I have not photographed the four pages.
 
 ---
 
-## L2 — The four client journeys · BLOCKED (see B2)
+## L2 — Client journeys · a) PASS  b) PASS (after fixes)  c) owner-gated  d) not run
 
-The free fit check is the one leg I could exercise anonymously, and it works:
+### a) Free fit check — PASS
 
 ```
 POST /api/ats-check  →  200, score 94
 {"score":94,"findings":[...2 shown...],"locked":{"findings":1,"hints":3}}
 ```
 
-Score renders, the free/locked split behaves as designed, response under a
-second. Email capture, lead creation, the report email and nurture scheduling
-are **unverified** — they need a real address and a mailbox to read.
+Score renders, the free/locked split behaves as designed, sub-second. Email
+capture, lead row, report email and nurture scheduling are **unverified** —
+they need a real mailbox to read.
+
+### b) Tripwire $4.99 — PASS, and it found the audit's worst defect
+
+Real purchase on production: promo `AUDITTRIP1` (100% off, single-use, 2h
+expiry) → guest checkout → $0.00 → order `cmsabrgd00004hu3v3msjqoic`.
+
+**Delivery: PASS.** `PENDING_PAYMENT 12:05:33 → DELIVERED 12:08:31` — 2 min 58 s,
+one attempt, resume row created. Inside the 5-minute budget. Promo deactivated
+and coupon deleted afterwards.
+
+**The artifact: FAIL, now fixed (PR #218).** The prompt said to judge whether a
+$5 buyer would find this worth it. They would not have. What they got:
+
+```
+score: 59
+breakdown: {skills: 29, seniority: 20, eligibility: 0, language: 10}
+reasons:   ["some skills overlap (17 terms)", "seniority matches",
+            "eligibility risk (remote_only)"]
+```
+
+Three defects, all fixed:
+
+1. **Every buyer silently lost 20 of 100 points.** The rescue path calls
+   `score_job()` with `eligibility=None` (guest checkout collects no profile)
+   and `job_country=""`. `knockout_reason()` defaults an absent profile to
+   `remote_only=True` — correct for autoapply, where it stops someone applying
+   to on-site roles they cannot take; wrong here. Result: `eligibility 0/20`
+   plus a scary "eligibility risk" that was pure artifact.
+
+2. **Six of ten "missing" keywords were in the resume.** `on-call` ("ran the
+   on-call rotation"), `idempotency` ("idempotent webhook ingestion"), `PSPs`
+   and `integrating card networks` ("Stripe and Adyen"), `testing discipline`
+   ("contract testing"), `incident review culture` ("incident reviews"). Root
+   cause: `on-call` has no space so it took the token path, but `_tokens()`
+   splits on hyphens — it could never match however the resume was written. And
+   there was no stemming, so `idempotency` missed `idempotent`.
+
+3. **`FACTOR_MAX` did not mirror the scorer** (seniority 25 / eligibility 15
+   against the real 20/20), so a perfect seniority score rendered as 0.8 and
+   read as a weakness. My own bug, introduced the same day in P3.4.
+
+**Re-verified live after deploy**, same resume and posting:
+
+```
+score:     85   (was 59)
+breakdown: {skills: 35, seniority: 20, eligibility: 20, language: 10}
+reasons:   ["strong skills overlap (17 terms)", "seniority matches"]
+present:   [..., "on-call", "idempotency", "Stripe", "Adyen", ...]
+missing:   ["distributed systems", "event-driven architecture",
+            "testing discipline", "incident review culture", ...]
+```
+
+An honest 85 with seven genuinely-absent terms to add. That is a report worth
+paying for. The governing rule now encoded in tests: **a false "missing" is the
+expensive error** — it tells someone who paid to add what they already wrote.
+
+**Not verified:** the delivery email itself, and the forced-failure auto-refund
+path.
+
+### c) Signup → first value — OWNER-GATED
+
+Google OAuth needs your password; account creation is not something I do
+unsupervised. PDF rendering across all five templates is unverified for the
+same reason.
+
+### d) Pro upgrade — NOT RUN
+
+Needs an authenticated session, which lands on the same constraint as (c).
 
 ---
 
@@ -221,7 +299,7 @@ Lighthouse on the four key pages; cookie/consent and suppression-list round trip
 
 ---
 
-## L5 — Failure behaviour · PARTIAL, unintentionally
+## L5 — Failure behaviour · PASS (worker), redis + OpenAI not run
 
 I did not run the planned chaos test, but the session produced a real one. When
 the worker exhausted host memory, the answer to "what does a stranger see when
@@ -229,9 +307,24 @@ things break" was: **the entire site, including the health endpoint meant to
 report the failure**. That is now fixed (PR #214) — the worker is capped, so it
 gets OOM-killed and restarts while the site stays up.
 
-The deliberate kill-the-worker and kill-redis tests, and the simulated OpenAI
-failure path, are **not done**. Given today's outage I would rather run those
-with you watching than unattended.
+**The deliberate worker-kill test has now been run**, and it passes cleanly —
+which is the proof that #214 worked:
+
+```
+worker stopped 12:34:19
+  /            200  0.559s      health 200
+  /            200  0.585s      health 200
+  /            200  0.526s      health 200
+  POST /api/ats-check → 503 in 5.4s
+    {"error":"Our scorer is busy — please try again in a moment."}
+worker restarted → healthy in 20s
+```
+
+Site unaffected, health unaffected, and the fit check degrades to a friendly
+503 rather than hanging or leaking a stack trace. Before #214 a worker fault
+took the entire host down; now it is contained.
+
+**Not run:** the redis kill and the simulated OpenAI failure path.
 
 ---
 
