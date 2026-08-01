@@ -3,6 +3,7 @@
 // from the scraper cache (JobListing) and refreshes via ISR, so pages stay
 // current automatically as the existing crons run.
 import type { Metadata } from 'next'
+import { relatedBySlug } from '@/lib/seo/related'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { RescueCtaBlock } from '@/components/rescue-cta-block'
@@ -60,7 +61,10 @@ export default async function ApplyToCompanyPage({
   const roles = openRoles?.count ?? 0
 
   const guide = ATS_GUIDE[c.ats]
-  const related = APPLY_COMPANIES.filter((x) => x.ats === c.ats && x.slug !== c.slug).slice(0, 6)
+  // Rotating window, not slice(0,6): taking the first six siblings gave every
+  // sibling link to the alphabetically earliest companies and left 80% of these
+  // pages with only the hub linking to them.
+  const related = relatedBySlug(APPLY_COMPANIES, c.slug, 6)
 
   const faq = applyToFaq(c)
 

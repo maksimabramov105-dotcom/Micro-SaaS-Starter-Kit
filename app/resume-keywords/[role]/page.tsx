@@ -4,6 +4,7 @@
 // exist only for roles with genuine corpus support, and new roles appear
 // automatically as the listing corpus grows.
 import type { Metadata } from 'next'
+import { relatedBySlug } from '@/lib/seo/related'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { RescueCtaBlock } from '@/components/rescue-cta-block'
@@ -47,7 +48,7 @@ export default async function ResumeKeywordsPage({
   const r = getRole(role)
   if (!r) notFound()
 
-  const related = ROLES.filter((x) => x.slug !== r.slug).slice(0, 6)
+  const related = relatedBySlug(ROLES, r.slug, 6)
   const faq = roleFaq(r)
 
   const jsonLd = {
