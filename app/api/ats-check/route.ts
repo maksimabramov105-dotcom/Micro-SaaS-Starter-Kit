@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { trackEvent } from '@/lib/analytics-advanced'
 import { enrollLead, isSuppressed, sendFitReportEmail } from '@/lib/nurture'
-import { getRedis } from '@/lib/redis'
+import { redisTry } from '@/lib/redis'
 
 /**
  * POST /api/ats-check — free, UNAUTHENTICATED fit check (lead magnet, C1).
@@ -97,14 +97,17 @@ export async function POST(req: Request) {
   // ── Rate limit: 3 / IP / day ──────────────────────────────────────────────
   const ip = clientIp(req)
   const key = `ats-check:${ip}:${new Date().toISOString().slice(0, 10)}`
-  let count = 1
-  try {
-    const redis = getRedis()
-    count = await redis.incr(key)
-    if (count === 1) await redis.expire(key, 86_400)
-  } catch {
-    count = 1
-  }
+  // redisTry, not a bare try/catch: the client queues commands indefinitely
+  // while Redis is down, so an await here hangs rather than throwing. Proven in
+  // the launch audit — this endpoint sat for 45s with Redis stopped.
+  const count = await redisTry(
+    async (redis) => {
+      const n = await redis.incr(key)
+      if (n === 1) await redis.expire(key, 86_400)
+      return n
+    },
+    1,
+  )
   if (count > DAILY_LIMIT) {
     return NextResponse.json(
       { error: 'You’ve used your 3 free checks today. Come back tomorrow — or get the full rescue for one job now.' },

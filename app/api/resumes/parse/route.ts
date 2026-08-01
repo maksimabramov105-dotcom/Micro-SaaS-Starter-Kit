@@ -22,7 +22,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { callWorker, WorkerError } from '@/lib/worker-client'
-import { getRedis } from '@/lib/redis'
+import { redisTry } from '@/lib/redis'
 
 export const dynamic = 'force-dynamic'
 
@@ -52,16 +52,19 @@ export interface ParsedResume {
 }
 
 async function overRateLimit(userId: string): Promise<boolean> {
-  try {
-    const redis = getRedis()
-    const key = `resume:parse:rl:${userId}`
-    const hits = await redis.incr(key)
-    if (hits === 1) await redis.expire(key, WINDOW_SECONDS)
-    return hits > RATE_LIMIT
-  } catch {
-    // Redis outage must not block resume creation.
-    return false
-  }
+  // A Redis outage must not block resume creation — and must not hang it
+  // either. The client queues commands while disconnected, so a bare
+  // try/catch never fires; redisTry puts a deadline on it.
+  const key = `resume:parse:rl:${userId}`
+  const hits = await redisTry(
+    async (redis) => {
+      const n = await redis.incr(key)
+      if (n === 1) await redis.expire(key, WINDOW_SECONDS)
+      return n
+    },
+    0,
+  )
+  return hits > RATE_LIMIT
 }
 
 export async function POST(req: Request) {
