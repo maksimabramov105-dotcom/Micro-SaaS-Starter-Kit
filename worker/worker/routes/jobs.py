@@ -489,26 +489,46 @@ async def autoapply_linkedin(body: LinkedInApplyRequest) -> dict:
     from worker.crypto import decrypt
 
     job = await _new_job()
-    logger.info(
-        "job.linkedin.started",
-        job_id=job.job_id,
-        user_id=body.user_id,
-        campaign_id=body.campaign_id,
-    )
-    try:
-        password = decrypt(body.password_encrypted)
-        applicator = LinkedInApplicator()
-        result = await applicator.apply(
-            email=body.email,
-            password=password,
-            job_title=body.job_title,
-            location=body.location,
+    # Same ceiling as careerops. This route launches chromium too (three call
+    # sites in autoapply/linkedin.py) and used to do it with no bound at all,
+    # which made MAX_CONCURRENT_APPLIES a ceiling on only ONE of the two ways we
+    # start a browser. Observed 2026-08-01: nine concurrent chromiums took the
+    # host to load 32 with 67 MB free and the whole site — web, health check and
+    # SSH — became unreachable.
+    async with _APPLY_SEMAPHORE:
+        avail = _available_memory_mb()
+        if avail < MIN_APPLY_MEMORY_MB:
+            logger.warning(
+                "job.linkedin.insufficient_memory",
+                available_mb=avail,
+                min_mb=MIN_APPLY_MEMORY_MB,
+            )
+            _finish(job, {"status": "error", "error": f"insufficient_memory ({avail}MB < {MIN_APPLY_MEMORY_MB}MB)"})
+            await _redis_save(job)
+            return job.model_dump()
+
+        logger.info(
+            "job.linkedin.started",
+            job_id=job.job_id,
+            user_id=body.user_id,
+            campaign_id=body.campaign_id,
+            available_mb=avail,
+            max_concurrent=MAX_CONCURRENT_APPLIES,
         )
-        _finish(job, result)
-        logger.info("job.linkedin.done", job_id=job.job_id)
-    except Exception as exc:
-        _fail(job, str(exc))
-        logger.error("job.linkedin.error", job_id=job.job_id, error=str(exc))
+        try:
+            password = decrypt(body.password_encrypted)
+            applicator = LinkedInApplicator()
+            result = await applicator.apply(
+                email=body.email,
+                password=password,
+                job_title=body.job_title,
+                location=body.location,
+            )
+            _finish(job, result)
+            logger.info("job.linkedin.done", job_id=job.job_id)
+        except Exception as exc:
+            _fail(job, str(exc))
+            logger.error("job.linkedin.error", job_id=job.job_id, error=str(exc))
 
     await _redis_save(job)
     return job.model_dump()
