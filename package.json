@@ -27,7 +27,8 @@
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
     "prepare": "husky install",
-    "db:backfill-referrals": "tsx scripts/backfill_referral_codes.ts"
+    "db:backfill-referrals": "tsx scripts/backfill_referral_codes.ts",
+    "lighthouse": "tsx scripts/lighthouse_check.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
