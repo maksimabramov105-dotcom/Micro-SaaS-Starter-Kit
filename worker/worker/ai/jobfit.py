@@ -95,8 +95,23 @@ def score_job(
             reasons.append("seniority mismatch")
 
     # ── eligibility (0–20) ───────────────────────────────────────────────────
+    # No profile supplied means we know NOTHING about work authorisation, not
+    # that there is a problem. knockout_reason() defaults an absent profile to
+    # remote_only=True — correct for autoapply, where the default protects a
+    # candidate from applying to on-site roles they cannot take, but wrong here.
+    #
+    # The paid Resume Rescue calls this with eligibility=None (guest checkout
+    # collects no profile) and job_country="" (only title/company/description),
+    # so EVERY buyer was knocked to 0/20 and shown an "eligibility risk" that
+    # was an artifact of having no profile. A genuinely strong match scored 59
+    # instead of 79. Inventing a risk we have no evidence for is exactly what
+    # this product refuses to do everywhere else.
     is_remote = bool(job.get("remote")) or "remote" in (job.get("location", "") or "").lower()
-    knockout = _elig.knockout_reason(eligibility, job_country, is_remote)
+    knockout = (
+        _elig.knockout_reason(eligibility, job_country, is_remote)
+        if eligibility is not None
+        else None
+    )
     if knockout:
         eligible = 0
         reasons.append(f"eligibility risk ({knockout})")
