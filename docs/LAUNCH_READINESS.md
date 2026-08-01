@@ -293,9 +293,32 @@ Replaced with five real dated milestones, guarded by a test.
 and the refund wording matches the Stripe reality (30-day guarantee).
 **Unverified:** that the contact form actually delivers.
 
+### Lighthouse — PASS
+
+Measured in isolation against production, 2026-08-01:
+
+| page | perf | a11y | best-practices | SEO |
+|---|---|---|---|---|
+| `/` | 97 | 96 | 96 | 100 |
+| `/ats-check` | 100 | 95 | 96 | 100 |
+| `/resume-rescue` | 100 | 92 | 96 | 100 |
+| `/pricing` | 99 | 94 | 96 | 100 |
+
+Every category clears the bar (perf 80+, everything else 90+). `/pricing`
+diagnostics: FCP 1.1s, LCP 1.7s, TBT 60ms, CLS 0.062, server response 120ms,
+zero opportunities over 150ms. Notable because /pricing is the page that sat at
+72 before A/B assignment moved client-side.
+
+`scripts/lighthouse_check.ts` (`npm run lighthouse`) re-runs this with budgets.
+It is deliberately NOT a CI gate: Lighthouse throttles the CPU of the machine
+running it, so on a busy laptop the dip simply follows whichever page is
+audited first — /pricing read 99, 82, 71, 72, 80 and / read 73 across runs of
+the same unchanged deploy. A check that fails at random gets ignored. Run it on
+a quiet box when page weight or rendering mode changes.
+
 ### Not done
 
-Lighthouse on the four key pages; cookie/consent and suppression-list round trip.
+Cookie/consent and suppression-list round trip.
 
 ---
 
@@ -324,7 +347,35 @@ Site unaffected, health unaffected, and the fit check degrades to a friendly
 503 rather than hanging or leaking a stack trace. Before #214 a worker fault
 took the entire host down; now it is contained.
 
-**Not run:** the redis kill and the simulated OpenAI failure path.
+### Redis kill — PASS, after a fix
+
+First attempt exposed a real defect: with Redis stopped, `POST /api/ats-check`
+**hung for the full 45s client timeout** and returned nothing. Every rate
+limiter wrapped its Redis call in try/catch expecting to fail open, and every
+one of those catches was dead code — the client is built with
+`maxRetriesPerRequest: null`, which makes ioredis queue commands indefinitely
+while disconnected rather than rejecting. The promise never settles.
+
+Fixed with `redisTry()` (PR #221), a 1.5s deadline applied to all four public
+rate limiters. Re-tested on production with Redis stopped:
+
+```
+POST /api/ats-check → 200 in 4.0s, real score returned
+```
+
+Pages and health were unaffected throughout both runs.
+
+### OpenAI failure path — PASS (tested, not simulated in production)
+
+Deliberately breaking the LLM key against production would have broken real
+orders, so the refund path is proven by test instead
+(`__tests__/lib/rescue-refund.test.ts`, 9 cases): one retry before refunding,
+then Stripe refund + apology to the buyer + Telegram alert to the founder; the
+apology and alert still fire when the refund call itself fails, and the alert
+says "refund manually"; a $0 promo order is reported as nothing-to-refund
+rather than a failed refund; and no artifact is ever delivered after a failure.
+
+The happy path was verified with a real purchase (2m58s, see L2).
 
 ---
 
