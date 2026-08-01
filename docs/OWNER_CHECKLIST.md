@@ -37,12 +37,31 @@ domain Resend no longer accepts, which is why mail has gone nowhere since
 
 ### What to do
 
-1. **Resend → Domains → `resumeai-bot.com`**, find the **Inbound / Receiving**
-   section. It will show you an MX record, almost certainly
+0. **FIRST: turn "Enable Receiving" ON.** In Resend → Domains →
+   `resumeai-bot.com`, scroll to the bottom. There are three sections: Domain
+   Verification, **Enable Sending** (toggle green), and **Enable Receiving**
+   (toggle grey/off). *Receiving is off.* Resend does not show you the inbound
+   MX record until you turn it on — which is why you could not find one to add.
+
+   **This is the whole blocker.** Everything else on the email side is done.
+
+   ⚠️ Common mistake, already hit once: the MX under **Enable Sending** with the
+   name `send` pointing at `feedback-smtp.us-east-1.amazonses.com` is the
+   *outbound bounce* record. It is for sending, it already exists, and adding it
+   again gives you "An identical record already exists". It is **not** the
+   inbound record and it will never make receiving work.
+
+1. **Then Resend shows the inbound MX.** Under the now-enabled Receiving
+   section it will show an MX record, almost certainly
    `inbound-smtp.us-east-1.amazonaws.com` priority `10`, and tell you which
    hostname to put it on (`@` or a subdomain).
 2. **Cloudflare → DNS → Add record → MX**, exactly as Resend shows. Proxy does
    not apply to MX records.
+
+   The **Name** field is the part that matters. For the root domain it is `@`
+   (Cloudflare may display this as `resumeai-bot.com`). It is **not** `send` —
+   that is the sending record above. Getting this wrong is the difference
+   between "identical record already exists" and inbound actually working.
 3. Check it:
 
    ```bash
