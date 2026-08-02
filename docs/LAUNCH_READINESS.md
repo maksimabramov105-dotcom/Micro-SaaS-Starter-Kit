@@ -4,6 +4,26 @@
 Every PASS below has command output, a database row, or a live HTTP response behind it.
 Items I could not execute are marked **BLOCKED** with the reason — not PASS.
 
+---
+
+## Round 3 — 2026-08-02
+
+Three defects, each found by doing the thing the previous round had written down
+as "not done" rather than by re-reading code. All three were promises the
+product was making to a person and not keeping.
+
+| PR | Finding |
+|---|---|
+| #231 | `/terms` and the signup email promised a **$20 referral credit** no code path could grant. #90 swapped the reward to "referrer gets a free month" six weeks ago and updated the mechanics, the referrer's email and the dashboard — not the two surfaces aimed at the referred user. Offer now defined once in `lib/referral/offer.ts` and imported by every surface. |
+| #232 | **`/resume-rescue` scrolled sideways on any phone ≤410px** — the page that takes the $4.99. A file input's ~300px min-content width, unshrinkable as a flex item, forced the form to 404px inside a 358px column. Found by finally photographing the four pages (L1's open item). The mobile guard in `journey.spec.ts` had only ever loaded `/`; it now covers all four. |
+| #233 | The **exit-intent modal (T3, shipped 08-01) said "check your inbox" and sent nothing.** It posted `/api/lead`, which wrote `{email, source}` and stopped: no consent, no suppression check, no nurture enrollment — and `processNurtureQueue` requires all of them, so those addresses could never receive anything at all. Capture now runs the same `/api/ats-check` path as the on-page form, and the modal finally reports whether it fired. |
+
+**The pattern worth naming:** every one of the three was a surface that had been
+*half* changed — a reward swapped in the code but not the terms, a guard written
+for one route out of four, a capture UI shipped without the send behind it.
+Nothing was broken by a wrong line; each was broken by an unfinished change that
+still looked finished.
+
 **Verdict (round 2, after the purchase run): launch-ready on the code side.**
 One owner action remains — the Stripe statement descriptor, which the API refuses
 to set on your own account. Everything else below is verified against production.
@@ -87,8 +107,17 @@ hand-written pages — `seo_health` checks title/description *lengths* on the li
 site, and the thin-content guard only covers generated templates. Now verified
 live and guarded by 16 tests.
 
-**Not done:** mobile Playwright screenshots at 390x844. The responsive classes
-are in place but I have not photographed the four pages.
+**Done 2026-08-02 — and it found something.** All four pages photographed at
+390x844 against production. `/`, `/ats-check` and `/pricing` were clean;
+`/resume-rescue` had 29px of horizontal scroll on the page that takes the money
+(#232). The check that was supposed to cover this had only ever loaded `/`.
+
+Two smaller things seen while photographing, neither fixed:
+
+- the promo banner's `✕` is an **11x20px** tap target — under the WCAG 2.2
+  minimum of 24x24, and at 390px the banner's second line runs into it
+- `/pricing` renders the free tier as **"Free" stacked above "Free"** (the plan
+  name, then the price)
 
 ---
 
@@ -104,6 +133,17 @@ POST /api/ats-check  →  200, score 94
 Score renders, the free/locked split behaves as designed, sub-second. Email
 capture, lead row, report email and nurture scheduling are **unverified** —
 they need a real mailbox to read.
+
+**This matters more since 08-02**: the exit-intent modal now captures through
+this same path (#233), so it is the only send path the free funnel has. The
+production `Lead` table has exactly one row ever — an evidence lead from
+07-20, unsubscribed the same day — so nothing has exercised it in the wild.
+
+Verifying it costs one probe: a fit check submitted with a real address, which
+creates a `Lead` row, sends the t0 report, and schedules stage 1 for +2 days.
+That is a live email to a live inbox and a live nurture enrollment, so it wants
+the owner's go-ahead and a cleanup afterwards (delete the row, as the audit did
+with the test promos).
 
 ### b) Tripwire $4.99 — PASS, and it found the audit's worst defect
 
