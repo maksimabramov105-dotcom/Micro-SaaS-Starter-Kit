@@ -106,6 +106,23 @@ week, the fastest legitimate channel is you, manually:
 
 ---
 
+## Rotating the Search Console key
+
+The key lives at `/opt/resumeai/gsc-key.json` and feeds the impressions numbers
+in your Monday report. If you ever rotate it in Google Cloud:
+
+```bash
+scp ~/Downloads/<new-key>.json root@178.105.185.214:/opt/resumeai/gsc-key.json
+ssh root@178.105.185.214 'chown 1001 /opt/resumeai/gsc-key.json && chmod 400 /opt/resumeai/gsc-key.json'
+```
+
+**The chown is not optional.** The web container runs as uid 1001; `scp` writes
+the file as root. Without it the app cannot read the key, and because every
+failure in that path degrades gracefully, the only symptom is the report
+quietly printing "unavailable" forever. Nothing errors. Nothing alerts.
+
+Never paste the key into a chat — send the path, or scp it yourself.
+
 ## Things you might expect to be here, and are not
 
 - **`support@` forwarding** — done. It was silently discarding mail; now
