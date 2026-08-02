@@ -549,6 +549,59 @@ Audited against production 2026-07-31; findings in the LOG.
 
 ## LOG
 
+- 2026-08-02 — THREE HALF-FINISHED CHANGES, EACH LYING TO A PERSON. PRs
+  #231-#233. Continuing the launch-readiness (L) and traffic (T) work; every one
+  of these was found by executing something the previous round had listed as
+  "not done", not by re-reading code.
+  * **The referral offer said $20 in two places that could never pay it**
+    (#231). #90 swapped the reward from a double-sided $20 credit to "the
+    referrer gets 1 free month of Pro when their friend buys Pro annual" and
+    updated the mechanics, the referrer's email and the dashboard. It missed
+    `/terms` §7 — live for six weeks describing a double-sided program — and the
+    email every referred user gets at signup: subject "X gave you $20 off",
+    body "You have a $20 gift waiting", button "Claim your $20 credit" pointing
+    at /pricing. `qualifyReferral` creates exactly one coupon and it belongs to
+    the referrer. 0 Referral rows and 0 referred users on prod, so it was copy
+    that would have broken the first person to use it, not a live liability.
+    The offer now lives in `lib/referral/offer.ts` and `/terms`, the dashboard
+    and both emails import it — the `lib/pricing.ts` answer to the identical
+    failure mode. `/terms` had also been allowlisted out of the price guard for
+    "legal liability thresholds" it does not contain, which is part of why the
+    figures survived; exemption removed.
+  * **The $4.99 page scrolled sideways on any phone 410px and under** (#232),
+    found by finally photographing the four pages at 390x844 — L1's one open
+    item. A `<input type=file>` reports a ~300px min-content width and will not
+    shrink as a flex item, so beside its label it forced the purchase form to
+    404px inside a 358px column. The existing mobile check, named "landing is
+    usable on a mobile viewport", had only ever loaded `/` — the same shape as
+    #214, where the concurrency ceiling covered one of two routes. It now covers
+    /, /ats-check, /resume-rescue and /pricing, and names the offending element.
+    Verified against production before the fix: /resume-rescue failed at 30px
+    over, the other three passed.
+  * **The exit-intent modal said "check your inbox" and sent nothing** (#233) —
+    T3, shipped the day before. It posted `/api/lead`, which wrote
+    `{email, source}` and stopped: `consentAt` null, `nurtureStage` 0,
+    `nurtureNextAt` null — and `processNurtureQueue` requires a due
+    `nurtureNextAt` AND a non-null `consentAt`, so every address captured there
+    was enrolled in nothing and could never receive anything. Same endpoint also
+    skipped the suppression list (an unsubscribed address could be written
+    straight back in) and asked for no consent, six inches under a form that
+    requires a ticked box. Capture now runs the same `/api/ats-check` path as
+    the on-page form, and the success copy is gated on that call succeeding.
+    It shipped with NO telemetry, which is why nothing looked wrong: there were
+    zero exit_intent events to look at. Its own commit says it should be deleted
+    rather than loosened if it stops earning its place — undecidable without a
+    denominator, so exit_intent_shown now fires on open.
+  * The pattern: none of the three was a wrong line of code. Each was a change
+    that stopped halfway and still looked complete — a reward swapped in the
+    code but not the terms, a guard written for one route out of four, a capture
+    UI shipped without the send behind it.
+  * Still open on the free funnel: the capture path itself (lead row → report
+    email → nurture stage 1) has never run for a real person. Production has one
+    Lead row ever, an evidence lead from 07-20 unsubscribed the same day.
+    Verifying it means sending one real email and enrolling one real address —
+    owner's call, then delete the row.
+
 - 2026-07-31 (late) — PHASES 3 & 4 LARGELY SHIPPED. PRs #194-#197. All green,
   deployed, verified live on resumeai-bot.com.
   * **P3.1 — the longest-standing TODO in the codebase is closed.** Paid
