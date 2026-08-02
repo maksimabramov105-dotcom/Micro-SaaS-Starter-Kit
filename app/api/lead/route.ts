@@ -1,13 +1,29 @@
 /**
  * POST /api/lead
  *
- * Public email-capture endpoint for lead-magnet pages (e.g. the free
- * resume-teardown landing page). Stores { email, source } in the Lead table.
- * No auth — it's a top-of-funnel capture. Validates email format and length.
+ * Public email-capture endpoint for lead-magnet pages. No auth — it's a
+ * top-of-funnel capture.
+ *
+ * It used to be `prisma.lead.create({ email, source })` and nothing else, which
+ * made it a hole in three rules the rest of the funnel keeps:
+ *   - an address that had UNSUBSCRIBED could be written straight back in, because
+ *     nothing consulted the suppression list;
+ *   - `consentAt` stayed null, so C4 ("no email processing without explicit
+ *     consent") had nothing recorded to rely on;
+ *   - `nurtureStage`/`nurtureNextAt` kept their defaults (0 / null), and
+ *     processNurtureQueue only ever selects rows with a non-null nurtureNextAt
+ *     AND a non-null consentAt — so every address captured here was enrolled in
+ *     nothing and could never be emailed at all.
+ *
+ * It now goes through enrollLead(), which is where all three live. Note it still
+ * sends NOTHING itself: a caller that promises the visitor an email must send
+ * that email on its own path (see /api/ats-check, which returns the report and
+ * mails it). The exit-intent modal promised one here and none was ever sent.
  */
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
 import { redisTry } from '@/lib/redis'
+import { enrollLead } from '@/lib/nurture'
+import { trackEvent } from '@/lib/analytics-advanced'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const RATE_LIMIT = 10 // captures per IP per hour — generous for humans, caps spam
@@ -47,12 +63,26 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Please enter a valid email address.' }, { status: 400 })
   }
 
+  // C4, same rule /api/ats-check enforces: no address is processed for email
+  // without an explicit affirmative act by the person it belongs to.
+  if (obj.consent !== true) {
+    return NextResponse.json(
+      { error: 'Please tick the consent box so we’re allowed to email you.' },
+      { status: 400 },
+    )
+  }
+
   try {
-    await prisma.lead.create({ data: { email, source } })
+    // enrollLead returns null when the address is on the suppression list. That
+    // is a success from the visitor's side — we simply do not re-add someone who
+    // asked us to stop — so it answers ok without a row and without an event.
+    const lead = await enrollLead({ email, source })
+    if (lead) {
+      trackEvent({ event: 'lead_captured', properties: { leadId: lead.id, source } }).catch(() => {})
+    }
   } catch (err) {
-    console.error('[lead] create failed', err)
-    // Don't leak internals; treat as success-ish so the UX isn't blocked by
-    // transient/duplicate issues, but signal non-200 for real failures.
+    console.error('[lead] capture failed', err)
+    // Don't leak internals; signal non-200 so the caller can say something true.
     return NextResponse.json({ error: 'Could not save right now. Please try again.' }, { status: 500 })
   }
 

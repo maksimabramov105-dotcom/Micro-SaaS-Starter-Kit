@@ -15,7 +15,10 @@ export function LeadForm({ source }: { source: string }) {
       const res = await fetch('/api/lead', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, source }),
+        // /api/lead requires explicit consent (C4). This component is currently
+        // rendered nowhere; whoever revives it should also decide what actually
+        // sends the teardown, because /api/lead only records the address.
+        body: JSON.stringify({ email, source, consent: true }),
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
@@ -31,7 +34,7 @@ export function LeadForm({ source }: { source: string }) {
   if (status === 'done') {
     return (
       <p style={{ padding: '14px 16px', background: '#ecfdf5', borderRadius: 10, color: '#065f46' }}>
-        ✅ Thanks! Check your inbox — we&apos;ll send your free resume teardown shortly.
+        ✅ Thanks — you&apos;re on the list. We&apos;ll be in touch by email.
       </p>
     )
   }

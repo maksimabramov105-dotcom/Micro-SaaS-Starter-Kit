@@ -21,23 +21,55 @@
  *   - It offers something true: the rest of the report they already generated.
  *
  * If it does not earn its place on those terms, it should be deleted rather
- * than loosened.
+ * than loosened. Which requires being able to tell — hence exit_intent_shown
+ * next to exit_intent_captured: a numerator with no denominator cannot answer
+ * the question this modal has to keep answering.
+ *
+ * CAPTURE GOES THROUGH THE CALLER (onCapture), not straight to a lead endpoint.
+ * As first shipped this posted to /api/lead, which writes { email, source } and
+ * nothing else: no suppression check, no consent timestamp, no nurture
+ * enrollment, and — the part that mattered — no email. The modal said "Sent —
+ * check your inbox" and "The full breakdown is on its way" to someone who was
+ * never going to receive anything. The owner of the report is the page that
+ * generated it, so it hands the address back there and lets the real capture
+ * path run.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 const SEEN_KEY = 'rai_exit_intent_seen'
+
+/** Fire-and-forget; a blocked or failed beacon must never affect the modal. */
+function track(event: string, properties: Record<string, unknown>) {
+  try {
+    void fetch('/api/analytics/event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event, properties, page: location.pathname }),
+    }).catch(() => {})
+  } catch {
+    // non-critical
+  }
+}
 
 export function ExitIntent({
   /** Where the capture came from, recorded on the Lead row. */
   source,
   /** Only arm once the visitor has something worth finishing. */
   enabled = true,
+  /**
+   * Performs the actual capture. Resolves true when the address was accepted
+   * AND the promised email is on its way — the modal's success copy is only
+   * honest if this is honest.
+   */
+  onCapture,
 }: {
   source: string
   enabled?: boolean
+  onCapture: (email: string) => Promise<boolean>
 }) {
   const [open, setOpen] = useState(false)
   const [email, setEmail] = useState('')
+  const [consent, setConsent] = useState(false)
   const [state, setState] = useState<'idle' | 'sending' | 'done' | 'error'>('idle')
   const armed = useRef(false)
   const closeRef = useRef<HTMLButtonElement>(null)
@@ -68,12 +100,14 @@ export function ExitIntent({
       armed.current = true
       markSeen()
       setOpen(true)
+      // The denominator. Without it "3 captures" is a number with no meaning.
+      track('exit_intent_shown', { source })
       document.removeEventListener('mouseout', onLeave)
     }
 
     document.addEventListener('mouseout', onLeave)
     return () => document.removeEventListener('mouseout', onLeave)
-  }, [enabled])
+  }, [enabled, source])
 
   // Focus the close button when it opens: the way out should be the first thing
   // a keyboard or screen-reader user reaches.
@@ -94,15 +128,14 @@ export function ExitIntent({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    if (!email.trim()) return
+    if (!email.trim() || !consent) return
     setState('sending')
     try {
-      const res = await fetch('/api/lead', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), source }),
-      })
-      setState(res.ok ? 'done' : 'error')
+      // "done" is a promise that an email is coming, so it is only allowed when
+      // the capture path says one is.
+      const ok = await onCapture(email.trim())
+      setState(ok ? 'done' : 'error')
+      if (ok) track('exit_intent_captured', { source })
     } catch {
       setState('error')
     }
@@ -160,12 +193,25 @@ export function ExitIntent({
               />
               <button
                 type="submit"
-                disabled={state === 'sending'}
+                disabled={state === 'sending' || !consent}
                 className="rounded-lg bg-emerald-600 px-5 py-2 font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
               >
                 {state === 'sending' ? 'Sending…' : 'Send it'}
               </button>
             </form>
+            {/* The same explicit consent the on-page capture requires. The C4
+                rule is server-enforced on /api/ats-check, so a growth surface
+                cannot quietly hold itself to a lower standard than the form
+                six inches above it. */}
+            <label className="mt-3 flex items-start gap-2 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                checked={consent}
+                onChange={(e) => setConsent(e.target.checked)}
+                className="mt-1 shrink-0"
+              />
+              <span>Email me the full report. I can unsubscribe in one click.</span>
+            </label>
             {state === 'error' && (
               <p className="mt-2 text-sm text-red-600">
                 That did not go through. You can close this and carry on — nothing is lost.
