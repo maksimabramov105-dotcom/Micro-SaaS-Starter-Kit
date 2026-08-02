@@ -30,16 +30,31 @@ test.describe('Journey', () => {
     expect(jsErrors, jsErrors.join('\n')).toHaveLength(0)
   })
 
-  test('1b. landing is usable on a mobile viewport', async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 })
-    await page.goto('/')
-    await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
-    // No horizontal overflow (a common mobile-trust killer).
-    const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-    )
-    expect(overflow).toBeLessThanOrEqual(2)
-  })
+  /**
+   * This check used to cover '/' only — so /resume-rescue, the page that takes
+   * the $4.99, scrolled sideways on every phone 410px and under without anything
+   * noticing. Same shape as #214: a guard that covered one of the routes it was
+   * described as covering. It now covers every page a stranger can reach on the
+   * way to paying, and the fix belongs in the page, never in the assertion.
+   */
+  for (const path of ['/', '/ats-check', '/resume-rescue', '/pricing']) {
+    test(`1b. ${path} is usable on a mobile viewport (390x844)`, async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 })
+      await page.goto(path)
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+
+      // No horizontal overflow (a common mobile-trust killer).
+      const { overflow, widest } = await page.evaluate(() => {
+        const de = document.documentElement
+        // Name the widest offender — "overflow: 29" alone starts a bisect.
+        const widest = [...document.querySelectorAll('body *')]
+          .filter((el) => el.getBoundingClientRect().right > de.clientWidth + 2)
+          .map((el) => `${el.tagName}.${String(el.className).slice(0, 60)}`)[0]
+        return { overflow: de.scrollWidth - de.clientWidth, widest: widest ?? '' }
+      })
+      expect(overflow, `${path} overflows by ${overflow}px — widest: ${widest}`).toBeLessThanOrEqual(2)
+    })
+  }
 
   test('2. unauthenticated dashboard redirects to /login (auth gate)', async ({ page }) => {
     await page.goto('/dashboard')

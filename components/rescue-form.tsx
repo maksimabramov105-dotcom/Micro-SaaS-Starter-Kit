@@ -184,10 +184,21 @@ export function RescueForm() {
           className={inputClass}
           placeholder="Paste your resume text here..."
         />
-        <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+        {/* flex-wrap and min-w-0 are load-bearing, not tidying. A file input
+            reports a min-content width of ~300px (the browser's own "Choose
+            File — no file selected" control), and as a non-shrinkable flex item
+            next to the label it forced this form to 404px inside a 358px
+            column. Result: the $4.99 page — the one that takes money — scrolled
+            sideways on every phone 410px and under. */}
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
           <span>or upload PDF:</span>
-          <input type="file" accept="application/pdf" onChange={onPdfChange} className="text-sm" />
-          {pdf && <span className="text-green-600">✓ {pdf.name}</span>}
+          <input
+            type="file"
+            accept="application/pdf"
+            onChange={onPdfChange}
+            className="min-w-0 max-w-full text-sm"
+          />
+          {pdf && <span className="max-w-full break-all text-green-600">✓ {pdf.name}</span>}
         </div>
       </div>
 

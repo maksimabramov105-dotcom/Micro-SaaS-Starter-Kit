@@ -141,15 +141,18 @@ export function ResumeImport({
           <label className="mb-1.5 block text-sm font-medium text-slate-700">
             Upload a PDF
           </label>
-          <div className="flex items-center gap-3">
+          {/* Same non-shrinkable file input as components/rescue-form.tsx: it
+              fits alone on a phone, and stops fitting the moment a filename is
+              rendered beside it. Wrapping is what keeps that from overflowing. */}
+          <div className="flex flex-wrap items-center gap-3">
             <input
               ref={fileInput}
               type="file"
               accept="application/pdf"
               onChange={onPdfChange}
-              className="text-sm"
+              className="min-w-0 max-w-full text-sm"
             />
-            {pdf && <span className="text-sm text-emerald-600">✓ {pdf.name}</span>}
+            {pdf && <span className="max-w-full break-all text-sm text-emerald-600">✓ {pdf.name}</span>}
           </div>
         </div>
 
