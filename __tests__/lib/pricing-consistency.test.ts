@@ -32,7 +32,11 @@ const OUR_PRICE_STRINGS = [
  * legal thresholds and unit-cost math are unrelated to plan pricing.
  */
 const ALLOWLIST: { file: string; reason: string }[] = [
-  { file: 'app/terms/page.tsx', reason: 'legal liability thresholds, not plan prices' },
+  // app/terms/page.tsx was exempted here for "legal liability thresholds". It
+  // had none — the only figures on the page were the referral program's $20 and
+  // $200, which stayed six weeks after the reward stopped being a dollar credit
+  // at all. The page now imports lib/referral/offer.ts and carries no price, so
+  // the exemption is gone and the guard covers it like everything else.
   { file: 'app/dashboard/settings/automation/page.tsx', reason: 'per-application AI unit cost' },
   { file: 'app/dashboard/admin/page.tsx', reason: 'admin metric formatting ($0 placeholder)' },
   { file: 'app/admin/pmf/page.tsx', reason: 'admin dashboard money formatting helpers' },

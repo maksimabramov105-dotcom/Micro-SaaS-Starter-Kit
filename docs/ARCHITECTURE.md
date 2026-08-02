@@ -405,11 +405,21 @@ User clicks "Confirm refund" on /dashboard/billing
 
 ### Referral (in-house)
 
-Double-sided $20 credit: referrer earns when the referred user pays; referee gets $20 off their first subscription.
+**One-sided.** The REFERRER gets 1 free month of Pro, and only when the referred
+user buys **Pro annual**. The referred user gets nothing — no credit, no
+discount. Any other purchase (Pro monthly, Unlimited, the $4.99 rescue) leaves
+the referral `pending`, so it can still qualify if they upgrade to annual later.
+
+The offer is defined once in **`lib/referral/offer.ts`** and imported by
+`/terms`, the dashboard and both emails. It used to be a double-sided $20
+credit; #90 changed the mechanics and half the copy, and the half it missed —
+the terms of service and the referred user's email — went on promising $20 for
+six weeks. `__tests__/lib/referral-claims.test.ts` now fails if any surface
+describes an offer `offer.ts` does not define.
 
 | Model | Key fields |
 |---|---|
-| `Referral` | `referrerId`, `refereeId`, `status` (pending → qualified → rewarded / abused / clawback), `stripeCouponReferrerId/RefereeId` |
+| `Referral` | `referrerId`, `refereeId`, `status` (pending → qualified → rewarded / abused / clawback), `stripeCouponReferrerId` (`…RefereeId` exists in the schema and is now always null) |
 | `User` | `referralCode` (unique slug), `referralCount`, `referralEarned`, `referredById` |
 
 **Code flow:**
@@ -425,17 +435,18 @@ New user signs up
               ├─ validates code (not self-referral, not already referred)
               ├─ creates Referral { status: 'pending' }
               ├─ sets User.referredById
-              └─ sends referral-received email
+              └─ sends "who invited you" email (no offer — there isn't one)
 
 Stripe checkout.session.completed (first payment)
   └─► app/api/webhooks/stripe/route.ts
-        └─► qualifyReferral(userId, stripeCustomerId)  ← lib/referral/index.ts
+        └─► qualifyReferral(userId, stripeCustomerId, priceId)  ← lib/referral/index.ts
+              ├─ returns early unless priceId === Pro annual
               ├─ checks MAX_REFERRALS cap (10)
-              ├─ creates $20 Stripe coupon for referrer (idempotency key: referral-{id}-referrer)
-              ├─ creates $20 Stripe coupon for referee  (idempotency key: referral-{id}-referee)
-              ├─ applies both coupons via stripe.customers.update
+              ├─ creates ONE coupon: 100% off, repeating, 1 month, for the referrer
+              │  (idempotency key: referral-{id}-referrer-freemonth)
+              ├─ applies it via stripe.customers.update
               ├─ marks Referral { status: 'rewarded' }
-              ├─ increments User.referralCount, User.referralEarned
+              ├─ increments User.referralCount, User.referralEarned (+$19)
               └─ sends referral-qualified email to referrer
 
 charge.refunded within 30 days
