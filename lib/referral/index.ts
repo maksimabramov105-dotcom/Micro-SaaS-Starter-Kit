@@ -24,14 +24,18 @@ import { stripe } from '@/lib/stripe'
 import { getPlanById } from '@/lib/pricing'
 import { customAlphabet } from 'nanoid'
 import { sendReferralQualifiedEmail, sendReferralReceivedEmail } from './emails'
+import {
+  REFERRAL_FREE_MONTHS,
+  PRO_MONTHLY_VALUE_USD,
+  MAX_REFERRALS,
+  CLAWBACK_WINDOW_DAYS,
+} from './offer'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
+// All of them live in ./offer, which /terms and the emails import too — the
+// offer is described in one place or it drifts. See the note there.
 
-export const REFERRAL_FREE_MONTHS = 1        // reward: 1 free month of Pro
-export const PRO_MONTHLY_VALUE_USD = 19   // value of the free month (referralEarned tracking)
-export const MAX_REFERRALS = 10              // max rewarded referrals per user per lifetime
-export const REFERRAL_COOKIE = 'referral_code'
-export const CLAWBACK_WINDOW_DAYS = 30
+export * from './offer'
 
 /** Stripe price ID for Pro annual — a referral only rewards when the friend buys this. */
 export function proYearlyPriceId(): string | null {
@@ -87,7 +91,8 @@ export async function ensureReferralCode(userId: string): Promise<string> {
 /**
  * Called from lib/auth.ts `createUser` event when a referral_code cookie is present.
  * Creates a `Referral` row with status='pending' and links the new user to their referrer.
- * Also sends the referee the "welcome + $20 credit coming" email.
+ * Also sends the referee the "here is who invited you" email — which promises
+ * them nothing, because the reward is the referrer's.
  *
  * Silently no-ops on any invalid state (no referrer found, self-referral, etc.).
  */
@@ -133,7 +138,7 @@ export async function captureReferral(
     }),
   ])
 
-  // Send referee the "you've been referred, $20 credit when you subscribe" email
+  // Tell the referee who invited them. No offer attached — there isn't one.
   try {
     await sendReferralReceivedEmail({
       to: referee.email,
@@ -153,13 +158,13 @@ export async function captureReferral(
  * referee's FIRST payment (existingUser.firstPaidAt was null).
  *
  * Steps:
- * 1. Find pending Referral for this user
- * 2. Check referrer hasn't hit the cap
- * 3. Create $20 Stripe coupons for both parties (idempotent)
- * 4. Apply referee coupon to their Stripe customer now
- * 5. Apply referrer coupon to their Stripe customer
+ * 1. Bail unless the purchase was Pro annual — nothing else qualifies
+ * 2. Find pending Referral for this user
+ * 3. Check referrer hasn't hit the cap
+ * 4. Create ONE free-month coupon, for the referrer (idempotent)
+ * 5. Apply it to the referrer's Stripe customer
  * 6. Mark referral rewarded, update counters
- * 7. Send referrer the "you earned $20" email
+ * 7. Send referrer the "you earned a free month of Pro" email
  */
 export async function qualifyReferral(
   refereeUserId: string,

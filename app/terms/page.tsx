@@ -1,6 +1,15 @@
 import { SiteHeader } from '@/components/site-header'
 import { SITE_URL } from '@/lib/site'
 import { SiteFooter } from '@/components/site-footer'
+// Section 7 states the referral offer; lib/referral/offer.ts defines it. Legal
+// copy that restates the numbers instead of importing them is how this page
+// came to promise a $20 credit six weeks after the code stopped granting one.
+import {
+  MAX_REFERRALS,
+  CLAWBACK_WINDOW_DAYS,
+  QUALIFYING_PLAN_LABEL,
+  freeMonthsLabel,
+} from '@/lib/referral/offer'
 
 export const metadata = {
   title: 'Terms of Service — ResumeAI',
@@ -9,7 +18,7 @@ export const metadata = {
 }
 
 // Bump this date on any meaningful policy edit.
-const LAST_UPDATED = new Date('2026-05-25')
+const LAST_UPDATED = new Date('2026-08-02')
 
 export default function TermsPage() {
   return (
@@ -99,15 +108,21 @@ export default function TermsPage() {
             <section className="mt-8">
               <h2 className="text-2xl font-semibold mb-4">7. Referral Program</h2>
               <p>
-                We operate a double-sided referral program. When you refer a new user who subscribes
-                to a paid plan, both you and the referred user receive a $20 account credit applied
-                to future invoices. Credits are non-transferable and have no cash value.
+                We operate a one-sided referral program. When someone who signed up through your
+                referral link subscribes to <strong>{QUALIFYING_PLAN_LABEL}</strong>, you receive{' '}
+                <strong>{freeMonthsLabel()}</strong>, applied automatically to your next Pro
+                invoice. No other purchase qualifies, and the reward is not transferable and has no
+                cash value.
               </p>
               <p className="mt-3">
-                Referral rewards are capped at 10 successful referrals per account ($200 total
-                credit). We reserve the right to withhold or reverse credits in cases of suspected
-                abuse, self-referral, or fraud. Credits are clawed back if the referred user
-                requests a refund within 30 days of their first payment.
+                The person you refer receives no credit or discount. They pay the same price they
+                would have paid without a referral link.
+              </p>
+              <p className="mt-3">
+                Rewards are capped at {MAX_REFERRALS} rewarded referrals per account. We reserve the
+                right to withhold or reverse a reward in cases of suspected abuse, self-referral, or
+                fraud. A reward is clawed back if the referred user requests a refund within{' '}
+                {CLAWBACK_WINDOW_DAYS} days of their first payment.
               </p>
             </section>
 
