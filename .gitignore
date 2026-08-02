@@ -52,3 +52,6 @@ e2e/.auth/
 # Generated test output
 playwright-report/
 test-results/
+
+# GSC service-account key — mounted at runtime, never committed
+gsc-key.json

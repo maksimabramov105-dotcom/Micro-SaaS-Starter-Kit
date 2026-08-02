@@ -10,10 +10,9 @@
  * Everything here is computed from AnalyticsEvent rows we already write — no
  * new tracking, no third-party script, no cookie banner implications.
  *
- * Google Search Console is deliberately absent: it needs a service-account key
- * only the owner can create. The report says so explicitly rather than quietly
- * omitting the row, because a metric that silently disappears is worse than one
- * labelled missing.
+ * Google Search Console lines are passed in by the caller (see lib/seo/gsc.ts).
+ * They are the only signal that answers "is Google SHOWING these pages" —
+ * referrers see clicks only, and a page can rank for weeks before it is clicked.
  */
 import { prisma } from '@/lib/prisma'
 
@@ -111,7 +110,11 @@ export async function getTrafficSnapshot(days = 7, sitemapCount?: number): Promi
 }
 
 /** Render the traffic block for the weekly report. Phone-readable. */
-export function formatTrafficBlock(t: TrafficSnapshot, prev?: TrafficSnapshot): string[] {
+export function formatTrafficBlock(
+  t: TrafficSnapshot,
+  prev?: TrafficSnapshot,
+  gscLines: string[] = ['  GSC impressions       unavailable'],
+): string[] {
   const wow = (now: number, before: number | undefined) => {
     if (before === undefined || before === 0) return ''
     const d = Math.round(((now - before) / before) * 100)
@@ -126,7 +129,7 @@ export function formatTrafficBlock(t: TrafficSnapshot, prev?: TrafficSnapshot): 
     `  Total                  ${t.total}${wow(t.total, prev?.total)}`,
   ]
   if (t.indexedPages !== null) lines.push(`  Pages in sitemap       ${t.indexedPages}`)
-  lines.push('  GSC clicks/impr        pending owner GSC API access')
+  lines.push(...gscLines)
   if (t.bestPage) {
     lines.push(
       `  Best-converting page   ${t.bestPage.page} (${Math.round(t.bestPage.rate * 100)}% of ${t.bestPage.visits})`,
