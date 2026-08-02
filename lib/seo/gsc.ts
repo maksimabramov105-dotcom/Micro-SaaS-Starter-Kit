@@ -13,6 +13,17 @@
  * Everything degrades to null. A missing key, an expired key, a revoked
  * permission or a Google outage must never break the Monday email — the rest of
  * that report is still worth sending.
+ *
+ * KEY FILE OWNERSHIP — the thing that actually bit us. The web container runs
+ * as uid 1001, not root. A key written by root at mode 600 mounts fine, the env
+ * var resolves fine, and the file is visibly there — and the app still cannot
+ * open it (EACCES). Because every failure here degrades to null, the only
+ * symptom is the report quietly saying "unavailable" forever.
+ *
+ * On the host:
+ *   chown 1001 /opt/resumeai/gsc-key.json && chmod 400 /opt/resumeai/gsc-key.json
+ *
+ * Redo that after any key rotation. scp restores root ownership every time.
  */
 import crypto from 'crypto'
 import fs from 'fs'
