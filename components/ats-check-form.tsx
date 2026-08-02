@@ -42,15 +42,26 @@ export function AtsCheckForm() {
   const [result, setResult] = useState<Result | null>(null)
   const [emailed, setEmailed] = useState(false)
 
-  async function submit(withEmail: boolean) {
+  /**
+   * `override` exists for the exit-intent modal: it collects its own address and
+   * consent, and setState is async, so reading them off state here would submit
+   * the previous (empty) values. Returns whether the capture succeeded — the
+   * modal only claims "on its way" when this says so.
+   */
+  async function submit(
+    withEmail: boolean,
+    override?: { email: string; consent: boolean },
+  ): Promise<boolean> {
     setError('')
+    const captureEmail = (override?.email ?? email).trim()
+    const captureConsent = override?.consent ?? consent
     if (resumeText.trim().length < 40 || jobDescription.trim().length < 40) {
       setError('Please paste both your resume and the job description (a few sentences each).')
-      return
+      return false
     }
-    if (withEmail && (!email.trim() || !consent)) {
+    if (withEmail && (!captureEmail || !captureConsent)) {
       setError('Enter your email and tick the consent box to get the full report.')
-      return
+      return false
     }
     setLoading(true)
     try {
@@ -61,18 +72,23 @@ export function AtsCheckForm() {
           resumeText,
           jobDescription,
           jobTitle: jobTitle.trim() || undefined,
-          ...(withEmail ? { email: email.trim(), consent } : {}),
+          ...(withEmail ? { email: captureEmail, consent: captureConsent } : {}),
         }),
       })
       const data = await res.json()
       if (!res.ok) {
         setError(data.error || 'Something went wrong — please try again.')
-        return
+        return false
       }
       setResult(data as Result)
-      if (withEmail) setEmailed(true)
+      if (withEmail) {
+        setEmail(captureEmail)
+        setEmailed(true)
+      }
+      return true
     } catch {
       setError('Network error — please try again.')
+      return false
     } finally {
       setLoading(false)
     }
@@ -257,7 +273,14 @@ export function AtsCheckForm() {
       {/* T3: one last honest offer, and only once the visitor has a result
           worth finishing. Armed only when the report is still gated — someone
           who already unlocked it has nothing left to be offered. */}
-      <ExitIntent source="ats-check-exit" enabled={Boolean(result) && !result?.unlocked} />
+      <ExitIntent
+        source="ats-check-exit"
+        enabled={Boolean(result) && !result?.unlocked}
+        // Same path as the on-page capture: suppression honoured, consent
+        // recorded, nurture enrolled, report actually emailed. The modal used
+        // to POST /api/lead, which did none of those and sent nothing.
+        onCapture={(captured) => submit(true, { email: captured, consent: true })}
+      />
     </div>
   )
 }
