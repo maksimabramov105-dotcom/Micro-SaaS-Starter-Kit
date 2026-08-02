@@ -108,9 +108,20 @@ describe('formatTrafficBlock', () => {
     expect(formatTrafficBlock(snap, prev).join('\n')).not.toContain('Infinity')
   })
 
-  it('says GSC is missing rather than silently omitting the row', () => {
-    // A metric that quietly disappears is worse than one labelled missing.
-    expect(formatTrafficBlock(snap).join('\n')).toMatch(/GSC.*pending owner/)
+  it('always keeps a GSC row, labelled, rather than silently omitting it', () => {
+    // A metric that quietly disappears is worse than one labelled missing. The
+    // caller now supplies these lines (lib/seo/gsc.ts); the default stands in
+    // when Search Console cannot be reached.
+    expect(formatTrafficBlock(snap).join('\n')).toMatch(/GSC impressions\s+unavailable/)
+  })
+
+  it('renders the GSC lines the caller passes in', () => {
+    const out = formatTrafficBlock(snap, undefined, [
+      '  GSC impressions       1234 (+20% WoW)',
+      '  GSC clicks            56',
+    ]).join('\n')
+    expect(out).toContain('1234 (+20% WoW)')
+    expect(out).toContain('GSC clicks            56')
   })
 
   it('names the best-converting page and the worst error', () => {

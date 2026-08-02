@@ -7,6 +7,7 @@
  * daily-digest cron (see app/api/cron/daily-digest/route.ts) to ADMIN_EMAILS.
  */
 import { trackEvent } from '@/lib/analytics-advanced'
+import { getSearchConsole, formatGscLines } from '@/lib/seo/gsc'
 import { sendEmail } from '@/lib/email'
 import { getRevenueMetrics } from '@/lib/pmf/queries'
 import { getRevenueFunnel } from '@/lib/pmf/revenue-funnel'
@@ -51,9 +52,11 @@ export async function buildWeeklySnapshot(): Promise<WeeklySnapshot> {
     getTrafficSnapshot(7, await sitemapSize()),
     getTrafficSnapshot(14).catch(() => undefined),
   ])
+  // Never let a Google outage block the whole report.
+  const gsc = await getSearchConsole(7).catch(() => null)
   // 14d minus 7d is not the prior week, but it is the only comparison available
   // without storing history, and it is directionally right for a WoW arrow.
-  const traffic = formatTrafficBlock(thisWeek, lastWeek)
+  const traffic = formatTrafficBlock(thisWeek, lastWeek, formatGscLines(gsc))
 
   const lines = [
     `ResumeAI weekly metrics — ${new Date().toISOString().slice(0, 10)}`,
